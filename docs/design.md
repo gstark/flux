@@ -1,8 +1,8 @@
-# Standalone FLUX Tool — Design Document
+# FLUX Design Document
 
 ## Summary
 
-Extract FLUX from Bellows into a standalone autonomous agent orchestrator with built-in issue tracking, realtime UI, and its own MCP server.
+An autonomous agent orchestrator with built-in issue tracking, realtime UI, and its own MCP server.
 
 ## Decisions
 
@@ -18,12 +18,12 @@ Extract FLUX from Bellows into a standalone autonomous agent orchestrator with b
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────┐
 │            Bun Server (port 8042)               │
 │  ┌─────────────────────────────────────────┐    │      ┌──────────────┐
 │  │  React Frontend (HTML import)           │────│─────▶│              │
 │  │  - useQuery (realtime)                  │◀───│──────│   Convex     │
-│  │  - useMutation                          │    │      │   (cloud)    │
+│  │  - useMutation                          │    │      │              │
 │  └─────────────────────────────────────────┘    │      └──────────────┘
 │  ┌─────────────────────────────────────────┐    │             ▲
 │  │  MCP endpoint (/mcp)                    │    │             │
@@ -34,7 +34,7 @@ Extract FLUX from Bellows into a standalone autonomous agent orchestrator with b
 │  │  ├── Monitor   → stream-json parsing    │    │
 │  │  └── Feedback  → retro + review loop    │    │
 │  └─────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────┘
 ```
 
 - Single Bun.serve() process hosts everything: React frontend (via HTML import), MCP endpoint, orchestrator
@@ -910,189 +910,19 @@ interface AgentProcess {
 
 ---
 
-## Milestones
+## Post-MVP Enhancements
 
-### F1: Foundation — Scaffold + Convex + Issue CRUD
+Features deferred until core system is validated:
 
-**Goal**: Standing project with Convex schema and working issue management via Convex functions.
-
-**Work**:
-1. Initialize project: `bun init` in `tools/flux/`, set up package.json with React, Convex, Tailwind, DaisyUI
-2. `bunx convex init` (may need interactive setup)
-3. Implement full Convex schema (all tables above, including labels)
-4. Implement Convex query/mutation functions:
-   - `projects`: create, get, getBySlug
-   - `issues`: create, list, get, getByShortId, update, close, ready (with dep resolution), claim (atomic)
-   - `epics`: create, list, get, update, close
-   - `labels`: create, list, update, delete
-   - `deps`: add (with cycle detection), remove, listForIssue
-   - `sessions`: create, update, list, get (stubs for now)
-5. Font Awesome Pro kit in index.html
-6. Bun.serve() entry point (`src/server/index.ts`) with HTML import for web, health endpoint, MCP route stub
-7. Convex Node client setup (`src/server/convex.ts`)
-8. Seed project record and default labels:
-   ```typescript
-   const DEFAULT_LABELS = [
-     { name: "bug", color: "#dc2626" },      // red
-     { name: "feature", color: "#2563eb" },  // blue
-     { name: "chore", color: "#6b7280" },    // gray
-     { name: "friction", color: "#f59e0b" }, // amber
-   ];
-   ```
-
-**Checkpoint**: Can create/query/update issues and epics via Convex dashboard or `bunx convex run`.
-
----
-
-### F2: MCP Server — Agent-Usable Issue Tracking
-
-**Goal**: AI agents can manage issues entirely through Flux MCP tools.
-
-**Work**:
-1. MCP HTTP server on port 8042 using `@modelcontextprotocol/sdk`
-2. Standard MCP tool definitions using `@modelcontextprotocol/sdk`
-3. Implement all `issues_*` tools (including `issues_unstick`)
-4. Implement all `epics_*` tools
-5. Implement `labels_*` tools
-6. Implement `comments_*` tools
-7. Implement `deps_*` tools
-8. `_meta` in all responses (orchestrator status, timestamp)
-9. Register in `.mcp.json`
-10. Startup script: `bun run src/server/index.ts`
-
-**Checkpoint**: `mcp-cli call flux/issues_create '{"title":"test", "priority":"medium"}'` works. Full CRUD cycle via MCP. AI agents can use `issues_list`, `issues_ready`, etc.
-
----
-
-### F3: Orchestrator — Autonomous Agent Execution
-
-**Goal**: FLUX can autonomously pick up issues and run agent sessions, writing all session data to Convex.
-
-**Work**:
-1. Define `AgentProvider` interface (`src/server/orchestrator/agents/types.ts`)
-2. Implement `ClaudeCodeProvider` — spawn `claude` CLI with stream-json, PID tracking
-3. Port `monitor.ts` — parse stream-json stdout, extract metrics (turns, tokens, cost), update `lastHeartbeat`
-4. **Activity streaming**:
-   - In-memory buffer (last 500 lines)
-   - Write to tmp file for crash recovery (`/tmp/flux-session-{id}.log`)
-   - SSE endpoint (`/sse/activity`) for live output to browsers
-   - Web UI can tail the tmp file
-5. Scheduler — `ConvexClient.onUpdate()` subscription on `issues.ready` query, reacts when work appears
-6. Orchestrator lifecycle:
-   - Claim issue (atomic mutation, check return)
-   - Record `startHead`
-   - Spawn agent
-   - Monitor + heartbeat
-   - Parse structured response (disposition + note)
-   - Handle disposition per inference table
-   - Update `endHead`, write session completion
-7. MCP tools: `orchestrator_status`, `orchestrator_enable`, `orchestrator_stop`, `orchestrator_kill`
-8. MCP tools: `sessions_list`, `sessions_show`
-9. Port `recovery.ts` — on startup, detect orphaned sessions via `lastHeartbeat`, check PID lock files
-10. Backoff/circuit breaker for repeated failures (plain class, no globalThis)
-
-**Checkpoint**: `orchestrator_enable` starts the subscription. Create an issue → orchestrator claims it, spawns Claude Code, session appears in Convex with metrics and disposition. Live output streams via SSE. `orchestrator_kill` stops everything.
-
----
-
-### F4: Feedback Loop — Retro + Review
-
-**Goal**: After each agent session, FLUX runs a retrospective and review loop, creating follow-up issues from findings.
-
-**Work**:
-1. **Retro integration**: After work completes (disposition=done, has commits), resume the same session (`--resume {agentSessionId}`) with retro prompt
-   - Design retro prompt (see Agent Tenets for guidance)
-   - Update prompt to require structured JSON response
-   - Retro findings become follow-up issues with `sourceIssueId` set
-   - This is still the same session record (type="work")
-2. **Review loop**: After retro, start review sessions until clean or max iterations
-   - Each review is stateless — gets full diff (`startHead..HEAD`) and list of related issues
-   - Review prompt instructs: review code, fix inline or create issues, return structured response
-   - If review makes commits → `reviewIterations++`, loop again
-   - If no commits (or noop) → review passed
-   - If `reviewIterations >= maxReviewIterations` → status="stuck"
-3. **Structured response parsing**: Parse disposition + note from all sessions
-   - Work session: determines if we proceed to review or close as noop
-   - Review session: determines if we loop, pass, or fail
-4. **Follow-up issue creation**:
-   - From retro findings
-   - From review findings (if creating issue instead of fixing)
-   - All get `sourceIssueId` pointing to original issue
-5. Track `createdIssueIds` on sessions for traceability
-
-**Checkpoint**: Work session completes → retro runs (resumed) → review loop runs until clean or stuck → issue closes or gets stuck status. Follow-up issues appear with proper `sourceIssueId` linking.
-
----
-
-### F5a: React Frontend — Core Layout + Issues
-
-**Goal**: Working web UI for issue management with realtime updates.
-
-**Work**:
-1. React Router setup (BrowserRouter, routes in index.tsx)
-2. Convex React provider (`ConvexProvider`)
-3. Tailwind + DaisyUI component setup (index.css with @tailwind directives, daisyui plugin)
-4. Root layout component: sidebar nav, header, orchestrator status bar (shows enabled/running/idle)
-5. **Issues list**: table view with filters (status, priority, labels, epic), create modal, excludes soft-deleted
-6. **Issue detail**: fields, edit inline, dependency list (blocks/blocked-by), comments list, session history, actions (including delete with confirmation)
-7. **Comments**: display chronologically on issue detail, add comment form
-8. **Labels management**: combo-box style input, prefer existing labels, allow freeform
-9. **Defer/Undefer modals**: prompt for optional note, create comment if provided
-10. **Status badges in nav**: counts for deferred, stuck issues
-
-**Checkpoint**: Browse issues, create/edit/close from UI. Defer/undefer with notes. View comments. Two tabs open — changes in one appear instantly in the other.
-
----
-
-### F5b: React Frontend — Dashboard + Sessions
-
-**Goal**: Dashboard for orchestrator control and session visibility with live activity streaming.
-
-**Work**:
-1. **Dashboard**: orchestrator status, active session card with live output, quick stats (open/in_progress/closed/stuck)
-2. **Live activity stream**: SSE connection to `/sse/activity` for realtime agent output
-   - Parse Claude Code stream-json for rich rendering (tool calls, results, messages)
-   - Fallback to terminal-style output for other agents
-3. Orchestrator controls: enable/stop/kill buttons with confirmation for kill
-4. **Sessions list**: table with filters (status, agent, date range), columns for metrics (duration, tokens, cost), disposition badge
-5. **Session detail**: metrics card, disposition + note, created issues list, full transcript (from sessionEvents table, rendered with `ansi-to-react` for terminal styling)
-6. **Settings**: project config, scheduler config (agent, focusEpicId, maxReviewIterations)
-7. **Browser notifications** (Notification API):
-   - Sticky for exceptions: `new Notification("Issue stuck: ARCL-42", { requireInteraction: true, body: "Review loop exhausted" })`
-   - Non-sticky for progress: `new Notification("Session complete: ARCL-41", { body: "Implement user authentication" })` (body = issue title)
-
-**Checkpoint**: Control orchestrator from dashboard. Watch live agent output in realtime. View session history with metrics and dispositions. Browser notifications for key events.
-
----
-
-### F5c: React Frontend — Polish + Board (Stretch)
-
-**Goal**: Enhanced UX and optional kanban view.
-
-**Work**:
-1. **Issues board**: kanban by status with drag-drop (stretch)
-2. **Epics view**: list epics, drill into child issues
-3. Live session activity stream (if we add sessionEvents table)
-4. Keyboard shortcuts (j/k navigation, quick actions)
-5. Dark mode (DaisyUI theme toggle)
-6. Mobile-responsive layout
-
-**Checkpoint**: Full-featured UI with multiple views and polish.
-
----
-
-### F6: Integration + Cutover (after F5b)
-
-**Goal**: FLUX is fully integrated and ready for production use.
-
-**Work**:
-1. Final `.mcp.json` configuration
-2. CLAUDE.md updates — document Flux MCP tools usage
-3. Agent system prompt templates — reference Flux tools
-4. Startup documentation / scripts
-5. End-to-end validation: create issue via MCP → enable orchestrator → session runs → retro → review loop → follow-ups created → view everything in UI
-
-**Checkpoint**: Full autonomous loop works end-to-end. Agent creates issues, orchestrator runs sessions, feedback creates follow-ups, UI shows everything in realtime.
+- **Kanban board**: Drag-drop status changes
+- **Epics management**: Epic list view, drill-down to child issues
+- **Keyboard shortcuts**: j/k navigation, quick create (Cmd+Shift+N)
+- **Mobile responsive**: Layout adjustments for small screens
+- **Rich activity rendering**: Parse stream-json for tool call visualization
+- **Search**: Full-text search across issues (Cmd+K)
+- **Analytics**: Cost tracking dashboards, failure rate metrics
+- **Hard delete**: Background cleanup of soft-deleted issues
+- **Session archiving**: Auto-archive old session events
 
 ---
 

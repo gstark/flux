@@ -1,5 +1,9 @@
 # FLUX
 
+An autonomous agent orchestrator with built-in issue tracking, realtime UI, and its own MCP server.
+
+See [design.md](docs/design.md) for details.
+
 ## Core Principles: Coding With Intent
 
 **CRITICAL:** This methodology must be applied to ALL code. No exceptions.
