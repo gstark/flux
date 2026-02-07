@@ -2,15 +2,16 @@ import type { ReactNode } from "react";
 
 /**
  * Lightweight markdown renderer for issue descriptions, close reasons, and comments.
- * Supports: fenced code blocks, inline code, bold, italic, unordered/ordered lists.
+ * Supports: fenced code blocks, inline code, bold, italic, links (markdown & bare URLs), unordered/ordered lists.
  * No external dependencies — intentionally minimal for our use case.
  */
 
-/** Parse inline markdown (bold, italic, inline code) within a text string. */
+/** Parse inline markdown (bold, italic, inline code, links) within a text string. */
 function parseInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  // Regex matches: inline code, bold, or italic (in priority order)
-  const inlinePattern = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g;
+  // Regex matches (priority order): inline code, markdown link, bare URL, bold, italic
+  const inlinePattern =
+    /(`[^`]+`)|(\[[^\]]+\]\([^)]+\))|(https?:\/\/[^\s<>)\]]+)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g;
   let lastIndex = 0;
 
   for (const match of text.matchAll(inlinePattern)) {
@@ -30,6 +31,35 @@ function parseInline(text: string): ReactNode[] {
         >
           {full.slice(1, -1)}
         </code>,
+      );
+    } else if (full.startsWith("[")) {
+      // Markdown link: [text](url)
+      const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(full);
+      if (linkMatch) {
+        nodes.push(
+          <a
+            key={matchIndex}
+            href={linkMatch[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link link-primary"
+          >
+            {linkMatch[1]}
+          </a>,
+        );
+      }
+    } else if (/^https?:\/\//.test(full)) {
+      // Bare URL
+      nodes.push(
+        <a
+          key={matchIndex}
+          href={full}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link link-primary"
+        >
+          {full}
+        </a>,
       );
     } else if (full.startsWith("**")) {
       // Bold
