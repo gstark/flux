@@ -23,6 +23,12 @@ function EventLine({ event }: { event: KeyedStreamEvent }) {
           [{event.state}] {event.message}
         </div>
       );
+    default: {
+      const _exhaustive: never = event;
+      throw new Error(
+        `Unhandled event type: ${(_exhaustive as KeyedStreamEvent).type}`,
+      );
+    }
   }
 }
 
