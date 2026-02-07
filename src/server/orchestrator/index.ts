@@ -164,8 +164,11 @@ class Orchestrator {
     for (const listener of this.lifecycleListeners) {
       try {
         listener(event);
-      } catch {
-        // Remove broken listeners silently
+      } catch (err) {
+        console.error(
+          `[Orchestrator] Lifecycle listener threw on ${event.type} — removing:`,
+          err,
+        );
         this.lifecycleListeners.delete(listener);
       }
     }
@@ -1131,11 +1134,8 @@ class Orchestrator {
     // Notify SSE clients about the new monitor
     this.emitLifecycle({ type: "monitor_changed", monitor: reviewMonitor });
 
-    // Persist phase transition so re-adoption can route correctly
-    await getConvexClient().mutation(api.sessions.update, {
-      sessionId: active.sessionId,
-      phase: SessionPhase.Review,
-    });
+    // No phase persistence needed here — sessions.create above already
+    // set phase: SessionPhase.Review on the new record.
 
     // Fire-and-forget: handle review exit
     reviewProcess.wait().then(
