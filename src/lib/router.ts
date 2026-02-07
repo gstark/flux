@@ -6,6 +6,8 @@ import {
 } from "@tanstack/react-router";
 import type { Id } from "$convex/_generated/dataModel";
 import { AppShell } from "../components/AppShell";
+import { NotFound } from "../components/NotFound";
+import { RouteError } from "../components/RouteError";
 import { ActivityPage } from "../pages/ActivityPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
 import { IssuesPage } from "../pages/IssuesPage";
@@ -20,6 +22,7 @@ export interface RouterContext {
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: AppShell,
+  notFoundComponent: NotFound,
 });
 
 const indexRoute = createRoute({
@@ -34,42 +37,49 @@ const issuesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/issues",
   component: IssuesPage,
+  errorComponent: RouteError,
 });
 
 const issueDetailRoute = createRoute({
   getParentRoute: () => issuesRoute,
   path: "$issueId",
   component: IssueDetailPage,
+  errorComponent: RouteError,
 });
 
 const activityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/activity",
   component: ActivityPage,
+  errorComponent: RouteError,
 });
 
 const sessionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sessions",
   component: SessionsPage,
+  errorComponent: RouteError,
 });
 
 const sessionDetailRoute = createRoute({
   getParentRoute: () => sessionsRoute,
   path: "$sessionId",
   component: SessionDetailPage,
+  errorComponent: RouteError,
 });
 
 const labelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/labels",
   component: LabelsPage,
+  errorComponent: RouteError,
 });
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
   component: SettingsPage,
+  errorComponent: RouteError,
 });
 
 const routeTree = rootRoute.addChildren([
