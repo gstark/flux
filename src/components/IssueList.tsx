@@ -29,12 +29,29 @@ export function IssueList() {
   const [deferNote, setDeferNote] = useState("");
   const [deferring, setDeferring] = useState(false);
   const [deferError, setDeferError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (deferTargetId) noteRef.current?.focus();
   }, [deferTargetId]);
+
+  // Clear error timer on unmount
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
+  function showActionError(err: unknown) {
+    const msg =
+      err instanceof Error ? err.message : "An unexpected error occurred";
+    setActionError(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setActionError(null), 8000);
+  }
 
   function openDeferModal(issueId: Id<"issues">) {
     setDeferTargetId(issueId);
@@ -75,8 +92,8 @@ export function IssueList() {
         issueId,
         note: "Undeferred from UI",
       });
-    } catch {
-      // Error is visible via status not changing — realtime subscription handles UI update
+    } catch (err) {
+      showActionError(err);
     }
   }
 
@@ -112,6 +129,19 @@ export function IssueList() {
           </button>
         ))}
       </div>
+
+      {actionError && (
+        <div role="alert" className="alert alert-error text-sm">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => setActionError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {issues === undefined ? (
         <div className="flex justify-center p-8">
