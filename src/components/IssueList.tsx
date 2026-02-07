@@ -1,9 +1,9 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
 import { IssueStatus } from "$convex/schema";
-import { useProjectId } from "../lib/ProjectContext";
+import { CreateIssueModal } from "./CreateIssueModal";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 
@@ -19,7 +19,7 @@ const TABS: { label: string; value: StatusFilter }[] = [
 ];
 
 export function IssueList() {
-  const projectId = useProjectId();
+  const { projectId } = useRouteContext({ from: "__root__" });
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
 
   const issues = useQuery(api.issues.list, {
@@ -30,12 +30,15 @@ export function IssueList() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-xl">Issues</h2>
-        {issues && (
-          <span className="text-base-content/60 text-sm">
-            {issues.length} {issues.length === 1 ? "issue" : "issues"}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          <h2 className="font-semibold text-xl">Issues</h2>
+          {issues && (
+            <span className="text-base-content/60 text-sm">
+              {issues.length} {issues.length === 1 ? "issue" : "issues"}
+            </span>
+          )}
+        </div>
+        <CreateIssueModal />
       </div>
 
       <div role="tablist" className="tabs tabs-box">
