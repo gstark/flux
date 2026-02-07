@@ -97,17 +97,37 @@ export const ready = query({
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .collect();
 
-    return issues
-      .filter(
-        (i) =>
-          i.status === IssueStatus.Open &&
-          i.failureCount < maxFailures &&
-          i.deletedAt === undefined,
-      )
-      .sort((a, b) => {
-        const diff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-        return diff !== 0 ? diff : a._creationTime - b._creationTime;
-      });
+    const candidates = issues.filter(
+      (i) =>
+        i.status === IssueStatus.Open &&
+        i.failureCount < maxFailures &&
+        i.deletedAt === undefined,
+    );
+
+    // Exclude issues blocked by non-closed dependencies
+    const ready = [];
+    for (const issue of candidates) {
+      const blockerDeps = await ctx.db
+        .query("dependencies")
+        .withIndex("by_blocked", (q) => q.eq("blockedId", issue._id))
+        .collect();
+
+      let blocked = false;
+      for (const dep of blockerDeps) {
+        const blocker = await ctx.db.get(dep.blockerId);
+        if (blocker && blocker.status !== IssueStatus.Closed) {
+          blocked = true;
+          break;
+        }
+      }
+
+      if (!blocked) ready.push(issue);
+    }
+
+    return ready.sort((a, b) => {
+      const diff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      return diff !== 0 ? diff : a._creationTime - b._creationTime;
+    });
   },
 });
 

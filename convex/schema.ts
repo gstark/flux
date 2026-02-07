@@ -218,4 +218,11 @@ export default defineSchema({
     maxFailures: v.number(),
     maxReviewIterations: v.number(),
   }).index("by_project", ["projectId"]),
+
+  dependencies: defineTable({
+    blockerId: v.id("issues"),
+    blockedId: v.id("issues"),
+  })
+    .index("by_blocker", ["blockerId"])
+    .index("by_blocked", ["blockedId"]),
 });

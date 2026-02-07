@@ -438,6 +438,69 @@ const epics_close: ToolHandler = async (args, ctx) => {
   }
 };
 
+const deps_add: ToolHandler = async (args, ctx) => {
+  const { blockerId, blockedId } = args as {
+    blockerId: string;
+    blockedId: string;
+  };
+
+  try {
+    const depId = await ctx.convex.mutation(api.deps.add, {
+      blockerId: blockerId as Id<"issues">,
+      blockedId: blockedId as Id<"issues">,
+    });
+    // Fetch both issues for a useful response
+    const [blocker, blocked] = await Promise.all([
+      ctx.convex.query(api.issues.get, {
+        issueId: blockerId as Id<"issues">,
+      }),
+      ctx.convex.query(api.issues.get, {
+        issueId: blockedId as Id<"issues">,
+      }),
+    ]);
+    return ok(ctx, {
+      dependency: {
+        depId,
+        blocker: { issueId: blockerId, shortId: blocker?.shortId },
+        blocked: { issueId: blockedId, shortId: blocked?.shortId },
+      },
+    });
+  } catch (err) {
+    return error(String(err instanceof Error ? err.message : err));
+  }
+};
+
+const deps_remove: ToolHandler = async (args, ctx) => {
+  const { blockerId, blockedId } = args as {
+    blockerId: string;
+    blockedId: string;
+  };
+
+  try {
+    const result = await ctx.convex.mutation(api.deps.remove, {
+      blockerId: blockerId as Id<"issues">,
+      blockedId: blockedId as Id<"issues">,
+    });
+    return ok(ctx, { removed: result.deleted });
+  } catch (err) {
+    return error(String(err instanceof Error ? err.message : err));
+  }
+};
+
+const deps_listForIssue: ToolHandler = async (args, ctx) => {
+  const { issueId } = args as { issueId: string };
+
+  const result = await ctx.convex.query(api.deps.listForIssue, {
+    issueId: issueId as Id<"issues">,
+  });
+  return ok(ctx, {
+    blockers: result.blockers,
+    blocks: result.blocks,
+    blockerCount: result.blockers.length,
+    blocksCount: result.blocks.length,
+  });
+};
+
 // ── Export all implemented handlers ───────────────────────────────────
 
 export const handlers: Record<string, ToolHandler> = {
@@ -458,6 +521,9 @@ export const handlers: Record<string, ToolHandler> = {
   epics_show,
   epics_update,
   epics_close,
+  deps_add,
+  deps_remove,
+  deps_listForIssue,
   orchestrator_run,
   orchestrator_kill,
   orchestrator_status,
