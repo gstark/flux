@@ -77,6 +77,20 @@ class Orchestrator {
     this.provider = provider ?? new ClaudeCodeProvider();
   }
 
+  /**
+   * Assert that activeSession is set, returning the narrowed type.
+   * Throws immediately if null — fail fast per 'No Silent Fallbacks'.
+   */
+  private requireActiveSession(caller: string): ActiveSession {
+    if (!this.activeSession) {
+      throw new Error(
+        `[Orchestrator] ${caller}: activeSession is null — this is a bug. ` +
+          "The orchestrator should never reach this point without an active session.",
+      );
+    }
+    return this.activeSession;
+  }
+
   getStatus(): {
     state: OrchestratorState;
     schedulerEnabled: boolean;
@@ -420,7 +434,7 @@ class Orchestrator {
    * | done        | Yes      | auto-commit → retro → review               |
    */
   private async handleWorkExit(exitCode: number): Promise<boolean> {
-    const active = this.activeSession!;
+    const active = this.requireActiveSession("handleWorkExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = await resolveRepoRoot();
@@ -567,7 +581,7 @@ class Orchestrator {
    * Always proceeds to review regardless of retro outcome.
    */
   private async handleRetroExit(_exitCode: number): Promise<boolean> {
-    const active = this.activeSession!;
+    const active = this.requireActiveSession("handleRetroExit");
     const { sessionId, issue } = active;
     const convex = getConvexClient();
     const cwd = await resolveRepoRoot();
@@ -631,7 +645,7 @@ class Orchestrator {
    * | done        | Yes      | incrementReviewIterations, loop or mark stuck    |
    */
   private async handleReviewExit(exitCode: number): Promise<boolean> {
-    const active = this.activeSession!;
+    const active = this.requireActiveSession("handleReviewExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = await resolveRepoRoot();
@@ -790,7 +804,7 @@ class Orchestrator {
    * Retro is advisory — the agent reflects and may create follow-up issues.
    */
   private async startRetro(workNote: string): Promise<void> {
-    const active = this.activeSession!;
+    const active = this.requireActiveSession("startRetro");
     const cwd = await resolveRepoRoot();
 
     const retroPrompt = this.provider.buildRetroPrompt({
@@ -799,11 +813,18 @@ class Orchestrator {
       workNote,
     });
 
+    if (!active.agentSessionId) {
+      throw new Error(
+        `[Orchestrator] startRetro: agentSessionId is null for ${active.issue.shortId} — ` +
+          "cannot resume agent session without a session ID.",
+      );
+    }
+
     // Resume the same agent session for retro
     const retroProcess = this.provider.resume({
       cwd,
       prompt: retroPrompt,
-      sessionId: active.agentSessionId!,
+      sessionId: active.agentSessionId,
     });
 
     // Create a new monitor for the retro output, continuing sequence from work monitor
@@ -840,7 +861,7 @@ class Orchestrator {
    * with diff and related issues context.
    */
   private async startReviewLoop(): Promise<void> {
-    const active = this.activeSession!;
+    const active = this.requireActiveSession("startReviewLoop");
     const { issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = await resolveRepoRoot();
@@ -1033,7 +1054,13 @@ class Orchestrator {
       // Live PID with no in-memory handle — re-adopt it.
       // Only re-adopt one; others will be picked up on the next cycle.
       if (this.activeSession === null) {
-        const adopted = await this.adoptOrphanedSession(session, pid!);
+        if (!pid) {
+          console.error(
+            `[Orchestrator] Cannot re-adopt session ${session._id}: PID is null despite being alive`,
+          );
+          continue;
+        }
+        const adopted = await this.adoptOrphanedSession(session, pid);
         if (adopted) break;
       }
     }
