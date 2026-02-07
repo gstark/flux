@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
+import { CommentsThread } from "./CommentsThread";
 import { StatusBadge } from "./StatusBadge";
 
 type CloseTypeValue = (typeof CloseType)[keyof typeof CloseType];
@@ -349,6 +350,9 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           )}
         </dl>
       </div>
+
+      {/* Comments */}
+      <CommentsThread issueId={issueId} />
     </div>
   );
 }
