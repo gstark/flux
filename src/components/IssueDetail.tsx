@@ -5,6 +5,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
 import { callTool } from "../lib/api";
+import { formatTime } from "../lib/format";
 import { CommentsThread } from "./CommentsThread";
 import { DependencySection } from "./DependencySection";
 import {
@@ -35,10 +36,6 @@ const PRIORITY_OPTIONS: { value: PriorityValue; label: string }[] = [
   { value: IssuePriority.Medium, label: "Medium" },
   { value: IssuePriority.Low, label: "Low" },
 ];
-
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleString();
-}
 
 export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const { projectId } = useRouteContext({ from: "__root__" });

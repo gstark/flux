@@ -43,6 +43,10 @@ export function formatDuration(startedAt: number, endedAt?: number): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
+export function formatTime(ts: number): string {
+  return new Date(ts).toLocaleString();
+}
+
 export function formatRelativeTime(ts: number): string {
   const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (seconds < 60) return `${seconds}s ago`;

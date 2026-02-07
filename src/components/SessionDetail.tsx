@@ -8,7 +8,12 @@ import {
   SessionEventDirection,
   SessionStatus,
 } from "$convex/schema";
-import { formatDuration, phaseLabel, typeLabel } from "../lib/format";
+import {
+  formatDuration,
+  formatTime,
+  phaseLabel,
+  typeLabel,
+} from "../lib/format";
 import { type ParsedLine, parseStreamLine } from "../lib/parseStreamLine";
 import {
   FontAwesomeIcon,
@@ -51,10 +56,6 @@ function dispositionLabel(disposition: DispositionValue): {
       throw new Error(`Unhandled disposition: ${_exhaustive}`);
     }
   }
-}
-
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleString();
 }
 
 /** Render a single parsed output line (text, tool_use, tool_result). */
