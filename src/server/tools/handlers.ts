@@ -1,6 +1,7 @@
 import type { ConvexClient } from "convex/browser";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { IssueStatus } from "$convex/schema";
 import type { Orchestrator } from "../orchestrator";
 import type {
   CloseTypeValue,
@@ -318,16 +319,16 @@ const issues_defer: ToolHandler = async (args, ctx) => {
         `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
       );
     }
-    if (issue.status === "deferred") {
+    if (issue.status === IssueStatus.Deferred) {
       return error(`Issue ${issue.shortId} is already deferred.`);
     }
-    if (issue.status === "closed") {
+    if (issue.status === IssueStatus.Closed) {
       return error(`Cannot defer a closed issue (${issue.shortId}).`);
     }
 
     const updated = await ctx.convex.mutation(api.issues.update, {
       issueId: issueId as Id<"issues">,
-      status: "deferred",
+      status: IssueStatus.Deferred,
     });
     await ctx.convex.mutation(api.comments.create, {
       issueId: issueId as Id<"issues">,
@@ -352,7 +353,7 @@ const issues_undefer: ToolHandler = async (args, ctx) => {
         `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
       );
     }
-    if (issue.status !== "deferred") {
+    if (issue.status !== IssueStatus.Deferred) {
       return error(
         `Issue ${issue.shortId} is not deferred (status: ${issue.status}).`,
       );
@@ -360,7 +361,7 @@ const issues_undefer: ToolHandler = async (args, ctx) => {
 
     const updated = await ctx.convex.mutation(api.issues.update, {
       issueId: issueId as Id<"issues">,
-      status: "open",
+      status: IssueStatus.Open,
     });
     await ctx.convex.mutation(api.comments.create, {
       issueId: issueId as Id<"issues">,
