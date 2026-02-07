@@ -10,7 +10,11 @@ export function ProjectProvider({
   projectId: Id<"projects">;
   children: React.ReactNode;
 }) {
-  return <ProjectContext value={projectId}>{children}</ProjectContext>;
+  return (
+    <ProjectContext.Provider value={projectId}>
+      {children}
+    </ProjectContext.Provider>
+  );
 }
 
 export function useProjectId(): Id<"projects"> {
