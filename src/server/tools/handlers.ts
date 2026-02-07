@@ -301,22 +301,22 @@ const issues_retry: ToolHandler = async (args, ctx) => {
 const issues_defer: ToolHandler = async (args, ctx) => {
   const { issueId, note } = args as { issueId: string; note: string };
 
-  const issue = await ctx.convex.query(api.issues.get, {
-    issueId: issueId as Id<"issues">,
-  });
-  if (!issue) {
-    return error(
-      `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
-    );
-  }
-  if (issue.status === "deferred") {
-    return error(`Issue ${issue.shortId} is already deferred.`);
-  }
-  if (issue.status === "closed") {
-    return error(`Cannot defer a closed issue (${issue.shortId}).`);
-  }
-
   try {
+    const issue = await ctx.convex.query(api.issues.get, {
+      issueId: issueId as Id<"issues">,
+    });
+    if (!issue) {
+      return error(
+        `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
+      );
+    }
+    if (issue.status === "deferred") {
+      return error(`Issue ${issue.shortId} is already deferred.`);
+    }
+    if (issue.status === "closed") {
+      return error(`Cannot defer a closed issue (${issue.shortId}).`);
+    }
+
     const updated = await ctx.convex.mutation(api.issues.update, {
       issueId: issueId as Id<"issues">,
       status: "deferred",
@@ -335,21 +335,21 @@ const issues_defer: ToolHandler = async (args, ctx) => {
 const issues_undefer: ToolHandler = async (args, ctx) => {
   const { issueId, note } = args as { issueId: string; note: string };
 
-  const issue = await ctx.convex.query(api.issues.get, {
-    issueId: issueId as Id<"issues">,
-  });
-  if (!issue) {
-    return error(
-      `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
-    );
-  }
-  if (issue.status !== "deferred") {
-    return error(
-      `Issue ${issue.shortId} is not deferred (status: ${issue.status}).`,
-    );
-  }
-
   try {
+    const issue = await ctx.convex.query(api.issues.get, {
+      issueId: issueId as Id<"issues">,
+    });
+    if (!issue) {
+      return error(
+        `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
+      );
+    }
+    if (issue.status !== "deferred") {
+      return error(
+        `Issue ${issue.shortId} is not deferred (status: ${issue.status}).`,
+      );
+    }
+
     const updated = await ctx.convex.mutation(api.issues.update, {
       issueId: issueId as Id<"issues">,
       status: "open",
