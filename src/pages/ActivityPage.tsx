@@ -10,7 +10,7 @@ function EventLine({ event }: { event: KeyedStreamEvent }) {
   switch (event.type) {
     case "session_start":
       return (
-        <div className="mb-1 border-base-content/20 border-b pb-1 font-bold text-info">
+        <div className="mb-1 border-base-content/20 border-b pb-1 text-info/60 text-xs">
           ── Session {event.sessionId.slice(0, 8)} │ Issue: {event.issueId} │
           PID: {event.pid} ──
         </div>
@@ -36,7 +36,7 @@ function EventLine({ event }: { event: KeyedStreamEvent }) {
 }
 
 export function ActivityPage() {
-  const { events, connected, clear } = useActivityStream();
+  const { events, connected, clear, currentSession } = useActivityStream();
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef(true);
 
@@ -81,11 +81,19 @@ export function ActivityPage() {
         </button>
       </div>
 
+      {/* Sticky session banner */}
+      {currentSession && (
+        <div className="rounded-t-lg bg-neutral px-4 py-2 font-mono text-info text-sm">
+          ── Session {currentSession.sessionId.slice(0, 8)} │ Issue:{" "}
+          {currentSession.issueId} │ PID: {currentSession.pid} ──
+        </div>
+      )}
+
       {/* Terminal-style output */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="grow overflow-y-auto rounded-lg bg-neutral p-4 font-mono text-neutral-content text-sm leading-relaxed"
+        className={`min-h-0 grow overflow-y-auto ${currentSession ? "rounded-b-lg" : "rounded-lg"} bg-neutral p-4 font-mono text-neutral-content text-sm leading-relaxed`}
       >
         {events.length === 0 ? (
           <div className="text-base-content/40 italic">

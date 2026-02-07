@@ -66,9 +66,12 @@ function parseSSE<T>(
  */
 export function useActivityStream(): ActivityStreamState & {
   clear: () => void;
+  currentSession: SessionStartEvent | null;
 } {
   const [events, setEvents] = useState<KeyedStreamEvent[]>([]);
   const [connected, setConnected] = useState(false);
+  const [currentSession, setCurrentSession] =
+    useState<SessionStartEvent | null>(null);
   const retryDelay = useRef(1000);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -94,14 +97,14 @@ export function useActivityStream(): ActivityStreamState & {
           pid: number;
         }>(e, "session_start", setEvents);
         if (!data) return;
-        setEvents((prev) =>
-          appendEvent(prev, {
-            type: "session_start" as const,
-            sessionId: data.sessionId,
-            issueId: data.issueId,
-            pid: data.pid,
-          }),
-        );
+        const sessionEvent: SessionStartEvent = {
+          type: "session_start" as const,
+          sessionId: data.sessionId,
+          issueId: data.issueId,
+          pid: data.pid,
+        };
+        setCurrentSession(sessionEvent);
+        setEvents((prev) => appendEvent(prev, sessionEvent));
       });
 
       es.addEventListener("activity", (e: MessageEvent) => {
@@ -157,5 +160,5 @@ export function useActivityStream(): ActivityStreamState & {
     };
   }, []);
 
-  return { events, connected, clear };
+  return { events, connected, clear, currentSession };
 }
