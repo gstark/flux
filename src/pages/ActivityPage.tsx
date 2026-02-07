@@ -83,13 +83,18 @@ export function ActivityPage() {
     autoScroll.current = atBottom;
   }
 
-  // Auto-scroll to bottom when new events arrive
-  // biome-ignore lint/correctness/useExhaustiveDependencies: events.length triggers scroll on new events
+  // Auto-scroll to bottom when new events arrive.
+  // Use last event id (not events.length) so this fires even when the array
+  // is capped at MAX_EVENTS and length stops changing.
+  const lastEvent = events[events.length - 1];
+  const lastEventId = lastEvent !== undefined ? lastEvent.id : -1;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lastEventId is the stable trigger for new events
   useEffect(() => {
-    if (autoScroll.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (autoScroll.current && el) {
+      el.scrollTop = el.scrollHeight;
     }
-  }, [events.length]);
+  }, [lastEventId]);
 
   return (
     <div className="flex h-[calc(100vh-5rem)] flex-col">
