@@ -5,7 +5,6 @@
 An autonomous agent orchestrator with built-in issue tracking, realtime UI, and its own MCP server.
 
 - See [design.md](docs/design.md) for project overview and architecture.
-- See [milestones.md](docs/milestones.md) for the development roadmap.
 
 ## Core Principles: Coding With Intent
 

@@ -131,6 +131,10 @@ export function useActivityStream(): ActivityStreamState & {
           message: string;
         }>(e, "status", setEvents);
         if (!data) return;
+        // Clear the sticky session banner when no session is active
+        if (data.state === "idle" || data.state === "stopped") {
+          setCurrentSession(null);
+        }
         setEvents((prev) =>
           appendEvent(prev, {
             type: "status" as const,
