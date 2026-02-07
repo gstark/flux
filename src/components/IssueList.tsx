@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { IssueStatus } from "$convex/schema";
+import { useDismissableError } from "../hooks/useDismissableError";
 import { callTool } from "../lib/api";
 import { CreateIssueModal } from "./CreateIssueModal";
+import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faCirclePause, faCirclePlay } from "./Icon";
 import { LabelBadge } from "./LabelBadge";
 import { PriorityBadge } from "./PriorityBadge";
@@ -31,30 +33,18 @@ export function IssueList() {
   const [deferNote, setDeferNote] = useState("");
   const [deferring, setDeferring] = useState(false);
   const [deferError, setDeferError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const {
+    error: actionError,
+    showError: showActionError,
+    clearError: clearActionError,
+  } = useDismissableError();
   const [undeferringId, setUndeferringId] = useState<Id<"issues"> | null>(null);
-  const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (deferTargetId) noteRef.current?.focus();
   }, [deferTargetId]);
-
-  // Clear error timer on unmount
-  useEffect(() => {
-    return () => {
-      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    };
-  }, []);
-
-  function showActionError(err: unknown) {
-    const msg =
-      err instanceof Error ? err.message : "An unexpected error occurred";
-    setActionError(msg);
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    errorTimerRef.current = setTimeout(() => setActionError(null), 8000);
-  }
 
   function openDeferModal(issueId: Id<"issues">) {
     setDeferTargetId(issueId);
@@ -139,18 +129,7 @@ export function IssueList() {
         ))}
       </div>
 
-      {actionError && (
-        <div role="alert" className="alert alert-error text-sm">
-          <span>{actionError}</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs"
-            onClick={() => setActionError(null)}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      <ErrorBanner error={actionError} onDismiss={clearActionError} />
 
       {issues === undefined ? (
         <div className="flex justify-center p-8">

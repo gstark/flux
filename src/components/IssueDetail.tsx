@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
+import { useDismissableError } from "../hooks/useDismissableError";
 import { callTool } from "../lib/api";
 import { formatTime } from "../lib/format";
 import { CommentsThread } from "./CommentsThread";
 import { DependencySection } from "./DependencySection";
+import { ErrorBanner } from "./ErrorBanner";
 import {
   FontAwesomeIcon,
   faArrowLeft,
@@ -65,8 +67,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const [undeferring, setUndeferring] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  const [mutationError, setMutationError] = useState<string | null>(null);
-  const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const { error: mutationError, showError, clearError } = useDismissableError();
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -78,13 +79,6 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   useEffect(() => {
     if (editingDesc) descTextareaRef.current?.focus();
   }, [editingDesc]);
-
-  // Clear error timer on unmount
-  useEffect(() => {
-    return () => {
-      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    };
-  }, []);
 
   if (issue === undefined) {
     return (
@@ -130,14 +124,6 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
     } finally {
       setSaving(false);
     }
-  }
-
-  function showError(err: unknown) {
-    setMutationError(
-      err instanceof Error ? err.message : "An unexpected error occurred",
-    );
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    errorTimerRef.current = setTimeout(() => setMutationError(null), 8000);
   }
 
   function startEditTitle() {
@@ -271,18 +257,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Mutation error banner */}
-      {mutationError && (
-        <div role="alert" className="alert alert-error text-sm">
-          <span>{mutationError}</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs"
-            onClick={() => setMutationError(null)}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      <ErrorBanner error={mutationError} onDismiss={clearError} />
 
       {/* Header */}
       <div className="flex items-center gap-2">
