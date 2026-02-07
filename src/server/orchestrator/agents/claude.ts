@@ -30,7 +30,6 @@ export class ClaudeCodeProvider implements AgentProvider {
         cwd: opts.cwd,
         stdout: "pipe",
         stderr: "pipe",
-        env: { ...process.env, FLUX_AGENT_SESSION: "1" },
       },
     );
 
@@ -53,7 +52,6 @@ export class ClaudeCodeProvider implements AgentProvider {
         cwd: opts.cwd,
         stdout: "pipe",
         stderr: "pipe",
-        env: { ...process.env, FLUX_AGENT_SESSION: "1" },
       },
     );
 

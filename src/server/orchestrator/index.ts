@@ -8,6 +8,7 @@ import {
   getCurrentHead,
   getDiff,
   hasNewCommits,
+  isProcessAlive,
   resolveRepoRoot,
 } from "../git";
 import type { AgentProcess, AgentProvider, WorkPromptContext } from "./agents";
@@ -991,16 +992,7 @@ class Orchestrator {
 
     for (const session of sessions) {
       const pid = session.pid;
-      let alive = false;
-
-      if (pid) {
-        try {
-          process.kill(pid, 0);
-          alive = true;
-        } catch {
-          alive = false;
-        }
-      }
+      const alive = pid ? isProcessAlive(pid) : false;
 
       if (!alive) {
         await convex.mutation(api.sessions.update, {
@@ -1145,15 +1137,7 @@ class Orchestrator {
     resolveExit: (value: { exitCode: number }) => void,
   ): void {
     const interval = setInterval(async () => {
-      let alive = false;
-      try {
-        process.kill(pid, 0);
-        alive = true;
-      } catch {
-        alive = false;
-      }
-
-      if (alive) return; // Still running, keep polling
+      if (isProcessAlive(pid)) return; // Still running, keep polling
 
       clearInterval(interval);
 
