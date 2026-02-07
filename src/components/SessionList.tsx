@@ -41,7 +41,7 @@ function formatRelativeTime(ts: number): string {
 
 function formatDuration(startedAt: number, endedAt?: number): string {
   if (!endedAt) return "—";
-  const seconds = Math.floor((endedAt - startedAt) / 1000);
+  const seconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
