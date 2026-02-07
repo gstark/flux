@@ -34,10 +34,10 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault();
     const trimmed = draft.trim();
-    if (!trimmed) return;
+    if (!trimmed || submitting) return;
 
     setSubmitting(true);
     setSubmitError(null);
