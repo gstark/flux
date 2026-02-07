@@ -8,9 +8,98 @@
 
 export type ParsedLine =
   | { kind: "text"; text: string }
-  | { kind: "tool_use"; toolName: string; toolId: string }
+  | {
+      kind: "tool_use";
+      toolName: string;
+      toolId: string;
+      toolInput: Record<string, unknown> | null;
+    }
   | { kind: "tool_result"; toolName: string | null; content: string }
   | { kind: "skip" };
+
+/**
+ * Summarize a tool's input arguments into a concise display string.
+ * Returns null if there's nothing useful to show.
+ */
+export function summarizeToolInput(
+  toolName: string,
+  input: Record<string, unknown> | null,
+): string | null {
+  if (!input || Object.keys(input).length === 0) return null;
+
+  switch (toolName) {
+    case "Read":
+      return typeof input.file_path === "string"
+        ? input.file_path.replace(/.*\//, "")
+        : null;
+    case "Write":
+      return typeof input.file_path === "string"
+        ? input.file_path.replace(/.*\//, "")
+        : null;
+    case "Edit":
+      return typeof input.file_path === "string"
+        ? input.file_path.replace(/.*\//, "")
+        : null;
+    case "Bash":
+      return typeof input.command === "string"
+        ? truncate(input.command, 80)
+        : null;
+    case "Grep":
+      return typeof input.pattern === "string"
+        ? `/${truncate(input.pattern, 40)}/`
+        : null;
+    case "Glob":
+      return typeof input.pattern === "string"
+        ? truncate(input.pattern, 60)
+        : null;
+    case "WebFetch":
+      return typeof input.url === "string" ? truncate(input.url, 80) : null;
+    case "WebSearch":
+      return typeof input.query === "string" ? truncate(input.query, 80) : null;
+    case "Task":
+      return typeof input.description === "string"
+        ? truncate(input.description, 60)
+        : null;
+    case "TodoWrite":
+      return null; // Too noisy, not useful
+    default: {
+      // Generic: show first string-valued key that looks meaningful
+      const summary = genericInputSummary(input);
+      return summary ? truncate(summary, 80) : null;
+    }
+  }
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+/** For unknown tools, pick the most informative string field to display. */
+function genericInputSummary(input: Record<string, unknown>): string | null {
+  // Prefer short descriptive keys
+  const preferred = [
+    "path",
+    "file_path",
+    "name",
+    "query",
+    "command",
+    "url",
+    "description",
+    "content",
+  ];
+  for (const key of preferred) {
+    if (typeof input[key] === "string" && input[key]) {
+      return input[key] as string;
+    }
+  }
+  // Fall back to first short string value
+  for (const val of Object.values(input)) {
+    if (typeof val === "string" && val.length > 0 && val.length < 200) {
+      return val;
+    }
+  }
+  return null;
+}
 
 /**
  * Parse a single NDJSON line from Claude's stream-json output.
@@ -53,6 +142,7 @@ export function parseStreamLine(line: string): ParsedLine {
         kind: "tool_use",
         toolName: (block.name as string) ?? "unknown",
         toolId: (block.id as string) ?? "",
+        toolInput: extractToolInput(block.input),
       };
     }
     // text block start — no content yet, skip
@@ -82,6 +172,7 @@ export function parseStreamLine(line: string): ParsedLine {
           kind: "tool_use",
           toolName: (tool.name as string) ?? "unknown",
           toolId: (tool.id as string) ?? "",
+          toolInput: extractToolInput(tool.input),
         };
       }
     }
@@ -160,4 +251,13 @@ export function parseStreamLine(line: string): ParsedLine {
 
   // Not a recognized envelope — render as plain text
   return { kind: "text", text: line };
+}
+
+/** Safely extract tool input, returning null if not a valid object. */
+function extractToolInput(input: unknown): Record<string, unknown> | null {
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    const obj = input as Record<string, unknown>;
+    return Object.keys(obj).length > 0 ? obj : null;
+  }
+  return null;
 }

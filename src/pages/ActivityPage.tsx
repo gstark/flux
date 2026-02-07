@@ -1,45 +1,10 @@
 import { useEffect, useRef } from "react";
-import {
-  FontAwesomeIcon,
-  faCircleCheck,
-  faScrewdriverWrench,
-} from "../components/Icon";
+import { StreamContent } from "../components/StreamContent";
 import {
   type KeyedStreamEvent,
   useActivityStream,
 } from "../hooks/useActivityStream";
-import { type ParsedLine, parseStreamLine } from "../lib/parseStreamLine";
-
-/** Render a parsed stream-json line with appropriate formatting. */
-function ActivityContent({ parsed }: { parsed: ParsedLine }) {
-  switch (parsed.kind) {
-    case "text":
-      return (
-        <div className="whitespace-pre-wrap break-words">{parsed.text}</div>
-      );
-    case "tool_use":
-      return (
-        <div className="flex items-center gap-2 text-info">
-          <FontAwesomeIcon icon={faScrewdriverWrench} aria-hidden="true" />
-          <span className="font-semibold">{parsed.toolName}</span>
-        </div>
-      );
-    case "tool_result":
-      return (
-        <details className="group">
-          <summary className="cursor-pointer select-none text-success">
-            <FontAwesomeIcon icon={faCircleCheck} aria-hidden="true" />{" "}
-            <span className="text-base-content/60 text-xs">Tool result</span>
-          </summary>
-          <div className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded bg-base-300/20 p-2 text-xs">
-            {parsed.content}
-          </div>
-        </details>
-      );
-    case "skip":
-      return null;
-  }
-}
+import { parseStreamLine } from "../lib/parseStreamLine";
 
 function EventLine({ event }: { event: KeyedStreamEvent }) {
   switch (event.type) {
@@ -53,7 +18,7 @@ function EventLine({ event }: { event: KeyedStreamEvent }) {
     case "activity": {
       const parsed = parseStreamLine(event.content);
       if (parsed.kind === "skip") return null;
-      return <ActivityContent parsed={parsed} />;
+      return <StreamContent parsed={parsed} />;
     }
     case "status":
       return (

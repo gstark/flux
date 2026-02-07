@@ -14,16 +14,11 @@ import {
   phaseLabel,
   typeLabel,
 } from "../lib/format";
-import { type ParsedLine, parseStreamLine } from "../lib/parseStreamLine";
-import {
-  FontAwesomeIcon,
-  faArrowLeft,
-  faCircleCheck,
-  faScrewdriverWrench,
-  Icon,
-} from "./Icon";
+import { parseStreamLine } from "../lib/parseStreamLine";
+import { FontAwesomeIcon, faArrowLeft, Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 import { SessionStatusBadge } from "./SessionStatusBadge";
+import { StreamContent } from "./StreamContent";
 
 type DispositionValue = (typeof Disposition)[keyof typeof Disposition];
 
@@ -58,37 +53,6 @@ function dispositionLabel(disposition: DispositionValue): {
   }
 }
 
-/** Render a single parsed output line (text, tool_use, tool_result). */
-function OutputContent({ parsed }: { parsed: ParsedLine }) {
-  switch (parsed.kind) {
-    case "text":
-      return (
-        <div className="whitespace-pre-wrap break-words">{parsed.text}</div>
-      );
-    case "tool_use":
-      return (
-        <div className="flex items-center gap-2 text-info">
-          <FontAwesomeIcon icon={faScrewdriverWrench} aria-hidden="true" />
-          <span className="font-semibold">{parsed.toolName}</span>
-        </div>
-      );
-    case "tool_result":
-      return (
-        <details className="group">
-          <summary className="cursor-pointer select-none text-success">
-            <FontAwesomeIcon icon={faCircleCheck} aria-hidden="true" />{" "}
-            <span className="text-neutral-content/60 text-xs">Tool result</span>
-          </summary>
-          <div className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded bg-base-300/20 p-2 text-xs">
-            {parsed.content}
-          </div>
-        </details>
-      );
-    case "skip":
-      return null;
-  }
-}
-
 /** Render transcript event content: parse output JSON, render input as markdown. */
 function TranscriptEventContent({
   direction,
@@ -104,7 +68,7 @@ function TranscriptEventContent({
   // Output events are NDJSON lines from Claude's stream-json — parse and render
   const parsed = parseStreamLine(content);
   if (parsed.kind === "skip") return null;
-  return <OutputContent parsed={parsed} />;
+  return <StreamContent parsed={parsed} />;
 }
 
 /** Check if an output event should be displayed (non-skip after parsing). */
