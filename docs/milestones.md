@@ -62,15 +62,16 @@
 
 ---
 
-- [ ] ### F3b: Orchestrator — Auto-Scheduler
+- [x] ### F3b: Orchestrator — Auto-Scheduler
 
 **Goal**: Orchestrator automatically picks up ready issues.
 
 **Work**:
-- [ ] Scheduler — `ConvexClient.onUpdate()` subscription on `issues.ready` query
-- [ ] Claim + spawn loop (atomic mutation with check)
-- [ ] Recovery on startup — detect orphaned `in_progress` issues via `lastHeartbeat`, reset to `open`
-- [ ] MCP tools: `orchestrator_enable`, `orchestrator_stop`, `orchestrator_status`
+- [x] Scheduler — `ConvexClient.onUpdate()` subscription on `issues.ready` query
+- [x] Claim + spawn loop (atomic mutation with check)
+- [x] Recovery on startup — detect orphaned `in_progress` issues via PID liveness check, reset to `open`
+- [x] MCP tools: `orchestrator_enable`, `orchestrator_stop`, `issues_ready`
+- [x] `orchestratorConfig.enable` upsert fix + `orchestratorConfig.disable` mutation
 
 **Checkpoint**: `orchestrator_enable` → create issue → automatically claimed and worked. Stop → finishes current, then pauses.
 
