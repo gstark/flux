@@ -64,6 +64,27 @@ interface ActiveSession {
   timeoutTimer: ReturnType<typeof setTimeout> | null;
 }
 
+/**
+ * Lifecycle event emitted by the Orchestrator when session state changes.
+ * SSE clients subscribe to these to know when to start/stop piping monitor output.
+ */
+export type OrchestratorLifecycleEvent =
+  | {
+      type: "session_start";
+      sessionId: string;
+      issueId: string;
+      pid: number;
+      monitor: SessionMonitor;
+    }
+  | {
+      type: "session_end";
+      state: "stopped" | "idle";
+    }
+  | {
+      type: "monitor_changed";
+      monitor: SessionMonitor;
+    };
+
 /** Orchestrator manages claiming issues, spawning agents, and session lifecycle. */
 class Orchestrator {
   private state: OrchestratorState = OrchestratorState.Stopped;
@@ -76,6 +97,9 @@ class Orchestrator {
   private maxFailures = 3;
   private maxReviewIterations = 10;
   private sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes default
+  private lifecycleListeners = new Set<
+    (event: OrchestratorLifecycleEvent) => void
+  >();
 
   constructor(projectId: Id<"projects">, provider?: AgentProvider) {
     this.projectId = projectId;
@@ -125,6 +149,26 @@ class Orchestrator {
   /** Get the active session's monitor (for reading live buffer). */
   getActiveMonitor(): SessionMonitor | null {
     return this.activeSession?.monitor ?? null;
+  }
+
+  /** Subscribe to lifecycle events (session start/end). Returns unsubscribe function. */
+  onLifecycle(
+    callback: (event: OrchestratorLifecycleEvent) => void,
+  ): () => void {
+    this.lifecycleListeners.add(callback);
+    return () => this.lifecycleListeners.delete(callback);
+  }
+
+  /** Emit a lifecycle event to all listeners. */
+  private emitLifecycle(event: OrchestratorLifecycleEvent): void {
+    for (const listener of this.lifecycleListeners) {
+      try {
+        listener(event);
+      } catch {
+        // Remove broken listeners silently
+        this.lifecycleListeners.delete(listener);
+      }
+    }
   }
 
   /**
@@ -299,7 +343,16 @@ class Orchestrator {
       timeoutTimer: null,
     };
 
-    // 9. Wire up agentSessionId extraction from stream-json
+    // 9. Notify SSE clients of the new session
+    this.emitLifecycle({
+      type: "session_start",
+      sessionId: session._id,
+      issueId,
+      pid: agentProcess.pid,
+      monitor,
+    });
+
+    // 10. Wire up agentSessionId extraction from stream-json
     const activeRef = this.activeSession;
     monitor.onLine((line) => {
       if (activeRef.agentSessionId) return; // Already captured
@@ -327,13 +380,13 @@ class Orchestrator {
       }
     });
 
-    // 10. Fire-and-forget: handle agent exit in background
+    // 11. Fire-and-forget: handle agent exit in background
     agentProcess.wait().then(
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
     );
 
-    // 11. Start session timeout enforcement
+    // 12. Start session timeout enforcement
     this.startSessionTimeout();
 
     return { sessionId: session._id, pid: agentProcess.pid };
@@ -949,6 +1002,9 @@ class Orchestrator {
     active.monitorDone = retroMonitorDone;
     active.phase = SessionPhase.Retro;
 
+    // Notify SSE clients about the new monitor
+    this.emitLifecycle({ type: "monitor_changed", monitor: retroMonitor });
+
     // Persist phase transition so re-adoption can route correctly
     await getConvexClient().mutation(api.sessions.update, {
       sessionId: active.sessionId,
@@ -1072,6 +1128,15 @@ class Orchestrator {
     active.monitorDone = reviewMonitorDone;
     active.phase = SessionPhase.Review;
 
+    // Notify SSE clients about the new monitor
+    this.emitLifecycle({ type: "monitor_changed", monitor: reviewMonitor });
+
+    // Persist phase transition so re-adoption can route correctly
+    await getConvexClient().mutation(api.sessions.update, {
+      sessionId: active.sessionId,
+      phase: SessionPhase.Review,
+    });
+
     // Fire-and-forget: handle review exit
     reviewProcess.wait().then(
       ({ exitCode }) => this.handleExit(exitCode),
@@ -1130,6 +1195,12 @@ class Orchestrator {
       this.state = OrchestratorState.Idle;
       this.scheduleNext();
     }
+
+    // Notify SSE clients the session ended (after state transition so they see the new state)
+    this.emitLifecycle({
+      type: "session_end",
+      state: this.state as "stopped" | "idle",
+    });
   }
 
   /**
