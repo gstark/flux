@@ -1,4 +1,5 @@
 import { api } from "$convex/_generated/api";
+import type { Id } from "$convex/_generated/dataModel";
 import { getConvexClient } from "./convex";
 import { inferProjectSlug } from "./git";
 
@@ -7,7 +8,7 @@ function titleize(slug: string): string {
 }
 
 export async function ensureProject(): Promise<{
-  projectId: string;
+  projectId: Id<"projects">;
   projectSlug: string;
 }> {
   const client = getConvexClient();
