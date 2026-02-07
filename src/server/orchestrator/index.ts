@@ -373,9 +373,19 @@ class Orchestrator {
       } else if (phase === "review") {
         cleanExit = await this.handleReviewExit(exitCode);
       }
-      // Only clean up tmp file on success — keep on failure for debugging
+      // Only clean up tmp file on success — keep on failure for debugging.
+      // Isolated try-catch: a filesystem error here must NOT propagate to
+      // the outer catch, which calls finalize() — that would orphan an
+      // in-flight retro/review session.
       if (cleanExit) {
-        await monitor.cleanupTmpFile();
+        try {
+          await monitor.cleanupTmpFile();
+        } catch (cleanupErr) {
+          console.error(
+            "[Orchestrator] tmp file cleanup failed (non-fatal):",
+            cleanupErr,
+          );
+        }
       }
     } catch (err) {
       // Exit handler crashed — keep tmp file for debugging
