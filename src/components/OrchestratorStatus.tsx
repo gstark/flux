@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
@@ -136,12 +137,22 @@ export function OrchestratorStatus({
       ? `${PHASE_ABBREV[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`
       : stateLabel;
 
+  // Session link target
+  const activeSessionId = status?.activeSession?.sessionId ?? null;
+
   // Button visibility
   const showEnable = state !== "busy" && !enabled;
   const showStop = enabled;
   const showKill = state === "busy";
 
   // ── Render ───────────────────────────────────────────────────────
+
+  const statusLabel = (
+    <>
+      <span className="font-medium text-xs sm:hidden">{shortLabel}</span>
+      <span className="hidden font-medium text-sm sm:inline">{stateLabel}</span>
+    </>
+  );
 
   return (
     <output
@@ -159,9 +170,18 @@ export function OrchestratorStatus({
         <div className={`status status-lg ${dotClass}`} aria-hidden />
       </div>
 
-      {/* State label: condensed on mobile, full on desktop */}
-      <span className="font-medium text-xs sm:hidden">{shortLabel}</span>
-      <span className="hidden font-medium text-sm sm:inline">{stateLabel}</span>
+      {/* State label: link to active session when busy, plain text otherwise */}
+      {activeSessionId ? (
+        <Link
+          to="/sessions/$sessionId"
+          params={{ sessionId: activeSessionId }}
+          className="hover:underline"
+        >
+          {statusLabel}
+        </Link>
+      ) : (
+        statusLabel
+      )}
 
       {/* Error tooltip */}
       {error && (
