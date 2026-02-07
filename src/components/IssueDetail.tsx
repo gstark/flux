@@ -57,6 +57,8 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   );
   const [closeReason, setCloseReason] = useState("");
 
+  const [saving, setSaving] = useState(false);
+
   const [showDeferForm, setShowDeferForm] = useState(false);
   const [deferNote, setDeferNote] = useState("");
   const [deferring, setDeferring] = useState(false);
@@ -110,6 +112,9 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const isInProgress = currentIssue.status === IssueStatus.InProgress;
   const isStuck = currentIssue.status === IssueStatus.Stuck;
 
+  // Any mutation in flight — disables interactive controls
+  const busy = saving || deferring || undeferring || resetting;
+
   // Build a lookup map for label data
   const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
   const assignedLabels = (currentIssue.labelIds ?? [])
@@ -117,10 +122,13 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
     .filter((l): l is NonNullable<typeof l> => l !== undefined);
 
   async function handleLabelsChange(labelIds: Id<"labels">[]) {
+    setSaving(true);
     try {
       await updateIssue({ issueId, labelIds });
     } catch (err) {
       showError(err);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -140,10 +148,13 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   async function saveTitle() {
     const trimmed = titleDraft.trim();
     if (trimmed && trimmed !== currentIssue.title) {
+      setSaving(true);
       try {
         await updateIssue({ issueId, title: trimmed });
       } catch (err) {
         showError(err);
+      } finally {
+        setSaving(false);
       }
     }
     setEditingTitle(false);
@@ -166,10 +177,13 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   async function saveDesc() {
     const trimmed = descDraft.trim();
     if (trimmed !== (currentIssue.description ?? "")) {
+      setSaving(true);
       try {
         await updateIssue({ issueId, description: trimmed });
       } catch (err) {
         showError(err);
+      } finally {
+        setSaving(false);
       }
     }
     setEditingDesc(false);
@@ -182,14 +196,18 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   }
 
   async function handlePriorityChange(value: string) {
+    setSaving(true);
     try {
       await updateIssue({ issueId, priority: value as PriorityValue });
     } catch (err) {
       showError(err);
+    } finally {
+      setSaving(false);
     }
   }
 
   async function handleClose() {
+    setSaving(true);
     try {
       await closeIssue({
         issueId,
@@ -200,6 +218,8 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
       setCloseReason("");
     } catch (err) {
       showError(err);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -292,9 +312,10 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
         ) : (
           <button
             type="button"
-            className="cursor-pointer text-left font-semibold text-xl hover:text-primary"
+            className="cursor-pointer text-left font-semibold text-xl hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
             onClick={startEditTitle}
             title="Click to edit"
+            disabled={busy}
           >
             {currentIssue.title}
           </button>
@@ -308,7 +329,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           className="select select-sm"
           value={currentIssue.priority}
           onChange={(e) => handlePriorityChange(e.target.value)}
-          disabled={isClosed}
+          disabled={isClosed || busy}
         >
           {PRIORITY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -380,9 +401,10 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
         ) : (
           <button
             type="button"
-            className="w-full cursor-pointer rounded-lg bg-base-200 p-4 text-left hover:ring-1 hover:ring-primary/30"
+            className="w-full cursor-pointer rounded-lg bg-base-200 p-4 text-left hover:ring-1 hover:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={startEditDesc}
             title="Click to edit"
+            disabled={busy}
           >
             <Markdown
               content={currentIssue.description}
@@ -399,7 +421,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             type="button"
             className="btn btn-outline btn-info btn-sm"
             onClick={handleResetToOpen}
-            disabled={resetting}
+            disabled={busy}
           >
             {resetting ? (
               <span className="loading loading-spinner loading-xs" />
@@ -429,7 +451,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   type="button"
                   className="btn btn-warning btn-sm"
                   onClick={handleDefer}
-                  disabled={deferring}
+                  disabled={busy}
                 >
                   {deferring ? (
                     <span className="loading loading-spinner loading-xs" />
@@ -445,7 +467,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                     setShowDeferForm(false);
                     setDeferNote("");
                   }}
-                  disabled={deferring}
+                  disabled={busy}
                 >
                   Cancel
                 </button>
@@ -456,6 +478,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
               type="button"
               className="btn btn-outline btn-warning btn-sm"
               onClick={() => setShowDeferForm(true)}
+              disabled={busy}
             >
               <FontAwesomeIcon icon={faCirclePause} aria-hidden="true" />
               Defer Issue
@@ -471,7 +494,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             type="button"
             className="btn btn-outline btn-info btn-sm"
             onClick={handleUndefer}
-            disabled={undeferring}
+            disabled={busy}
           >
             {undeferring ? (
               <span className="loading loading-spinner loading-xs" />
@@ -503,6 +526,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   onChange={(e) =>
                     setCloseType(e.target.value as CloseTypeValue)
                   }
+                  disabled={saving}
                 >
                   {Object.entries(CLOSE_TYPE_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -523,14 +547,20 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   type="button"
                   className="btn btn-error btn-sm"
                   onClick={handleClose}
+                  disabled={saving}
                 >
-                  <FontAwesomeIcon icon={faCircleXmark} aria-hidden="true" />
+                  {saving ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <FontAwesomeIcon icon={faCircleXmark} aria-hidden="true" />
+                  )}
                   Confirm Close
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
                   onClick={() => setShowCloseForm(false)}
+                  disabled={saving}
                 >
                   Cancel
                 </button>
@@ -541,6 +571,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
               type="button"
               className="btn btn-outline btn-error btn-sm"
               onClick={() => setShowCloseForm(true)}
+              disabled={busy}
             >
               <FontAwesomeIcon icon={faCircleXmark} aria-hidden="true" />
               Close Issue
