@@ -942,10 +942,19 @@ class Orchestrator {
           endedAt: Date.now(),
           exitCode: -1,
         });
-        await convex.mutation(api.issues.update, {
+        // FLUX-25: Only reopen if the issue isn't already closed.
+        // A session can be orphaned after it completed work but before its
+        // status was updated to "completed" — reopening a closed issue
+        // would undo finished work.
+        const issue = await convex.query(api.issues.get, {
           issueId: session.issueId,
-          status: IssueStatus.Open,
         });
+        if (issue && issue.status !== IssueStatus.Closed) {
+          await convex.mutation(api.issues.update, {
+            issueId: session.issueId,
+            status: IssueStatus.Open,
+          });
+        }
         continue;
       }
 
@@ -1120,14 +1129,15 @@ class Orchestrator {
   }
 }
 
-// Module-level singleton — initialized once per server lifetime
-let _orchestrator: Orchestrator | undefined;
+// Survive hot reloads: globalThis persists across Bun HMR re-evaluations,
+// preventing ghost orchestrator instances with dangling Convex subscriptions.
+const _global = globalThis as unknown as { __fluxOrchestrator?: Orchestrator };
 
 export function getOrchestrator(projectId: Id<"projects">): Orchestrator {
-  if (!_orchestrator) {
-    _orchestrator = new Orchestrator(projectId);
+  if (!_global.__fluxOrchestrator) {
+    _global.__fluxOrchestrator = new Orchestrator(projectId);
   }
-  return _orchestrator;
+  return _global.__fluxOrchestrator;
 }
 
 export { Orchestrator, OrchestratorState };
