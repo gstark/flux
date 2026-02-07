@@ -237,9 +237,13 @@ export class SessionMonitor {
    * Skipped on failure paths so the file remains for debugging.
    */
   async cleanupTmpFile(): Promise<void> {
-    const file = Bun.file(this.tmpPath);
-    if (await file.exists()) {
+    try {
       await fs.unlink(this.tmpPath);
+    } catch (err: unknown) {
+      // ENOENT is fine — file already gone (e.g., manual cleanup or race)
+      if (err instanceof Error && "code" in err && err.code !== "ENOENT") {
+        throw err;
+      }
     }
   }
 }

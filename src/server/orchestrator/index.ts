@@ -365,15 +365,18 @@ class Orchestrator {
     // means the scheduler stops picking up new work.
     try {
       const { phase } = this.activeSession;
+      let cleanExit = false;
       if (phase === "work") {
-        await this.handleWorkExit(exitCode);
+        cleanExit = await this.handleWorkExit(exitCode);
       } else if (phase === "retro") {
-        await this.handleRetroExit(exitCode);
+        cleanExit = await this.handleRetroExit(exitCode);
       } else if (phase === "review") {
-        await this.handleReviewExit(exitCode);
+        cleanExit = await this.handleReviewExit(exitCode);
       }
-      // Phase completed — clean up tmp file (keep on failure for debugging)
-      await monitor.cleanupTmpFile();
+      // Only clean up tmp file on success — keep on failure for debugging
+      if (cleanExit) {
+        await monitor.cleanupTmpFile();
+      }
     } catch (err) {
       // Exit handler crashed — keep tmp file for debugging
       console.error(
@@ -395,7 +398,7 @@ class Orchestrator {
    * | done        | No       | close as noop                              |
    * | done        | Yes      | auto-commit → retro → review               |
    */
-  private async handleWorkExit(exitCode: number): Promise<void> {
+  private async handleWorkExit(exitCode: number): Promise<boolean> {
     const active = this.activeSession!;
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
@@ -437,7 +440,7 @@ class Orchestrator {
         maxFailures: this.maxFailures,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     const { disposition, note } = dispositionResult;
@@ -450,7 +453,7 @@ class Orchestrator {
         maxFailures: this.maxFailures,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     // ── Noop ──
@@ -461,7 +464,7 @@ class Orchestrator {
         closeReason: note,
       });
       this.finalize();
-      return;
+      return true;
     }
 
     // ── Done: check for commits ──
@@ -478,7 +481,7 @@ class Orchestrator {
         maxFailures: this.maxFailures,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     if (!hasCommits) {
@@ -489,7 +492,7 @@ class Orchestrator {
         closeReason: note,
       });
       this.finalize();
-      return;
+      return true;
     }
 
     // Done with commits — auto-commit dirty tree, then proceed to retro
@@ -522,13 +525,14 @@ class Orchestrator {
       }
       await this.startReviewLoop();
     }
+    return true;
   }
 
   /**
    * Handle retro session exit. Retro is advisory — never blocks the pipeline.
    * Always proceeds to review regardless of retro outcome.
    */
-  private async handleRetroExit(_exitCode: number): Promise<void> {
+  private async handleRetroExit(_exitCode: number): Promise<boolean> {
     const active = this.activeSession!;
     const { sessionId, issue } = active;
     const convex = getConvexClient();
@@ -565,6 +569,7 @@ class Orchestrator {
 
     // Always proceed to review, regardless of retro outcome
     await this.startReviewLoop();
+    return true;
   }
 
   /**
@@ -578,7 +583,7 @@ class Orchestrator {
    * | done        | No       | incrementReviewIterations, close as completed    |
    * | done        | Yes      | incrementReviewIterations, loop or mark stuck    |
    */
-  private async handleReviewExit(exitCode: number): Promise<void> {
+  private async handleReviewExit(exitCode: number): Promise<boolean> {
     const active = this.activeSession!;
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
@@ -622,7 +627,7 @@ class Orchestrator {
         reopenToOpen: false,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     const { disposition, note } = dispositionResult;
@@ -637,7 +642,7 @@ class Orchestrator {
         reopenToOpen: false,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     // ── Done or Noop: increment review iterations ──
@@ -654,7 +659,7 @@ class Orchestrator {
         closeReason: note || "Review passed clean — no issues found.",
       });
       this.finalize();
-      return;
+      return true;
     }
 
     // ── Done: check for new commits ──
@@ -672,7 +677,7 @@ class Orchestrator {
         reopenToOpen: false,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     if (!hasCommits) {
@@ -684,7 +689,7 @@ class Orchestrator {
           note || "Review complete, findings captured as follow-up issues.",
       });
       this.finalize();
-      return;
+      return true;
     }
 
     // Review made commits — auto-commit dirty tree
@@ -709,11 +714,12 @@ class Orchestrator {
         status: IssueStatus.Stuck,
       });
       this.finalize();
-      return;
+      return false;
     }
 
     // Loop: start another review
     await this.startReviewLoop();
+    return true;
   }
 
   // ── Retro & review lifecycle ─────────────────────────────────────────
