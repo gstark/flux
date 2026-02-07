@@ -51,8 +51,9 @@ export const update = mutation({
     maxReviewIterations: v.optional(v.number()),
     maxFailures: v.optional(v.number()),
     sessionTimeoutMs: v.optional(v.number()),
+    focusEpicId: v.optional(v.union(v.id("epics"), v.null())),
   },
-  handler: async (ctx, { projectId, ...patch }) => {
+  handler: async (ctx, { projectId, focusEpicId, ...patch }) => {
     const config = await ctx.db
       .query("orchestratorConfig")
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
@@ -60,10 +61,18 @@ export const update = mutation({
     if (!config) {
       throw new Error(`No orchestrator config found for project ${projectId}`);
     }
-    // Strip undefined values
-    const updates: Record<string, number> = {};
+    // Strip undefined values from numeric fields
+    const updates: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(patch)) {
       if (val !== undefined) updates[k] = val;
+    }
+    // Handle focusEpicId: null clears it, undefined means no change
+    if (focusEpicId !== undefined) {
+      if (focusEpicId === null) {
+        updates.focusEpicId = undefined;
+      } else {
+        updates.focusEpicId = focusEpicId;
+      }
     }
     await ctx.db.patch(config._id, updates);
     return { success: true };

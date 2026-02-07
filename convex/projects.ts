@@ -38,3 +38,10 @@ export const get = query({
       .unique();
   },
 });
+
+export const getById = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    return await ctx.db.get(projectId);
+  },
+});

@@ -12,6 +12,7 @@ import { IssuesPage } from "../pages/IssuesPage";
 import { LabelsPage } from "../pages/LabelsPage";
 import { SessionDetailPage } from "../pages/SessionDetailPage";
 import { SessionsPage } from "../pages/SessionsPage";
+import { SettingsPage } from "../pages/SettingsPage";
 
 export interface RouterContext {
   projectId: Id<"projects">;
@@ -65,12 +66,19 @@ const labelsRoute = createRoute({
   component: LabelsPage,
 });
 
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: SettingsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   issuesRoute.addChildren([issueDetailRoute]),
   activityRoute,
   sessionsRoute.addChildren([sessionDetailRoute]),
   labelsRoute,
+  settingsRoute,
 ]);
 
 export function createAppRouter(context: RouterContext) {

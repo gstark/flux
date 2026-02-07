@@ -43,6 +43,16 @@ export function Sidebar() {
           Sessions
         </Link>
       </li>
+      <li>
+        <Link
+          to="/settings"
+          activeProps={{ className: "menu-active" }}
+          inactiveProps={{ className: "" }}
+        >
+          <i className="fa-solid fa-gear" aria-hidden="true" />
+          Settings
+        </Link>
+      </li>
     </ul>
   );
 }
