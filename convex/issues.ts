@@ -114,15 +114,24 @@ export const list = query({
   handler: async (ctx, args) => {
     const cap = args.limit || 100;
 
-    // Collect all then filter — take() before filter would under-count
-    // when status or deletedAt filters discard rows.
-    const all = await ctx.db
-      .query("issues")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-
-    let issues = all.filter((i) => i.deletedAt === undefined);
-    if (args.status) issues = issues.filter((i) => i.status === args.status);
+    // Compound index eliminates in-memory deletedAt/status filtering
+    const { status } = args;
+    const issues = status
+      ? await ctx.db
+          .query("issues")
+          .withIndex("by_project_deletedAt_status", (q) =>
+            q
+              .eq("projectId", args.projectId)
+              .eq("deletedAt", undefined)
+              .eq("status", status),
+          )
+          .collect()
+      : await ctx.db
+          .query("issues")
+          .withIndex("by_project_deletedAt_status", (q) =>
+            q.eq("projectId", args.projectId).eq("deletedAt", undefined),
+          )
+          .collect();
 
     issues.sort((a, b) => {
       const diff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
@@ -141,17 +150,18 @@ export const ready = query({
     maxFailures: v.number(),
   },
   handler: async (ctx, { projectId, maxFailures }) => {
-    const issues = await ctx.db
+    // Compound index narrows to non-deleted, open issues; failureCount filtered in-memory
+    const openIssues = await ctx.db
       .query("issues")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .withIndex("by_project_deletedAt_status", (q) =>
+        q
+          .eq("projectId", projectId)
+          .eq("deletedAt", undefined)
+          .eq("status", IssueStatus.Open),
+      )
       .collect();
 
-    const candidates = issues.filter(
-      (i) =>
-        i.status === IssueStatus.Open &&
-        i.failureCount < maxFailures &&
-        i.deletedAt === undefined,
-    );
+    const candidates = openIssues.filter((i) => i.failureCount < maxFailures);
 
     // Exclude issues blocked by non-closed dependencies
     const ready = [];
@@ -355,17 +365,18 @@ export const search = query({
       )
       .take(cap);
 
-    // Secondary: scan for description matches (case-insensitive substring)
+    // Secondary: scan non-deleted issues for description matches (case-insensitive substring)
     const queryLower = args.query.toLowerCase();
-    const allProjectIssues = await ctx.db
+    const nonDeletedIssues = await ctx.db
       .query("issues")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project_deletedAt_status", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined),
+      )
       .collect();
 
     const titleMatchIds = new Set(titleMatches.map((i) => i._id));
-    const descriptionMatches = allProjectIssues.filter(
+    const descriptionMatches = nonDeletedIssues.filter(
       (i) =>
-        i.deletedAt === undefined &&
         !titleMatchIds.has(i._id) &&
         i.description?.toLowerCase().includes(queryLower),
     );

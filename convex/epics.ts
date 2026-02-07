@@ -31,20 +31,19 @@ export const list = query({
   handler: async (ctx, args) => {
     const cap = Math.min(args.limit ?? 50, 200);
 
-    let epics: Doc<"epics">[];
-    if (args.status) {
-      // Collect all then filter — take() before filter would under-count
-      const all = await ctx.db
-        .query("epics")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-      epics = all.filter((e) => e.status === args.status).slice(0, cap);
-    } else {
-      epics = await ctx.db
-        .query("epics")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .take(cap);
-    }
+    // Compound index narrows by status when provided, avoiding in-memory filter
+    const { status } = args;
+    const epics: Doc<"epics">[] = status
+      ? await ctx.db
+          .query("epics")
+          .withIndex("by_project_status", (q) =>
+            q.eq("projectId", args.projectId).eq("status", status),
+          )
+          .take(cap)
+      : await ctx.db
+          .query("epics")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+          .take(cap);
 
     // Most recent first
     epics.sort((a, b) => b._creationTime - a._creationTime);

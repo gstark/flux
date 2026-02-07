@@ -16,17 +16,22 @@ async function querySessions(
   ctx: QueryCtx,
   args: { projectId: Id<"projects">; status?: SessionStatusValue },
 ) {
-  const sessions = await ctx.db
-    .query("sessions")
-    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-    .collect();
+  // Compound index narrows by status when provided, avoiding in-memory filter
+  const { status } = args;
+  const sessions = status
+    ? await ctx.db
+        .query("sessions")
+        .withIndex("by_project_status", (q) =>
+          q.eq("projectId", args.projectId).eq("status", status),
+        )
+        .collect()
+    : await ctx.db
+        .query("sessions")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
 
-  const filtered = args.status
-    ? sessions.filter((s) => s.status === args.status)
-    : sessions;
-
-  filtered.sort((a, b) => b.startedAt - a.startedAt);
-  return filtered;
+  sessions.sort((a, b) => b.startedAt - a.startedAt);
+  return sessions;
 }
 
 export const create = mutation({

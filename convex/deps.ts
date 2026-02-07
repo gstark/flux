@@ -19,12 +19,14 @@ export const add = mutation({
     if (!blocker) throw new Error(`Blocker issue ${blockerId} not found`);
     if (!blocked) throw new Error(`Blocked issue ${blockedId} not found`);
 
-    // Check for duplicate
+    // Check for duplicate via compound index — single row lookup instead of collect+scan
     const existing = await ctx.db
       .query("dependencies")
-      .withIndex("by_blocker", (q) => q.eq("blockerId", blockerId))
-      .collect();
-    if (existing.some((d) => d.blockedId === blockedId)) {
+      .withIndex("by_blocker_blocked", (q) =>
+        q.eq("blockerId", blockerId).eq("blockedId", blockedId),
+      )
+      .first();
+    if (existing) {
       throw new Error(
         `Dependency already exists: ${blocker.shortId} blocks ${blocked.shortId}`,
       );
@@ -65,12 +67,13 @@ export const remove = mutation({
     blockedId: v.id("issues"),
   },
   handler: async (ctx, { blockerId, blockedId }) => {
-    const deps = await ctx.db
+    // Compound index: direct lookup instead of collect+find
+    const dep = await ctx.db
       .query("dependencies")
-      .withIndex("by_blocker", (q) => q.eq("blockerId", blockerId))
-      .collect();
-
-    const dep = deps.find((d) => d.blockedId === blockedId);
+      .withIndex("by_blocker_blocked", (q) =>
+        q.eq("blockerId", blockerId).eq("blockedId", blockedId),
+      )
+      .first();
     if (!dep) {
       throw new Error("Dependency not found.");
     }
@@ -94,7 +97,7 @@ export const listForIssue = query({
     // Issues that this one blocks (can't start until this one completes)
     const blockedDeps = await ctx.db
       .query("dependencies")
-      .withIndex("by_blocker", (q) => q.eq("blockerId", issueId))
+      .withIndex("by_blocker_blocked", (q) => q.eq("blockerId", issueId))
       .collect();
 
     // Resolve issue details for each

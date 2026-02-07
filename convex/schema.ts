@@ -150,6 +150,7 @@ export default defineSchema({
     deletedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
+    .index("by_project_deletedAt_status", ["projectId", "deletedAt", "status"])
     .index("by_epic", ["epicId"])
     .searchIndex("search_title", {
       searchField: "title",
@@ -178,7 +179,9 @@ export default defineSchema({
     status: epicStatusValidator,
     closedAt: v.optional(v.number()),
     closeReason: v.optional(v.string()),
-  }).index("by_project", ["projectId"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"]),
 
   llmCosts: defineTable({
     model: v.string(),
@@ -212,6 +215,7 @@ export default defineSchema({
     createdIssueIds: v.optional(v.array(v.id("issues"))),
   })
     .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"])
     .index("by_issue", ["issueId"]),
 
   sessionEvents: defineTable({
@@ -236,6 +240,6 @@ export default defineSchema({
     blockerId: v.id("issues"),
     blockedId: v.id("issues"),
   })
-    .index("by_blocker", ["blockerId"])
+    .index("by_blocker_blocked", ["blockerId", "blockedId"])
     .index("by_blocked", ["blockedId"]),
 });
