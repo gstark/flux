@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { IssueStatus } from "$convex/schema";
 import { StatusBadge } from "./StatusBadge";
 
 type DepDirection = "blockers" | "blocks";
@@ -114,12 +115,14 @@ export function DependencySection({
   );
 }
 
+type Status = (typeof IssueStatus)[keyof typeof IssueStatus];
+
 type DepItem = {
-  depId: string;
-  issueId: string;
+  depId: Id<"dependencies">;
+  issueId: Id<"issues">;
   shortId?: string;
   title?: string;
-  status?: string;
+  status?: Status;
 };
 
 function DepList({
@@ -157,14 +160,8 @@ function DepList({
       {items.length > 0 ? (
         <ul className="mt-1 flex flex-col gap-1">
           {items.map((item) => {
-            const blockerId =
-              direction === "blockers"
-                ? (item.issueId as Id<"issues">)
-                : issueId;
-            const blockedId =
-              direction === "blockers"
-                ? issueId
-                : (item.issueId as Id<"issues">);
+            const blockerId = direction === "blockers" ? item.issueId : issueId;
+            const blockedId = direction === "blockers" ? issueId : item.issueId;
             return (
               <li key={item.depId} className="flex items-center gap-2 text-sm">
                 <Link
@@ -177,7 +174,7 @@ function DepList({
                 <span className="truncate text-base-content/80">
                   {item.title}
                 </span>
-                {item.status && <StatusBadge status={item.status as never} />}
+                {item.status && <StatusBadge status={item.status} />}
                 {!disabled && (
                   <button
                     type="button"
@@ -285,11 +282,11 @@ function IssuePicker({
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-base-200"
-                onClick={() => onSelect(issue._id as Id<"issues">)}
+                onClick={() => onSelect(issue._id)}
               >
                 <span className="font-mono text-xs">{issue.shortId}</span>
                 <span className="truncate">{issue.title}</span>
-                <StatusBadge status={issue.status as never} />
+                <StatusBadge status={issue.status} />
               </button>
             </li>
           ))}
