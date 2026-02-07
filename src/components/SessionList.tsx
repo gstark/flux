@@ -2,13 +2,16 @@ import { Link, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
-import { SessionPhase, SessionStatus, SessionType } from "$convex/schema";
-import { formatRelativeTime } from "../lib/format";
+import { SessionStatus } from "$convex/schema";
+import {
+  formatDuration,
+  formatRelativeTime,
+  phaseLabel,
+  typeLabel,
+} from "../lib/format";
 import { SessionStatusBadge } from "./SessionStatusBadge";
 
 type StatusFilter = (typeof SessionStatus)[keyof typeof SessionStatus] | null;
-type SessionTypeValue = (typeof SessionType)[keyof typeof SessionType];
-type SessionPhaseValue = (typeof SessionPhase)[keyof typeof SessionPhase];
 
 const TABS: { label: string; value: StatusFilter }[] = [
   { label: "All", value: null },
@@ -16,44 +19,6 @@ const TABS: { label: string; value: StatusFilter }[] = [
   { label: "Completed", value: SessionStatus.Completed },
   { label: "Failed", value: SessionStatus.Failed },
 ];
-
-function typeLabel(type: SessionTypeValue): string {
-  switch (type) {
-    case SessionType.Work:
-      return "Work";
-    case SessionType.Review:
-      return "Review";
-    default: {
-      const _exhaustive: never = type;
-      throw new Error(`Unhandled session type: ${_exhaustive}`);
-    }
-  }
-}
-
-function phaseLabel(phase: SessionPhaseValue): string {
-  switch (phase) {
-    case SessionPhase.Work:
-      return "Work";
-    case SessionPhase.Retro:
-      return "Retro";
-    case SessionPhase.Review:
-      return "Review";
-    default:
-      return phase;
-  }
-}
-
-function formatDuration(startedAt: number, endedAt?: number): string {
-  if (!endedAt) return "—";
-  const seconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return `${hours}h ${remainingMinutes}m`;
-}
 
 export function SessionList() {
   const { projectId } = useRouteContext({ from: "__root__" });
@@ -130,9 +95,7 @@ export function SessionList() {
                   <td className="font-mono text-sm">{session._id.slice(-8)}</td>
                   <td>{typeLabel(session.type)}</td>
                   <td className="text-sm">
-                    {session.phase
-                      ? phaseLabel(session.phase as SessionPhaseValue)
-                      : "—"}
+                    {session.phase ? phaseLabel(session.phase) : "—"}
                   </td>
                   <td>
                     <SessionStatusBadge status={session.status} />

@@ -27,6 +27,7 @@ const closeTypeEnum = z.enum(Object.values(CloseType) as [string, ...string[]]);
 const sessionStatusEnum = z.enum(
   Object.values(SessionStatus) as [string, ...string[]],
 );
+
 // ── Derived TypeScript types for handler type assertions ─────────────
 export type IssueStatusValue = (typeof IssueStatus)[keyof typeof IssueStatus];
 export type IssuePriorityValue =
