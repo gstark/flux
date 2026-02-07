@@ -83,6 +83,21 @@ Read the Bun API docs in `node_modules/bun-types/docs/**.mdx`
 
 Do not add any new dependencies without asking first. This requires explicit permission from the user.
 
+### Git & Auto-Commit
+
+The orchestrator auto-commits any dirty working tree after each session phase (work, retro, review) via `autoCommitDirtyTree()` in `src/server/git.ts`. This safety net catches uncommitted changes, but uses a generic commit message.
+
+**Agents must commit their own changes before exiting.** Always use a single atomic command to prevent the auto-commit from racing between `git add` and `git commit`:
+
+```bash
+# CORRECT: atomic add + commit
+git add src/foo.ts src/bar.ts && git commit -m "FLUX-XX: Descriptive message"
+
+# WRONG: separate tool calls — auto-commit can fire between them
+git add src/foo.ts src/bar.ts   # ← orchestrator may auto-commit here
+git commit -m "FLUX-XX: ..."    # ← nothing left to commit
+```
+
 ## MCP Tools
 
 ### Morph

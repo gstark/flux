@@ -42,6 +42,12 @@ Every Flux MCP response includes \`_meta\` with system state. Check health befor
 ## Commit Guidance
 Commit your changes before ending the session. Use clear, descriptive commit messages. If you cannot complete the task, commit any partial progress with a WIP prefix so work is not lost.
 
+**Important:** The Flux orchestrator auto-commits any dirty working tree after your session ends with a generic message. To ensure your commits have proper messages, always use a single atomic command:
+\`\`\`bash
+git add <files> && git commit -m "YOUR-MESSAGE"
+\`\`\`
+Never separate \`git add\` and \`git commit\` into two tool calls — the orchestrator may auto-commit between them, stealing your staged changes.
+
 ## Flux MCP Tools
 You have access to the \`flux\` MCP server. Use it to:
 - Search related issues: \`issues_search\`, \`issues_list\`
@@ -218,6 +224,7 @@ Priority for follow-up issues:
 
 ## Commit Guidance
 If you make inline fixes, commit them with clear messages. Each commit should be a logical unit.
+Always use a single atomic command: \`git add <files> && git commit -m "MESSAGE"\` — never separate add and commit into two calls.
 
 ## Flux MCP Tools
 Use the \`flux\` MCP server to:
