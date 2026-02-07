@@ -63,6 +63,16 @@ export const issuePriorityValidator = v.union(
   v.literal(IssuePriority.Low),
 );
 
+export const EpicStatus = {
+  Open: "open",
+  Closed: "closed",
+} as const;
+
+export const epicStatusValidator = v.union(
+  v.literal(EpicStatus.Open),
+  v.literal(EpicStatus.Closed),
+);
+
 export const CloseType = {
   Completed: "completed",
   Noop: "noop",
@@ -123,6 +133,15 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_project_name", ["projectId", "name"]),
+
+  epics: defineTable({
+    projectId: v.id("projects"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    status: epicStatusValidator,
+    closedAt: v.optional(v.number()),
+    closeReason: v.optional(v.string()),
+  }).index("by_project", ["projectId"]),
 
   llmCosts: defineTable({
     model: v.string(),
