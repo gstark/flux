@@ -225,6 +225,7 @@ function LabelRow({
           <button
             type="button"
             className="btn btn-ghost btn-sm"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setEditing(false)}
           >
             Cancel
