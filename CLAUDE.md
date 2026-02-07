@@ -98,6 +98,100 @@ git add src/foo.ts src/bar.ts   # ← orchestrator may auto-commit here
 git commit -m "FLUX-XX: ..."    # ← nothing left to commit
 ```
 
+## UI Component Patterns (Biome A11y)
+
+Biome's recommended a11y rules are enabled. These patterns cause repeated lint failures when agents don't follow them upfront. Get them right on the first pass.
+
+### No `autoFocus` prop — use `useRef` + `useEffect`
+
+Biome's `noAutofocus` rule bans the `autoFocus` prop. Use a ref instead:
+
+```tsx
+// WRONG — biome error: noAutofocus
+<input autoFocus />
+
+// CORRECT
+const inputRef = useRef<HTMLInputElement>(null);
+useEffect(() => { inputRef.current?.focus(); }, []);
+<input ref={inputRef} />
+```
+
+### Non-null assertions in closures — capture to a `const`
+
+Biome's `noNonNullAssertion` catches `ref.current!` and `state!` patterns. After a null guard, capture to a local const:
+
+```tsx
+// WRONG — biome error: noNonNullAssertion
+if (!dialogRef.current) return;
+dialogRef.current!.close();
+
+// CORRECT — capture after guard
+const dialog = dialogRef.current;
+if (!dialog) return;
+dialog.close();
+```
+
+### `onClick` on non-interactive elements needs `onKeyDown`
+
+Biome's `useKeyWithClickEvents` requires keyboard support alongside click handlers on non-interactive elements. Prefer using `<button>` instead of adding `onKeyDown` to a `<div>`:
+
+```tsx
+// WRONG — biome error: useKeyWithClickEvents
+<div onClick={handleClick}>Click me</div>
+
+// WRONG — patching a div with keyboard handler
+<div onClick={handleClick} onKeyDown={handleKey} tabIndex={0} role="button">
+
+// CORRECT — use a real button
+<button type="button" onClick={handleClick} className="btn">Click me</button>
+```
+
+### Use semantic elements, not ARIA roles on `<div>`
+
+Biome's `noNoninteractiveElementToInteractiveRole` bans adding interactive roles like `role="button"` to `<div>`, `<h2>`, etc. Use the actual interactive element:
+
+```tsx
+// WRONG — biome error: noNoninteractiveElementToInteractiveRole
+<div role="button" onClick={handleClick}>Save</div>
+<h2 role="button" onClick={toggle}>Toggle</h2>
+
+// CORRECT
+<button type="button" onClick={handleClick}>Save</button>
+<button type="button" onClick={toggle} className="text-xl font-bold">Toggle</button>
+```
+
+Exception: `role="alert"` on `<div>` is fine — it's a live-region role, not interactive.
+
+### Labels need `htmlFor` + matching `id`
+
+Biome's `noLabelWithoutControl` requires labels to reference their input. Use DaisyUI's `fieldset`/`legend` pattern when possible, or explicit `htmlFor`:
+
+```tsx
+// WRONG — biome error: noLabelWithoutControl
+<label>Email</label>
+<input type="email" />
+
+// CORRECT — htmlFor + id
+<label htmlFor="email-input">Email</label>
+<input id="email-input" type="email" />
+
+// PREFERRED — DaisyUI fieldset (no htmlFor needed)
+<fieldset className="fieldset">
+  <legend className="fieldset-legend">Email</legend>
+  <input type="email" className="input input-bordered w-full" />
+</fieldset>
+```
+
+### Quick reference
+
+| Biome Rule | Fix |
+|---|---|
+| `noAutofocus` | `useRef` + `useEffect` instead of `autoFocus` prop |
+| `noNonNullAssertion` | Capture to a `const` after null guard |
+| `useKeyWithClickEvents` | Use `<button>` instead of `<div onClick>` |
+| `noNoninteractiveElementToInteractiveRole` | Use semantic elements (`<button>`, `<a>`) |
+| `noLabelWithoutControl` | `htmlFor` + `id`, or DaisyUI `fieldset`/`legend` |
+
 ## MCP Tools
 
 ### Morph

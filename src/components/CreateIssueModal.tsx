@@ -1,6 +1,6 @@
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import { IssuePriority } from "$convex/schema";
 
@@ -18,6 +18,7 @@ export function CreateIssueModal() {
   const navigate = useNavigate();
   const createIssue = useMutation(api.issues.create);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -26,9 +27,16 @@ export function CreateIssueModal() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [isOpen, setIsOpen] = useState(false);
+
   function open() {
     dialogRef.current?.showModal();
+    setIsOpen(true);
   }
+
+  useEffect(() => {
+    if (isOpen) titleInputRef.current?.focus();
+  }, [isOpen]);
 
   function close() {
     dialogRef.current?.close();
@@ -41,6 +49,7 @@ export function CreateIssueModal() {
     setTitleError(false);
     setSubmitError(null);
     setSubmitting(false);
+    setIsOpen(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -93,6 +102,7 @@ export function CreateIssueModal() {
                 Title <span className="text-error">*</span>
               </legend>
               <input
+                ref={titleInputRef}
                 type="text"
                 className={`input input-bordered w-full ${titleError ? "input-error" : ""}`}
                 placeholder="Issue title"
@@ -101,7 +111,6 @@ export function CreateIssueModal() {
                   setTitle(e.target.value);
                   if (titleError) setTitleError(false);
                 }}
-                autoFocus
               />
               {titleError && (
                 <p className="mt-1 text-error text-sm">Title is required.</p>
