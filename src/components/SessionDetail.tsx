@@ -84,6 +84,9 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
   }
 
   const isRunning = session.status === SessionStatus.Running;
+  const dispo = session.disposition
+    ? dispositionLabel(session.disposition as DispositionValue)
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -120,10 +123,8 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
         >
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">Disposition:</span>
-            <span
-              className={`badge badge-sm ${dispositionLabel(session.disposition as DispositionValue).className}`}
-            >
-              {dispositionLabel(session.disposition as DispositionValue).label}
+            <span className={`badge badge-sm ${dispo!.className}`}>
+              {dispo!.label}
             </span>
           </div>
           {session.note && (
