@@ -35,32 +35,42 @@ function parseInline(text: string): ReactNode[] {
     } else if (full.startsWith("[")) {
       // Markdown link: [text](url)
       const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(full);
-      if (linkMatch) {
+      const linkText = linkMatch?.[1];
+      const linkHref = linkMatch?.[2];
+      if (linkText && linkHref && /^https?:\/\//.test(linkHref)) {
         nodes.push(
           <a
             key={matchIndex}
-            href={linkMatch[2]}
+            href={linkHref}
             target="_blank"
             rel="noopener noreferrer"
             className="link link-primary"
           >
-            {linkMatch[1]}
+            {linkText}
           </a>,
         );
+      } else {
+        // Re-parse failed or non-http scheme — emit raw text
+        nodes.push(full);
       }
     } else if (/^https?:\/\//.test(full)) {
-      // Bare URL
+      // Bare URL — strip common trailing punctuation that the greedy regex captures
+      const cleaned = full.replace(/[.,;:!?)]+$/, "");
       nodes.push(
         <a
           key={matchIndex}
-          href={full}
+          href={cleaned}
           target="_blank"
           rel="noopener noreferrer"
           className="link link-primary"
         >
-          {full}
+          {cleaned}
         </a>,
       );
+      // Re-emit any stripped trailing punctuation as plain text
+      if (cleaned.length < full.length) {
+        nodes.push(full.slice(cleaned.length));
+      }
     } else if (full.startsWith("**")) {
       // Bold
       nodes.push(<strong key={matchIndex}>{full.slice(2, -2)}</strong>);
