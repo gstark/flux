@@ -1069,8 +1069,9 @@ class Orchestrator {
       () => this.handleExit(1),
     );
 
-    // Restart timeout for the new phase
+    // Restart timeout and PID watchdog for the new phase
     this.startSessionTimeout();
+    this.startPidWatchdog();
   }
 
   /**
@@ -1192,8 +1193,9 @@ class Orchestrator {
       () => this.handleExit(1),
     );
 
-    // Restart timeout for the new phase
+    // Restart timeout and PID watchdog for the new phase
     this.startSessionTimeout();
+    this.startPidWatchdog();
   }
 
   // ── Scheduling ───────────────────────────────────────────────────────
