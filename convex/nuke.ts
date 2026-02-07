@@ -4,11 +4,16 @@ import { internalMutation } from "./_generated/server";
 export const all = internalMutation({
   handler: async (ctx) => {
     const tables: TableNames[] = [
-      "projects",
+      "sessionEvents",
+      "sessions",
+      "comments",
+      "dependencies",
       "issues",
+      "epics",
       "labels",
       "llmCosts",
       "orchestratorConfig",
+      "projects",
     ];
 
     let totalDeleted = 0;
