@@ -360,6 +360,84 @@ const comments_list: ToolHandler = async (args, ctx) => {
   return ok(ctx, { comments, count: comments.length });
 };
 
+const epics_list: ToolHandler = async (args, ctx) => {
+  const { status, limit } = args as {
+    status?: "open" | "closed";
+    limit?: number;
+  };
+
+  const epics = await ctx.convex.query(api.epics.list, {
+    projectId: ctx.projectId,
+    status,
+    limit: Math.min(limit ?? 50, 200),
+  });
+  // Strip descriptions from list (token efficiency)
+  const summary = epics.map(({ description: _description, ...rest }) => rest);
+  return ok(ctx, { epics: summary, count: summary.length });
+};
+
+const epics_create: ToolHandler = async (args, ctx) => {
+  const { title, description } = args as {
+    title: string;
+    description?: string;
+  };
+
+  const epicId = await ctx.convex.mutation(api.epics.create, {
+    projectId: ctx.projectId,
+    title,
+    description,
+  });
+  const epic = await ctx.convex.query(api.epics.get, {
+    epicId: epicId as Id<"epics">,
+  });
+  return ok(ctx, { epic });
+};
+
+const epics_show: ToolHandler = async (args, ctx) => {
+  const { epicId } = args as { epicId: string };
+
+  const epic = await ctx.convex.query(api.epics.show, {
+    epicId: epicId as Id<"epics">,
+  });
+  if (!epic) {
+    return error(
+      `Epic not found: ${epicId}. Use epics_list to find valid IDs.`,
+    );
+  }
+  return ok(ctx, { epic });
+};
+
+const epics_update: ToolHandler = async (args, ctx) => {
+  const { epicId, ...updates } = args as {
+    epicId: string;
+    title?: string;
+    description?: string;
+  };
+
+  const updated = await ctx.convex.mutation(api.epics.update, {
+    epicId: epicId as Id<"epics">,
+    ...updates,
+  });
+  return ok(ctx, { epic: updated });
+};
+
+const epics_close: ToolHandler = async (args, ctx) => {
+  const { epicId, reason } = args as {
+    epicId: string;
+    reason?: string;
+  };
+
+  try {
+    const updated = await ctx.convex.mutation(api.epics.close, {
+      epicId: epicId as Id<"epics">,
+      closeReason: reason,
+    });
+    return ok(ctx, { epic: updated });
+  } catch (err) {
+    return error(String(err instanceof Error ? err.message : err));
+  }
+};
+
 // ── Export all implemented handlers ───────────────────────────────────
 
 export const handlers: Record<string, ToolHandler> = {
@@ -375,6 +453,11 @@ export const handlers: Record<string, ToolHandler> = {
   issues_bulk_create,
   comments_create,
   comments_list,
+  epics_list,
+  epics_create,
+  epics_show,
+  epics_update,
+  epics_close,
   orchestrator_run,
   orchestrator_kill,
   orchestrator_status,
