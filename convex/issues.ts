@@ -296,7 +296,7 @@ export const search = query({
   handler: async (ctx, args) => {
     const cap = Math.min(args.limit ?? 20, 100);
 
-    // Full-text search on title, scoped to project
+    // Primary: full-text search on title via search index (relevance-ranked)
     const titleMatches = await ctx.db
       .query("issues")
       .withSearchIndex("search_title", (q) =>
@@ -304,7 +304,28 @@ export const search = query({
       )
       .take(cap);
 
-    return titleMatches.filter((i) => i.deletedAt === undefined);
+    // Secondary: scan for description matches (case-insensitive substring)
+    const queryLower = args.query.toLowerCase();
+    const allProjectIssues = await ctx.db
+      .query("issues")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    const titleMatchIds = new Set(titleMatches.map((i) => i._id));
+    const descriptionMatches = allProjectIssues.filter(
+      (i) =>
+        i.deletedAt === undefined &&
+        !titleMatchIds.has(i._id) &&
+        i.description?.toLowerCase().includes(queryLower),
+    );
+
+    // Title matches first (relevance-ranked), then description matches, capped
+    const combined = [
+      ...titleMatches.filter((i) => i.deletedAt === undefined),
+      ...descriptionMatches,
+    ].slice(0, cap);
+
+    return combined;
   },
 });
 

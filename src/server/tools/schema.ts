@@ -164,7 +164,7 @@ const issues_unstick: ToolDef = {
 const issues_search: ToolDef = {
   name: "issues_search",
   description:
-    "Full-text search across issue titles using Convex searchIndex. Scoped to the current project.",
+    "Search issues by title (full-text via search index) and description (substring match). Title matches rank first. Scoped to the current project.",
   schema: {
     query: z.string().describe("Search query text."),
     limit: z.number().optional().describe("Max results. Default 20, max 100."),
