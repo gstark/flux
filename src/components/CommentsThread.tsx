@@ -32,6 +32,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
 
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,9 +40,14 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
     if (!trimmed) return;
 
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await createComment({ issueId, content: trimmed, author: "user" });
       setDraft("");
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to add comment",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -81,6 +87,12 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {submitError && (
+        <div role="alert" className="alert alert-error text-sm">
+          {submitError}
         </div>
       )}
 
