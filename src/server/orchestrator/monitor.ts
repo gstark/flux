@@ -115,7 +115,8 @@ export class SessionMonitor {
 
   /** Process a single line of stdout output. */
   private processLine(line: string): void {
-    // After shutdown, refuse to process — fail visibly instead of silently dropping data
+    // After shutdown, drop lines — the abort controller should have broken the read loop,
+    // but guard here as defense-in-depth for the race window between abort and loop exit.
     if (this._shuttingDown) return;
 
     // 1. Push to in-memory buffer
