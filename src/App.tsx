@@ -12,12 +12,19 @@ import "./index.css";
  */
 export function App() {
   const [projectId, setProjectId] = useState<Id<"projects"> | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/config")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`/api/config failed: ${res.status}`);
+        return res.json();
+      })
       .then((data: { projectId: string }) => {
         setProjectId(data.projectId as Id<"projects">);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
       });
   }, []);
 
@@ -25,6 +32,16 @@ export function App() {
     () => (projectId ? createAppRouter({ projectId }) : null),
     [projectId],
   );
+
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <pre className="max-w-lg whitespace-pre-wrap text-error">
+          Failed to load config: {error}
+        </pre>
+      </div>
+    );
+  }
 
   if (!router) {
     return (
