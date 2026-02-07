@@ -9,6 +9,7 @@ import { AppShell } from "../components/AppShell";
 import { ActivityPage } from "../pages/ActivityPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
 import { IssuesPage } from "../pages/IssuesPage";
+import { SessionsPage } from "../pages/SessionsPage";
 
 export interface RouterContext {
   projectId: Id<"projects">;
@@ -44,10 +45,24 @@ const activityRoute = createRoute({
   component: ActivityPage,
 });
 
+const sessionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sessions",
+  component: SessionsPage,
+});
+
+const sessionDetailRoute = createRoute({
+  getParentRoute: () => sessionsRoute,
+  path: "$sessionId",
+  // TODO: SessionDetailPage will be built in a follow-up issue
+  component: () => null,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   issuesRoute.addChildren([issueDetailRoute]),
   activityRoute,
+  sessionsRoute.addChildren([sessionDetailRoute]),
 ]);
 
 export function createAppRouter(context: RouterContext) {

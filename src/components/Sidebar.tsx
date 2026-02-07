@@ -23,6 +23,16 @@ export function Sidebar() {
           Activity
         </Link>
       </li>
+      <li>
+        <Link
+          to="/sessions"
+          activeProps={{ className: "menu-active" }}
+          inactiveProps={{ className: "" }}
+        >
+          <i className="fa-solid fa-clock-rotate-left" aria-hidden="true" />
+          Sessions
+        </Link>
+      </li>
     </ul>
   );
 }

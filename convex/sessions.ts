@@ -104,3 +104,34 @@ export const get = query({
     return await ctx.db.get(args.sessionId);
   },
 });
+
+export const listWithIssues = query({
+  args: {
+    projectId: v.id("projects"),
+    status: v.optional(sessionStatusValidator),
+  },
+  handler: async (ctx, args) => {
+    let sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    if (args.status) {
+      sessions = sessions.filter((s) => s.status === args.status);
+    }
+
+    sessions.sort((a, b) => b.startedAt - a.startedAt);
+
+    const enriched = await Promise.all(
+      sessions.map(async (session) => {
+        const issue = await ctx.db.get(session.issueId);
+        return {
+          ...session,
+          issueShortId: issue?.shortId ?? null,
+        };
+      }),
+    );
+
+    return enriched;
+  },
+});
