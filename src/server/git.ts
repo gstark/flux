@@ -83,9 +83,26 @@ export async function getCommitLog(
 }
 
 /**
+ * Check if a process with the given PID is still alive.
+ * Returns false if the process has exited or the PID is invalid.
+ */
+export function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Auto-commit any dirty working tree changes.
- * Returns true if a commit was made, false if tree was clean.
+ * Returns true if a commit was made, false if tree was clean or commit was suppressed.
  * Non-blocking by design — callers should catch errors and continue.
+ *
+ * When `agentPid` is provided, the commit is suppressed if that process is still
+ * alive. This prevents the orchestrator from racing with a still-running agent
+ * (e.g., PostToolUse hooks modifying files after the agent's last tool call).
  *
  * @example Commit message format:
  * ```
@@ -99,7 +116,18 @@ export async function autoCommitDirtyTree(
   shortId: string,
   sessionId: string,
   phase?: string,
+  agentPid?: number,
 ): Promise<boolean> {
+  // Guard: suppress auto-commit if the agent process is still alive.
+  // This prevents racing with PostToolUse hooks or other agent child processes
+  // that may still be modifying files.
+  if (agentPid !== undefined && isProcessAlive(agentPid)) {
+    console.warn(
+      `[git] Suppressing auto-commit: agent PID ${agentPid} is still alive`,
+    );
+    return false;
+  }
+
   const status = (await $`git -C ${cwd} status --porcelain`.text()).trim();
   if (!status) return false;
 

@@ -511,7 +511,13 @@ class Orchestrator {
 
     // Done with commits — auto-commit dirty tree, then proceed to retro
     try {
-      await autoCommitDirtyTree(cwd, issue.shortId, String(sessionId), "work");
+      await autoCommitDirtyTree(
+        cwd,
+        issue.shortId,
+        String(sessionId),
+        "work",
+        active.process.pid,
+      );
     } catch (err) {
       console.error("[Orchestrator] Auto-commit after work failed:", err);
     }
@@ -561,7 +567,13 @@ class Orchestrator {
 
     // Auto-commit any retro changes (e.g., friction fixes)
     try {
-      await autoCommitDirtyTree(cwd, issue.shortId, String(sessionId), "retro");
+      await autoCommitDirtyTree(
+        cwd,
+        issue.shortId,
+        String(sessionId),
+        "retro",
+        active.process.pid,
+      );
     } catch (err) {
       console.error("[Orchestrator] Auto-commit after retro failed:", err);
     }
@@ -727,6 +739,7 @@ class Orchestrator {
         issue.shortId,
         String(sessionId),
         "review",
+        active.process.pid,
       );
     } catch (err) {
       console.error("[Orchestrator] Auto-commit after review failed:", err);
