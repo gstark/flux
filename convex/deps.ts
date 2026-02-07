@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { IssueStatus } from "./schema";
 
 export const add = mutation({
   args: {
@@ -38,8 +37,8 @@ export const add = mutation({
     const visited = new Set<string>();
     const queue = [blockerId];
     while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (visited.has(current)) continue;
+      const current = queue.shift();
+      if (current === undefined || visited.has(current)) continue;
       visited.add(current);
 
       // What blocks `current`? Follow the reverse direction.
@@ -129,39 +128,5 @@ export const listForIssue = query({
     );
 
     return { blockers, blocks };
-  },
-});
-
-/**
- * Returns the set of issue IDs that are blocked by at least one non-closed issue.
- * Used by issues.ready to exclude blocked issues from the work queue.
- */
-export const blockedIssueIds = query({
-  args: { projectId: v.id("projects") },
-  handler: async (ctx, { projectId }) => {
-    // Get all dependencies — no project-scoped index, so collect all.
-    // Fine at current scale; if deps table grows large, add a projectId field.
-    const allDeps = await ctx.db.query("dependencies").collect();
-
-    // For each unique blockedId, check if any blocker is not closed
-    const blockedIdSet = new Set(allDeps.map((d) => d.blockedId));
-    const result = new Set<string>();
-
-    for (const blockedId of blockedIdSet) {
-      const issue = await ctx.db.get(blockedId);
-      // Skip deps for issues not in this project
-      if (!issue || issue.projectId !== projectId) continue;
-
-      const blockerDeps = allDeps.filter((d) => d.blockedId === blockedId);
-      for (const dep of blockerDeps) {
-        const blocker = await ctx.db.get(dep.blockerId);
-        if (blocker && blocker.status !== IssueStatus.Closed) {
-          result.add(blockedId);
-          break;
-        }
-      }
-    }
-
-    return [...result];
   },
 });
