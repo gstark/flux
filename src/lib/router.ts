@@ -9,6 +9,7 @@ import { AppShell } from "../components/AppShell";
 import { ActivityPage } from "../pages/ActivityPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
 import { IssuesPage } from "../pages/IssuesPage";
+import { SessionDetailPage } from "../pages/SessionDetailPage";
 import { SessionsPage } from "../pages/SessionsPage";
 
 export interface RouterContext {
@@ -54,8 +55,7 @@ const sessionsRoute = createRoute({
 const sessionDetailRoute = createRoute({
   getParentRoute: () => sessionsRoute,
   path: "$sessionId",
-  // TODO: SessionDetailPage will be built in a follow-up issue
-  component: () => null,
+  component: SessionDetailPage,
 });
 
 const routeTree = rootRoute.addChildren([

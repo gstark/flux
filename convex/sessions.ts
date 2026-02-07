@@ -115,6 +115,21 @@ export const get = query({
   },
 });
 
+export const getWithIssue = query({
+  args: { sessionId: v.id("sessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+
+    const issue = await ctx.db.get(session.issueId);
+    return {
+      ...session,
+      issueShortId: issue?.shortId ?? null,
+      issueTitle: issue?.title ?? null,
+    };
+  },
+});
+
 export const listWithIssues = query({
   args: {
     projectId: v.id("projects"),

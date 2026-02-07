@@ -40,6 +40,22 @@ export const batchInsert = mutation({
   },
 });
 
+export const list = query({
+  args: {
+    sessionId: v.id("sessions"),
+  },
+  handler: async (ctx, args) => {
+    const events = await ctx.db
+      .query("sessionEvents")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+
+    // Return in chronological order by sequence
+    events.sort((a, b) => a.sequence - b.sequence);
+    return events;
+  },
+});
+
 export const recent = query({
   args: {
     sessionId: v.id("sessions"),
