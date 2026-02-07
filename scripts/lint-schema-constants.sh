@@ -136,6 +136,13 @@ run_check \
   "SessionPhase constant from schema" \
   'type SessionPhase\s*='
 
+# IssuePriority assignments: priority: "critical", priority: "high", etc.
+# Constant: IssuePriority.Critical, IssuePriority.High, etc.
+run_check \
+  "Raw IssuePriority assignment" \
+  "IssuePriority.*" \
+  'priority:\s*"(critical|high|medium|low)"'
+
 # ── Result ───────────────────────────────────────────────────────────
 
 echo ""
