@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { IssueStatus } from "./schema";
 
 export const add = mutation({
   args: {
@@ -154,7 +155,7 @@ export const blockedIssueIds = query({
       const blockerDeps = allDeps.filter((d) => d.blockedId === blockedId);
       for (const dep of blockerDeps) {
         const blocker = await ctx.db.get(dep.blockerId);
-        if (blocker && blocker.status !== "closed") {
+        if (blocker && blocker.status !== IssueStatus.Closed) {
           result.add(blockedId);
           break;
         }
