@@ -416,7 +416,21 @@ class Orchestrator {
     }
 
     // ── Done: check for commits ──
-    const hasCommits = await hasNewCommits(cwd, startHead);
+    let hasCommits: boolean;
+    try {
+      hasCommits = await hasNewCommits(cwd, startHead);
+    } catch (err) {
+      console.error(
+        `[Orchestrator] Git error checking commits for ${issue.shortId}:`,
+        err,
+      );
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+      });
+      this.finalize();
+      return;
+    }
 
     if (!hasCommits) {
       // Agent said done but made no commits — treat as noop
@@ -583,7 +597,22 @@ class Orchestrator {
     }
 
     // ── Done: check for new commits ──
-    const hasCommits = await hasNewCommits(cwd, startHead);
+    let hasCommits: boolean;
+    try {
+      hasCommits = await hasNewCommits(cwd, startHead);
+    } catch (err) {
+      console.error(
+        `[Orchestrator] Git error checking commits for ${issue.shortId}:`,
+        err,
+      );
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+        reopenToOpen: false,
+      });
+      this.finalize();
+      return;
+    }
 
     if (!hasCommits) {
       // Review done, no inline fixes — findings became follow-up issues
@@ -698,19 +727,33 @@ class Orchestrator {
     }
 
     // Build review context
-    const diff = await getDiff(cwd, startHead);
-    if (!diff) {
-      // No diff means no changes to review — close as completed
-      await convex.mutation(api.issues.close, {
+    let diff: string;
+    let commitLog: string;
+    try {
+      diff = await getDiff(cwd, startHead);
+      if (!diff) {
+        // No diff means no changes to review — close as completed
+        await convex.mutation(api.issues.close, {
+          issueId,
+          closeType: "completed",
+          closeReason: "Work completed, no diff to review.",
+        });
+        this.finalize();
+        return;
+      }
+      commitLog = await getCommitLog(cwd, startHead);
+    } catch (err) {
+      console.error(
+        `[Orchestrator] Git error building review context for ${issue.shortId}:`,
+        err,
+      );
+      await convex.mutation(api.issues.update, {
         issueId,
-        closeType: "completed",
-        closeReason: "Work completed, no diff to review.",
+        status: IssueStatus.Stuck,
       });
       this.finalize();
       return;
     }
-
-    const commitLog = await getCommitLog(cwd, startHead);
 
     // Build related issues summary (issues created during retro/reviews)
     // TODO: Add issues.listBySource query when sourceIssueId filtering is available

@@ -51,56 +51,35 @@ export async function getCurrentHead(cwd: string): Promise<string> {
 
 /**
  * Check if there are new commits since the given SHA.
- * Returns false on git errors (conservative — treats as no commits).
+ * Throws on git errors — callers must handle failures explicitly.
  */
 export async function hasNewCommits(
   cwd: string,
   since: string,
 ): Promise<boolean> {
-  try {
-    const log = (
-      await $`git -C ${cwd} log ${since}..HEAD --oneline`.text()
-    ).trim();
-    return log.length > 0;
-  } catch {
-    console.error(
-      `[git] hasNewCommits failed for ${since}..HEAD, treating as no commits`,
-    );
-    return false;
-  }
+  const log = (
+    await $`git -C ${cwd} log ${since}..HEAD --oneline`.text()
+  ).trim();
+  return log.length > 0;
 }
 
 /**
  * Get the diff between a starting commit and HEAD.
- * Returns empty string on git errors (allows proceeding without review context).
+ * Throws on git errors — callers must handle failures explicitly.
  */
 export async function getDiff(cwd: string, since: string): Promise<string> {
-  try {
-    return (await $`git -C ${cwd} diff ${since}..HEAD`.text()).trim();
-  } catch {
-    console.error(
-      `[git] getDiff failed for ${since}..HEAD, returning empty diff`,
-    );
-    return "";
-  }
+  return (await $`git -C ${cwd} diff ${since}..HEAD`.text()).trim();
 }
 
 /**
  * Get one-line commit log between a starting commit and HEAD.
- * Returns empty string on git errors.
+ * Throws on git errors — callers must handle failures explicitly.
  */
 export async function getCommitLog(
   cwd: string,
   since: string,
 ): Promise<string> {
-  try {
-    return (await $`git -C ${cwd} log ${since}..HEAD --oneline`.text()).trim();
-  } catch {
-    console.error(
-      `[git] getCommitLog failed for ${since}..HEAD, returning empty`,
-    );
-    return "";
-  }
+  return (await $`git -C ${cwd} log ${since}..HEAD --oneline`.text()).trim();
 }
 
 /**
