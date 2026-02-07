@@ -1,5 +1,7 @@
 # FLUX
 
+> **Note:** `AGENTS.md` is a symlink to this file. Do not create a separate `AGENTS.md` — edit `CLAUDE.md` only.
+
 An autonomous agent orchestrator with built-in issue tracking, realtime UI, and its own MCP server.
 
 - See [design.md](docs/design.md) for project overview and architecture.
