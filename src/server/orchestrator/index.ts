@@ -485,8 +485,20 @@ class Orchestrator {
       console.warn(
         `[Orchestrator] No agentSessionId captured for ${issue.shortId}, skipping retro`,
       );
-      // TODO: Create comment on issue when comments infrastructure is available
-      // (I3: "Retro skipped — no agent session ID captured from stream-json output")
+      // Record the skip as a comment on the issue for traceability
+      try {
+        await convex.mutation(api.comments.create, {
+          issueId,
+          content:
+            "Retro skipped — no agent session ID captured from stream-json output.",
+          author: "flux",
+        });
+      } catch (err) {
+        console.error(
+          "[Orchestrator] Failed to create retro-skip comment:",
+          err,
+        );
+      }
       await this.startReviewLoop();
     }
   }
