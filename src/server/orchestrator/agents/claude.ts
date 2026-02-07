@@ -1,4 +1,17 @@
-import type { AgentProcess, AgentProvider, SpawnOptions } from "./types";
+import {
+  buildRetroPrompt,
+  buildReviewPrompt,
+  buildWorkPrompt,
+} from "./prompts";
+import type {
+  AgentProcess,
+  AgentProvider,
+  ResumeOptions,
+  RetroPromptContext,
+  ReviewPromptContext,
+  SpawnOptions,
+  WorkPromptContext,
+} from "./types";
 
 export class ClaudeCodeProvider implements AgentProvider {
   name = "claude" as const;
@@ -20,27 +33,53 @@ export class ClaudeCodeProvider implements AgentProvider {
       },
     );
 
-    return {
-      pid: proc.pid,
-      stdout: proc.stdout as ReadableStream<Uint8Array>,
-      stderr: proc.stderr as ReadableStream<Uint8Array>,
-      kill: () => proc.kill(),
-      wait: async () => {
-        const exitCode = await proc.exited;
-        return { exitCode };
-      },
-    };
+    return wrapProcess(proc);
   }
 
-  buildWorkPrompt(issue: {
-    shortId: string;
-    title: string;
-    description?: string;
-  }): string {
-    const lines = [`## Issue ${issue.shortId}: ${issue.title}`];
-    if (issue.description) {
-      lines.push("", issue.description);
-    }
-    return lines.join("\n");
+  resume(opts: ResumeOptions): AgentProcess {
+    const proc = Bun.spawn(
+      [
+        "claude",
+        "--output-format",
+        "stream-json",
+        "--dangerously-skip-permissions",
+        "--resume",
+        opts.sessionId,
+        "--print",
+        opts.prompt,
+      ],
+      {
+        cwd: opts.cwd,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+
+    return wrapProcess(proc);
   }
+
+  buildWorkPrompt(ctx: WorkPromptContext): string {
+    return buildWorkPrompt(ctx);
+  }
+
+  buildRetroPrompt(ctx: RetroPromptContext): string {
+    return buildRetroPrompt(ctx);
+  }
+
+  buildReviewPrompt(ctx: ReviewPromptContext): string {
+    return buildReviewPrompt(ctx);
+  }
+}
+
+function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
+  return {
+    pid: proc.pid,
+    stdout: proc.stdout as ReadableStream<Uint8Array>,
+    stderr: proc.stderr as ReadableStream<Uint8Array>,
+    kill: () => proc.kill(),
+    wait: async () => {
+      const exitCode = await proc.exited;
+      return { exitCode };
+    },
+  };
 }

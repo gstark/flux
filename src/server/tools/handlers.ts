@@ -253,6 +253,51 @@ const sessions_show: ToolHandler = async (args, ctx) => {
   });
 };
 
+const issues_close: ToolHandler = async (args, ctx) => {
+  const { issueId, closeType, reason } = args as {
+    issueId: string;
+    closeType: "completed" | "noop" | "duplicate" | "wontfix";
+    reason?: string;
+  };
+
+  try {
+    const updated = await ctx.convex.mutation(api.issues.close, {
+      issueId: issueId as Id<"issues">,
+      closeType,
+      closeReason: reason,
+    });
+    return ok(ctx, { issue: updated });
+  } catch (err) {
+    return error(String(err instanceof Error ? err.message : err));
+  }
+};
+
+const issues_unstick: ToolHandler = async (args, ctx) => {
+  const { issueId } = args as { issueId: string };
+
+  try {
+    const updated = await ctx.convex.mutation(api.issues.unstick, {
+      issueId: issueId as Id<"issues">,
+    });
+    return ok(ctx, { issue: updated });
+  } catch (err) {
+    return error(String(err instanceof Error ? err.message : err));
+  }
+};
+
+const issues_retry: ToolHandler = async (args, ctx) => {
+  const { issueId } = args as { issueId: string };
+
+  try {
+    const updated = await ctx.convex.mutation(api.issues.retry, {
+      issueId: issueId as Id<"issues">,
+    });
+    return ok(ctx, { issue: updated });
+  } catch (err) {
+    return error(String(err instanceof Error ? err.message : err));
+  }
+};
+
 // ── Export all implemented handlers ───────────────────────────────────
 
 export const handlers: Record<string, ToolHandler> = {
@@ -260,7 +305,10 @@ export const handlers: Record<string, ToolHandler> = {
   issues_list,
   issues_get,
   issues_update,
+  issues_close,
   issues_ready,
+  issues_unstick,
+  issues_retry,
   orchestrator_run,
   orchestrator_kill,
   orchestrator_status,

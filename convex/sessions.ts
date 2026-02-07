@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import {
+  dispositionValidator,
   SessionStatus,
   sessionStatusValidator,
   sessionTypeValidator,
@@ -13,6 +14,9 @@ export const create = mutation({
     type: sessionTypeValidator,
     agent: v.string(),
     pid: v.optional(v.number()),
+    agentSessionId: v.optional(v.string()),
+    startHead: v.optional(v.string()),
+    model: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -29,6 +33,9 @@ export const create = mutation({
       status: SessionStatus.Running,
       startedAt: Date.now(),
       pid: args.pid,
+      agentSessionId: args.agentSessionId,
+      startHead: args.startHead,
+      model: args.model,
     });
 
     return await ctx.db.get(sessionId);
@@ -42,6 +49,11 @@ export const update = mutation({
     endedAt: v.optional(v.number()),
     exitCode: v.optional(v.number()),
     lastHeartbeat: v.optional(v.number()),
+    disposition: v.optional(dispositionValidator),
+    note: v.optional(v.string()),
+    agentSessionId: v.optional(v.string()),
+    startHead: v.optional(v.string()),
+    endHead: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
@@ -53,6 +65,12 @@ export const update = mutation({
     if (args.exitCode !== undefined) updates.exitCode = args.exitCode;
     if (args.lastHeartbeat !== undefined)
       updates.lastHeartbeat = args.lastHeartbeat;
+    if (args.disposition !== undefined) updates.disposition = args.disposition;
+    if (args.note !== undefined) updates.note = args.note;
+    if (args.agentSessionId !== undefined)
+      updates.agentSessionId = args.agentSessionId;
+    if (args.startHead !== undefined) updates.startHead = args.startHead;
+    if (args.endHead !== undefined) updates.endHead = args.endHead;
 
     await ctx.db.patch(args.sessionId, updates);
     return await ctx.db.get(args.sessionId);

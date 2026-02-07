@@ -2,9 +2,21 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { IssueStatus, SessionStatus, SessionType } from "$convex/schema";
 import { getConvexClient } from "../convex";
-import { resolveRepoRoot } from "../git";
-import type { AgentProcess, AgentProvider } from "./agents";
-import { ClaudeCodeProvider } from "./agents";
+import {
+  autoCommitDirtyTree,
+  getCommitLog,
+  getCurrentHead,
+  getDiff,
+  hasNewCommits,
+  resolveRepoRoot,
+} from "../git";
+import type { AgentProcess, AgentProvider, WorkPromptContext } from "./agents";
+import {
+  ClaudeCodeProvider,
+  Disposition,
+  parseDisposition,
+  StatusMessages,
+} from "./agents";
 import { SessionMonitor } from "./monitor";
 
 /**
@@ -21,6 +33,9 @@ const OrchestratorState = {
 type OrchestratorState =
   (typeof OrchestratorState)[keyof typeof OrchestratorState];
 
+/** The phase of the current issue lifecycle within a busy orchestrator. */
+type SessionPhase = "work" | "retro" | "review";
+
 /** Runtime info about the currently active session. */
 interface ActiveSession {
   sessionId: Id<"sessions">;
@@ -29,6 +44,14 @@ interface ActiveSession {
   monitor: SessionMonitor;
   monitorDone: Promise<void>;
   killed: boolean;
+  /** Git HEAD when the work session started */
+  startHead: string;
+  /** Claude session UUID captured from stream-json output */
+  agentSessionId: string | null;
+  /** Issue context for prompt building */
+  issue: WorkPromptContext;
+  /** Current phase of the issue lifecycle */
+  phase: SessionPhase;
 }
 
 /** Orchestrator manages claiming issues, spawning agents, and session lifecycle. */
@@ -41,6 +64,7 @@ class Orchestrator {
   private pendingStop = false;
   private readyIssues: Array<{ _id: Id<"issues"> }> = [];
   private maxFailures = 3;
+  private maxReviewIterations = 5;
 
   constructor(projectId: Id<"projects">, provider?: AgentProvider) {
     this.projectId = projectId;
@@ -55,6 +79,7 @@ class Orchestrator {
       sessionId: string;
       issueId: string;
       pid: number;
+      phase: SessionPhase;
     } | null;
   } {
     return {
@@ -66,6 +91,7 @@ class Orchestrator {
             sessionId: this.activeSession.sessionId,
             issueId: this.activeSession.issueId,
             pid: this.activeSession.process.pid,
+            phase: this.activeSession.phase,
           }
         : null,
     };
@@ -94,12 +120,13 @@ class Orchestrator {
       projectId: this.projectId,
     });
 
-    // Fetch config for maxFailures
+    // Fetch config for thresholds
     const config = await convex.query(api.orchestratorConfig.get, {
       projectId: this.projectId,
     });
     if (config) {
       this.maxFailures = config.maxFailures;
+      this.maxReviewIterations = config.maxReviewIterations;
     }
 
     // Recover orphaned sessions before subscribing
@@ -173,32 +200,45 @@ class Orchestrator {
     // 2. Resolve repo root for cwd
     const cwd = await resolveRepoRoot();
 
-    // 3. Build prompt and spawn agent
-    const prompt = this.provider.buildWorkPrompt({
+    // 3. Record startHead before spawning
+    const startHead = await getCurrentHead(cwd);
+
+    // 4. Auto-commit dirty tree before starting work (non-blocking)
+    try {
+      await autoCommitDirtyTree(cwd, issue.shortId, "pre-session");
+    } catch (err) {
+      console.error("[Orchestrator] Auto-commit before session failed:", err);
+    }
+
+    // 5. Build prompt and spawn agent
+    const issueCtx: WorkPromptContext = {
       shortId: issue.shortId,
       title: issue.title,
       description: issue.description,
-    });
+    };
+    const prompt = this.provider.buildWorkPrompt(issueCtx);
     const agentProcess = this.provider.spawn({ cwd, prompt });
 
-    // 4. Create session record
+    // 6. Create session record with startHead
     const session = await convex.mutation(api.sessions.create, {
       projectId: this.projectId,
       issueId,
       type: SessionType.Work,
       agent: this.provider.name,
       pid: agentProcess.pid,
+      startHead,
     });
     if (!session) {
       agentProcess.kill();
       throw new Error("Failed to create session record");
     }
 
-    // 5. Start monitoring agent output
+    // 7. Start monitoring agent output
     const monitor = new SessionMonitor(session._id, this.projectId);
+    monitor.recordInput(prompt);
     const monitorDone = monitor.consume(agentProcess.stdout);
 
-    // 6. Track active session
+    // 8. Track active session
     this.state = OrchestratorState.Busy;
     this.activeSession = {
       sessionId: session._id,
@@ -207,9 +247,27 @@ class Orchestrator {
       monitor,
       monitorDone,
       killed: false,
+      startHead,
+      agentSessionId: null,
+      issue: issueCtx,
+      phase: "work",
     };
 
-    // 7. Fire-and-forget: handle agent exit in background
+    // 9. Wire up agentSessionId extraction from stream-json
+    const activeRef = this.activeSession;
+    monitor.onLine((line) => {
+      if (activeRef.agentSessionId) return; // Already captured
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>;
+        if (obj.type === "system" && typeof obj.session_id === "string") {
+          activeRef.agentSessionId = obj.session_id;
+        }
+      } catch {
+        // Not JSON — ignore
+      }
+    });
+
+    // 10. Fire-and-forget: handle agent exit in background
     agentProcess.wait().then(
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
@@ -236,9 +294,11 @@ class Orchestrator {
     // and will apply kill-specific finalization (hand-off semantics).
   }
 
+  // ── Exit handling ────────────────────────────────────────────────────
+
   /**
-   * Handle agent process exit. Called from the fire-and-forget .then() chain.
-   * Determines outcome based on exit code and whether kill() was called.
+   * Handle agent process exit. Routes to the appropriate phase handler.
+   * Called from the fire-and-forget .then() chain on agentProcess.wait().
    */
   private async handleExit(exitCode: number): Promise<void> {
     if (!this.activeSession) return;
@@ -251,45 +311,467 @@ class Orchestrator {
     }
     await this.activeSession.monitor.shutdown();
 
-    const { sessionId, issueId, killed } = this.activeSession;
-    const convex = getConvexClient();
-
-    if (killed) {
-      // Kill path: session failed, issue stays in_progress (hand-off to human)
+    // Kill path: hand-off to human — session failed, issue stays in_progress
+    if (this.activeSession.killed) {
+      const convex = getConvexClient();
       await convex.mutation(api.sessions.update, {
-        sessionId,
+        sessionId: this.activeSession.sessionId,
         status: SessionStatus.Failed,
         endedAt: Date.now(),
         exitCode,
       });
-    } else {
-      // Natural exit: finalize based on exit code
-      const succeeded = exitCode === 0;
-
-      await convex.mutation(api.sessions.update, {
-        sessionId,
-        status: succeeded ? SessionStatus.Completed : SessionStatus.Failed,
-        endedAt: Date.now(),
-        exitCode,
-      });
-
-      // Success → close issue. Failure → reopen for retry.
-      await convex.mutation(api.issues.update, {
-        issueId,
-        status: succeeded ? IssueStatus.Closed : IssueStatus.Open,
-      });
+      this.finalize();
+      return;
     }
 
-    this.activeSession = null;
-
-    if (this.pendingStop || !this.unsubscribeReady) {
-      this.state = OrchestratorState.Stopped;
-      this.pendingStop = false;
-    } else {
-      this.state = OrchestratorState.Idle;
-      this.scheduleNext();
+    // Route to phase-specific handler
+    const { phase } = this.activeSession;
+    if (phase === "work") {
+      await this.handleWorkExit(exitCode);
+    } else if (phase === "retro") {
+      await this.handleRetroExit(exitCode);
+    } else if (phase === "review") {
+      await this.handleReviewExit(exitCode);
     }
   }
+
+  /**
+   * Handle work session exit. Implements the worker session inference table:
+   *
+   * | Disposition | Commits? | Action                                    |
+   * |-------------|----------|-------------------------------------------|
+   * | malformed   | —        | incrementFailure, reopen (circuit breaker) |
+   * | fault       | —        | incrementFailure, reopen (circuit breaker) |
+   * | noop        | —        | close as noop                              |
+   * | done        | No       | close as noop                              |
+   * | done        | Yes      | auto-commit → retro → review               |
+   */
+  private async handleWorkExit(exitCode: number): Promise<void> {
+    const active = this.activeSession!;
+    const { sessionId, issueId, startHead, issue } = active;
+    const convex = getConvexClient();
+    const cwd = await resolveRepoRoot();
+
+    // Capture endHead (fallback to startHead if git fails)
+    let endHead: string;
+    try {
+      endHead = await getCurrentHead(cwd);
+    } catch {
+      endHead = startHead;
+    }
+
+    // Parse disposition from monitor buffer
+    const allLines = active.monitor.buffer.getAll();
+    const dispositionResult = parseDisposition(allLines);
+
+    // Update session record
+    await convex.mutation(api.sessions.update, {
+      sessionId,
+      status: SessionStatus.Completed,
+      endedAt: Date.now(),
+      exitCode,
+      disposition: dispositionResult.success
+        ? dispositionResult.disposition
+        : undefined,
+      note: dispositionResult.success ? dispositionResult.note : undefined,
+      agentSessionId: active.agentSessionId ?? undefined,
+      endHead,
+    });
+
+    // ── Malformed: no valid disposition parsed ──
+    if (!dispositionResult.success) {
+      console.error(
+        `[Orchestrator] ${StatusMessages.dispositionParseFailed(issue.shortId)}`,
+      );
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+      });
+      this.finalize();
+      return;
+    }
+
+    const { disposition, note } = dispositionResult;
+
+    // ── Fault ──
+    if (disposition === Disposition.Fault) {
+      console.error(`[Orchestrator] Agent fault for ${issue.shortId}: ${note}`);
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+      });
+      this.finalize();
+      return;
+    }
+
+    // ── Noop ──
+    if (disposition === Disposition.Noop) {
+      await convex.mutation(api.issues.close, {
+        issueId,
+        closeType: "noop",
+        closeReason: note,
+      });
+      this.finalize();
+      return;
+    }
+
+    // ── Done: check for commits ──
+    const hasCommits = await hasNewCommits(cwd, startHead);
+
+    if (!hasCommits) {
+      // Agent said done but made no commits — treat as noop
+      await convex.mutation(api.issues.close, {
+        issueId,
+        closeType: "noop",
+        closeReason: note,
+      });
+      this.finalize();
+      return;
+    }
+
+    // Done with commits — auto-commit dirty tree, then proceed to retro
+    try {
+      await autoCommitDirtyTree(cwd, issue.shortId, String(sessionId), "work");
+    } catch (err) {
+      console.error("[Orchestrator] Auto-commit after work failed:", err);
+    }
+
+    // Proceed to retro if we can resume, otherwise skip to review
+    if (active.agentSessionId) {
+      await this.startRetro(note);
+    } else {
+      console.warn(
+        `[Orchestrator] No agentSessionId captured for ${issue.shortId}, skipping retro`,
+      );
+      // TODO: Create comment on issue when comments infrastructure is available
+      // (I3: "Retro skipped — no agent session ID captured from stream-json output")
+      await this.startReviewLoop();
+    }
+  }
+
+  /**
+   * Handle retro session exit. Retro is advisory — never blocks the pipeline.
+   * Always proceeds to review regardless of retro outcome.
+   */
+  private async handleRetroExit(_exitCode: number): Promise<void> {
+    const active = this.activeSession!;
+    const { sessionId, issue } = active;
+    const convex = getConvexClient();
+    const cwd = await resolveRepoRoot();
+
+    // Auto-commit any retro changes (e.g., friction fixes)
+    try {
+      await autoCommitDirtyTree(cwd, issue.shortId, String(sessionId), "retro");
+    } catch (err) {
+      console.error("[Orchestrator] Auto-commit after retro failed:", err);
+    }
+
+    // Update session endHead after retro
+    try {
+      const endHead = await getCurrentHead(cwd);
+      await convex.mutation(api.sessions.update, {
+        sessionId,
+        endHead,
+      });
+    } catch (err) {
+      console.error("[Orchestrator] Post-retro endHead update failed:", err);
+    }
+
+    // Parse retro disposition for logging (but don't act on it)
+    const allLines = active.monitor.buffer.getAll();
+    const retroResult = parseDisposition(allLines);
+    if (retroResult.success) {
+      await convex.mutation(api.sessions.update, {
+        sessionId,
+        disposition: retroResult.disposition,
+        note: retroResult.note,
+      });
+    }
+
+    // Always proceed to review, regardless of retro outcome
+    await this.startReviewLoop();
+  }
+
+  /**
+   * Handle review session exit. Implements the review session inference table:
+   *
+   * | Disposition | Commits? | Action                                          |
+   * |-------------|----------|-------------------------------------------------|
+   * | malformed   | —        | incrementFailure                                |
+   * | fault       | —        | incrementFailure                                |
+   * | noop        | —        | incrementReviewIterations, close as completed    |
+   * | done        | No       | incrementReviewIterations, close as completed    |
+   * | done        | Yes      | incrementReviewIterations, loop or mark stuck    |
+   */
+  private async handleReviewExit(exitCode: number): Promise<void> {
+    const active = this.activeSession!;
+    const { sessionId, issueId, startHead, issue } = active;
+    const convex = getConvexClient();
+    const cwd = await resolveRepoRoot();
+
+    // Capture endHead
+    let endHead: string;
+    try {
+      endHead = await getCurrentHead(cwd);
+    } catch {
+      endHead = startHead;
+    }
+
+    // Parse review disposition
+    const allLines = active.monitor.buffer.getAll();
+    const dispositionResult = parseDisposition(allLines);
+
+    // Update review session record
+    await convex.mutation(api.sessions.update, {
+      sessionId,
+      status: SessionStatus.Completed,
+      endedAt: Date.now(),
+      exitCode,
+      disposition: dispositionResult.success
+        ? dispositionResult.disposition
+        : undefined,
+      note: dispositionResult.success ? dispositionResult.note : undefined,
+      endHead,
+    });
+
+    // ── Malformed or Fault: increment failure, leave issue in_progress ──
+    // reopenToOpen: false — review failures should NOT reopen to open,
+    // they leave the issue in_progress (unless circuit breaker trips → stuck)
+    if (!dispositionResult.success) {
+      console.error(
+        `[Orchestrator] ${StatusMessages.dispositionParseFailed(issue.shortId)}`,
+      );
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+        reopenToOpen: false,
+      });
+      this.finalize();
+      return;
+    }
+
+    const { disposition, note } = dispositionResult;
+
+    if (disposition === Disposition.Fault) {
+      console.error(
+        `[Orchestrator] Review fault for ${issue.shortId}: ${note}`,
+      );
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+        reopenToOpen: false,
+      });
+      this.finalize();
+      return;
+    }
+
+    // ── Done or Noop: increment review iterations ──
+    const newIterations = await convex.mutation(
+      api.issues.incrementReviewIterations,
+      { issueId },
+    );
+
+    // ── Noop: clean pass — close as completed ──
+    if (disposition === Disposition.Noop) {
+      await convex.mutation(api.issues.close, {
+        issueId,
+        closeType: "completed",
+        closeReason: note || "Review passed clean — no issues found.",
+      });
+      this.finalize();
+      return;
+    }
+
+    // ── Done: check for new commits ──
+    const hasCommits = await hasNewCommits(cwd, startHead);
+
+    if (!hasCommits) {
+      // Review done, no inline fixes — findings became follow-up issues
+      await convex.mutation(api.issues.close, {
+        issueId,
+        closeType: "completed",
+        closeReason:
+          note || "Review complete, findings captured as follow-up issues.",
+      });
+      this.finalize();
+      return;
+    }
+
+    // Review made commits — auto-commit dirty tree
+    try {
+      await autoCommitDirtyTree(
+        cwd,
+        issue.shortId,
+        String(sessionId),
+        "review",
+      );
+    } catch (err) {
+      console.error("[Orchestrator] Auto-commit after review failed:", err);
+    }
+
+    // Check iteration limit
+    if (newIterations >= this.maxReviewIterations) {
+      console.warn(
+        `[Orchestrator] ${StatusMessages.reviewLoopExhausted(issue.shortId, newIterations, this.maxReviewIterations)}`,
+      );
+      await convex.mutation(api.issues.update, {
+        issueId,
+        status: IssueStatus.Stuck,
+      });
+      this.finalize();
+      return;
+    }
+
+    // Loop: start another review
+    await this.startReviewLoop();
+  }
+
+  // ── Retro & review lifecycle ─────────────────────────────────────────
+
+  /**
+   * Start the retro phase by resuming the agent session.
+   * Retro is advisory — the agent reflects and may create follow-up issues.
+   */
+  private async startRetro(workNote: string): Promise<void> {
+    const active = this.activeSession!;
+    const cwd = await resolveRepoRoot();
+
+    const retroPrompt = this.provider.buildRetroPrompt({
+      shortId: active.issue.shortId,
+      title: active.issue.title,
+      workNote,
+    });
+
+    // Resume the same agent session for retro
+    const retroProcess = this.provider.resume({
+      cwd,
+      prompt: retroPrompt,
+      sessionId: active.agentSessionId!,
+    });
+
+    // Create a new monitor for the retro output, continuing sequence from work monitor
+    // Note: We reuse the same session record — retro is part of the work session
+    const retroMonitor = new SessionMonitor(
+      active.sessionId,
+      this.projectId,
+      active.monitor.currentSequence,
+    );
+    retroMonitor.recordInput(retroPrompt);
+    const retroMonitorDone = retroMonitor.consume(retroProcess.stdout);
+
+    // Update active session for retro phase
+    active.process = retroProcess;
+    active.monitor = retroMonitor;
+    active.monitorDone = retroMonitorDone;
+    active.phase = "retro";
+
+    // Fire-and-forget: handle retro exit
+    retroProcess.wait().then(
+      ({ exitCode }) => this.handleExit(exitCode),
+      () => this.handleExit(1),
+    );
+  }
+
+  /**
+   * Start a review loop iteration. Spawns a fresh stateless review session
+   * with diff and related issues context.
+   */
+  private async startReviewLoop(): Promise<void> {
+    const active = this.activeSession!;
+    const { issueId, startHead, issue } = active;
+    const convex = getConvexClient();
+    const cwd = await resolveRepoRoot();
+
+    // Check iteration limit before starting
+    const currentIssue = await convex.query(api.issues.get, { issueId });
+    const currentIterations = currentIssue?.reviewIterations ?? 0;
+    if (currentIterations >= this.maxReviewIterations) {
+      console.warn(
+        `[Orchestrator] Review iteration limit reached for ${issue.shortId}`,
+      );
+      await convex.mutation(api.issues.update, {
+        issueId,
+        status: IssueStatus.Stuck,
+      });
+      this.finalize();
+      return;
+    }
+
+    // Build review context
+    const diff = await getDiff(cwd, startHead);
+    if (!diff) {
+      // No diff means no changes to review — close as completed
+      await convex.mutation(api.issues.close, {
+        issueId,
+        closeType: "completed",
+        closeReason: "Work completed, no diff to review.",
+      });
+      this.finalize();
+      return;
+    }
+
+    const commitLog = await getCommitLog(cwd, startHead);
+
+    // Build related issues summary (issues created during retro/reviews)
+    // TODO: Add issues.listBySource query when sourceIssueId filtering is available
+    const relatedIssues: Array<{
+      shortId: string;
+      title: string;
+      status: string;
+    }> = [];
+
+    const reviewPrompt = this.provider.buildReviewPrompt({
+      shortId: issue.shortId,
+      title: issue.title,
+      description: issue.description,
+      diff,
+      commitLog,
+      relatedIssues,
+      reviewIteration: currentIterations + 1,
+      maxReviewIterations: this.maxReviewIterations,
+    });
+
+    // Spawn a fresh (stateless) review session
+    const reviewProcess = this.provider.spawn({ cwd, prompt: reviewPrompt });
+
+    // Create a new session record for the review
+    const reviewSession = await convex.mutation(api.sessions.create, {
+      projectId: this.projectId,
+      issueId,
+      type: SessionType.Review,
+      agent: this.provider.name,
+      pid: reviewProcess.pid,
+      startHead,
+    });
+    if (!reviewSession) {
+      reviewProcess.kill();
+      console.error(
+        `[Orchestrator] Failed to create review session for ${issue.shortId}`,
+      );
+      this.finalize();
+      return;
+    }
+
+    // Monitor review output
+    const reviewMonitor = new SessionMonitor(reviewSession._id, this.projectId);
+    reviewMonitor.recordInput(reviewPrompt);
+    const reviewMonitorDone = reviewMonitor.consume(reviewProcess.stdout);
+
+    // Update active session to track the review
+    active.sessionId = reviewSession._id;
+    active.process = reviewProcess;
+    active.monitor = reviewMonitor;
+    active.monitorDone = reviewMonitorDone;
+    active.phase = "review";
+
+    // Fire-and-forget: handle review exit
+    reviewProcess.wait().then(
+      ({ exitCode }) => this.handleExit(exitCode),
+      () => this.handleExit(1),
+    );
+  }
+
+  // ── Scheduling ───────────────────────────────────────────────────────
 
   /**
    * Try to pick up the next ready issue. No-op if not idle or queue is empty.
@@ -310,6 +792,22 @@ class Orchestrator {
       }
     };
     tryNext();
+  }
+
+  /**
+   * Finalize the current issue lifecycle. Clears active session and transitions
+   * state based on pendingStop and subscription status.
+   */
+  private finalize(): void {
+    this.activeSession = null;
+
+    if (this.pendingStop || !this.unsubscribeReady) {
+      this.state = OrchestratorState.Stopped;
+      this.pendingStop = false;
+    } else {
+      this.state = OrchestratorState.Idle;
+      this.scheduleNext();
+    }
   }
 
   /**

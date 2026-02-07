@@ -5,6 +5,8 @@ export const IssueStatus = {
   Open: "open",
   InProgress: "in_progress",
   Closed: "closed",
+  Deferred: "deferred",
+  Stuck: "stuck",
 } as const;
 
 export const IssuePriority = {
@@ -28,9 +30,13 @@ export const sessionStatusValidator = v.union(
 
 export const SessionType = {
   Work: "work",
+  Review: "review",
 } as const;
 
-export const sessionTypeValidator = v.union(v.literal(SessionType.Work));
+export const sessionTypeValidator = v.union(
+  v.literal(SessionType.Work),
+  v.literal(SessionType.Review),
+);
 
 export const SessionEventDirection = {
   Input: "input",
@@ -46,6 +52,8 @@ export const issueStatusValidator = v.union(
   v.literal(IssueStatus.Open),
   v.literal(IssueStatus.InProgress),
   v.literal(IssueStatus.Closed),
+  v.literal(IssueStatus.Deferred),
+  v.literal(IssueStatus.Stuck),
 );
 
 export const issuePriorityValidator = v.union(
@@ -53,6 +61,32 @@ export const issuePriorityValidator = v.union(
   v.literal(IssuePriority.High),
   v.literal(IssuePriority.Medium),
   v.literal(IssuePriority.Low),
+);
+
+export const CloseType = {
+  Completed: "completed",
+  Noop: "noop",
+  Duplicate: "duplicate",
+  Wontfix: "wontfix",
+} as const;
+
+export const closeTypeValidator = v.union(
+  v.literal(CloseType.Completed),
+  v.literal(CloseType.Noop),
+  v.literal(CloseType.Duplicate),
+  v.literal(CloseType.Wontfix),
+);
+
+export const Disposition = {
+  Done: "done",
+  Noop: "noop",
+  Fault: "fault",
+} as const;
+
+export const dispositionValidator = v.union(
+  v.literal(Disposition.Done),
+  v.literal(Disposition.Noop),
+  v.literal(Disposition.Fault),
 );
 
 export default defineSchema({
@@ -73,6 +107,13 @@ export default defineSchema({
     failureCount: v.number(),
     closedAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
+    sourceIssueId: v.optional(v.id("issues")),
+    reviewIterations: v.optional(v.number()),
+    closeType: v.optional(closeTypeValidator),
+    closeReason: v.optional(v.string()),
+    epicId: v.optional(v.id("epics")),
+    labelIds: v.optional(v.array(v.id("labels"))),
+    deletedAt: v.optional(v.number()),
   }).index("by_project", ["projectId"]),
 
   labels: defineTable({
@@ -100,6 +141,18 @@ export default defineSchema({
     exitCode: v.optional(v.number()),
     pid: v.optional(v.number()),
     lastHeartbeat: v.optional(v.number()),
+    disposition: v.optional(dispositionValidator),
+    note: v.optional(v.string()),
+    agentSessionId: v.optional(v.string()),
+    startHead: v.optional(v.string()),
+    endHead: v.optional(v.string()),
+    turns: v.optional(v.number()),
+    tokens: v.optional(v.number()),
+    cost: v.optional(v.number()),
+    duration: v.optional(v.number()),
+    toolCalls: v.optional(v.number()),
+    model: v.optional(v.string()),
+    createdIssueIds: v.optional(v.array(v.id("issues"))),
   })
     .index("by_project", ["projectId"])
     .index("by_issue", ["issueId"]),

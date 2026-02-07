@@ -93,20 +93,20 @@
 
 ---
 
-- [ ] ### F3d: Orchestrator — Feedback Loop
+- [x] ### F3d: Orchestrator — Feedback Loop
 
 **Goal**: Complete lifecycle with retro, review, and quality control.
 
 **Work**:
-- [ ] **Structured response parsing** — parse `{"disposition": "done|noop|fault", "note": "..."}` from agent output
-- [ ] **Disposition handling** per inference table (done → review, noop → close, fault → retry/fail)
-- [ ] **Retro phase**: Resume same session with retro prompt → findings create follow-up issues with `sourceIssueId`
-- [ ] **Review loop**: Stateless review sessions
-  - [ ] Review gets diff (`startHead..HEAD`) and related issues list
-  - [ ] If review makes commits → loop again (max iterations)
-  - [ ] If no commits → pass, close issue
-- [ ] Circuit breaker — `failureCount` tracking, stuck status when threshold hit
-- [ ] MCP tool: `issues_unstick` (reset stuck issues to `open`)
+- [x] **Structured response parsing** — parse `{"disposition": "done|noop|fault", "note": "..."}` from agent output
+- [x] **Disposition handling** per inference table (done → review, noop → close, fault → retry/fail)
+- [x] **Retro phase**: Resume same session with retro prompt → findings create follow-up issues with `sourceIssueId`
+- [x] **Review loop**: Stateless review sessions
+  - [x] Review gets diff (`startHead..HEAD`) and related issues list
+  - [x] If review makes commits → loop again (max iterations)
+  - [x] If no commits → pass, close issue
+- [x] Circuit breaker — `failureCount` tracking, stuck status when threshold hit
+- [x] MCP tool: `issues_unstick` (reset stuck issues to `open`)
 
 **Checkpoint**: Full loop: auto-claim → work → retro → review → close (or stuck). Follow-up issues created from findings.
 

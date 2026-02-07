@@ -31,10 +31,20 @@ export class SessionMonitor {
   private static readonly FLUSH_INTERVAL_MS = 5_000;
   private static readonly HEARTBEAT_INTERVAL_MS = 30_000;
 
-  constructor(sessionId: Id<"sessions">, _projectId: Id<"projects">) {
+  constructor(
+    sessionId: Id<"sessions">,
+    _projectId: Id<"projects">,
+    initialSequence = 0,
+  ) {
     this.sessionId = sessionId;
     this.buffer = new ActivityBuffer();
     this.tmpPath = `/tmp/flux-session-${sessionId}.log`;
+    this.sequence = initialSequence;
+  }
+
+  /** Current event sequence counter. Used to continue numbering across retro monitors. */
+  get currentSequence(): number {
+    return this.sequence;
   }
 
   /**
@@ -122,6 +132,19 @@ export class SessionMonitor {
   onLine(callback: (line: string) => void): () => void {
     this.lineListeners.add(callback);
     return () => this.lineListeners.delete(callback);
+  }
+
+  /**
+   * Record an input event (e.g. the prompt sent to the agent).
+   * Goes through the same batching pipeline as output events.
+   */
+  recordInput(content: string): void {
+    this.pendingEvents.push({
+      direction: SessionEventDirection.Input,
+      content,
+      timestamp: Date.now(),
+    });
+    this.sequence++;
   }
 
   /** Flush pending events to Convex sessionEvents table. */
