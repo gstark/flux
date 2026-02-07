@@ -28,6 +28,7 @@ export class SessionMonitor {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private sequence = 0;
   private convexFailures = 0;
+  private _shuttingDown = false;
   private static readonly MAX_CONVEX_FAILURES = 5;
   private static readonly FLUSH_INTERVAL_MS = 5_000;
   private static readonly HEARTBEAT_INTERVAL_MS = 30_000;
@@ -202,6 +203,9 @@ export class SessionMonitor {
    * Call this after consume() resolves and before finalizing the session.
    */
   async shutdown(): Promise<void> {
+    if (this._shuttingDown) return;
+    this._shuttingDown = true;
+
     // Clear timers
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
