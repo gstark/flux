@@ -1121,7 +1121,7 @@ claude  # MCP automatically connects to flux server
 ### Agent Context Injection
 When spawning an agent, the orchestrator:
 1. Resolves repo root from `git rev-parse --show-toplevel` — this is the agent's cwd
-2. The project's CLAUDE.md/AGENTS.md contains tenets, conventions, and context
+2. The project's CLAUDE.md contains tenets, conventions, and context
 3. Flux passes the issue details (title, description, shortId) as the initial prompt
 4. Flux does NOT inject a system prompt — the project's own config handles that
 5. The agent works in the repo naturally, same as a human-started session
