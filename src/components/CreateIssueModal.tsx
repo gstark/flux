@@ -14,7 +14,7 @@ const PRIORITY_OPTIONS: { value: PriorityValue; label: string }[] = [
 ];
 
 export function CreateIssueModal() {
-  const projectId = useProjectId();
+  const { projectId } = useRouteContext({ from: "__root__" });
   const navigate = useNavigate();
   const createIssue = useMutation(api.issues.create);
   const dialogRef = useRef<HTMLDialogElement>(null);
