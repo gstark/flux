@@ -5,6 +5,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
 import { CommentsThread } from "./CommentsThread";
+import { DependencySection } from "./DependencySection";
 import { LabelBadge } from "./LabelBadge";
 import { LabelPicker } from "./LabelPicker";
 import { Markdown } from "./Markdown";
@@ -286,6 +287,13 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           <p className="mt-1 text-base-content/40 text-sm">No labels</p>
         )}
       </div>
+
+      {/* Dependencies */}
+      <DependencySection
+        issueId={issueId}
+        disabled={isClosed}
+        onError={showError}
+      />
 
       {/* Description */}
       <div>
