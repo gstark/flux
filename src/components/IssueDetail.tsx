@@ -352,6 +352,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             <LabelPicker
               selectedIds={currentIssue.labelIds ?? []}
               onChange={handleLabelsChange}
+              disabled={busy}
             />
           )}
         </div>
@@ -526,7 +527,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   onChange={(e) =>
                     setCloseType(e.target.value as CloseTypeValue)
                   }
-                  disabled={saving}
+                  disabled={busy}
                 >
                   {Object.entries(CLOSE_TYPE_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -547,7 +548,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   type="button"
                   className="btn btn-error btn-sm"
                   onClick={handleClose}
-                  disabled={saving}
+                  disabled={busy}
                 >
                   {saving ? (
                     <span className="loading loading-spinner loading-xs" />
@@ -560,7 +561,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   type="button"
                   className="btn btn-ghost btn-sm"
                   onClick={() => setShowCloseForm(false)}
-                  disabled={saving}
+                  disabled={busy}
                 >
                   Cancel
                 </button>
