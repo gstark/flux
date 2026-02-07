@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import { IssuePriority } from "$convex/schema";
+import { FontAwesomeIcon, faPlus } from "./Icon";
 
 type PriorityValue = (typeof IssuePriority)[keyof typeof IssuePriority];
 
@@ -87,7 +88,7 @@ export function CreateIssueModal() {
   return (
     <>
       <button type="button" className="btn btn-primary btn-sm" onClick={open}>
-        <i className="fa-solid fa-plus" aria-hidden="true" />
+        <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
         New Issue
       </button>
 

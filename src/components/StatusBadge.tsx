@@ -1,4 +1,5 @@
 import { IssueStatus } from "$convex/schema";
+import { Icon } from "./Icon";
 
 const STATUS_CONFIG = {
   [IssueStatus.Open]: {
@@ -34,7 +35,7 @@ export function StatusBadge({ status }: { status: Status }) {
   const config = STATUS_CONFIG[status];
   return (
     <span className={`badge badge-sm gap-1 ${config.className}`}>
-      <i className={`fa-solid ${config.icon}`} aria-hidden="true" />
+      <Icon name={config.icon} />
       {config.label}
     </span>
   );

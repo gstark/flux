@@ -6,6 +6,7 @@ import type { Id } from "$convex/_generated/dataModel";
 import { IssueStatus } from "$convex/schema";
 import { callTool } from "../lib/api";
 import { CreateIssueModal } from "./CreateIssueModal";
+import { FontAwesomeIcon, faCirclePause, faCirclePlay } from "./Icon";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 
@@ -205,8 +206,8 @@ export function IssueList() {
                         {undeferringId === issue._id ? (
                           <span className="loading loading-spinner loading-xs" />
                         ) : (
-                          <i
-                            className="fa-solid fa-circle-play"
+                          <FontAwesomeIcon
+                            icon={faCirclePlay}
                             aria-hidden="true"
                           />
                         )}
@@ -218,8 +219,8 @@ export function IssueList() {
                         className="btn btn-ghost btn-xs"
                         onClick={() => openDeferModal(issue._id)}
                       >
-                        <i
-                          className="fa-solid fa-circle-pause"
+                        <FontAwesomeIcon
+                          icon={faCirclePause}
                           aria-hidden="true"
                         />
                         Defer
@@ -271,7 +272,7 @@ export function IssueList() {
               {deferring ? (
                 <span className="loading loading-spinner loading-sm" />
               ) : (
-                <i className="fa-solid fa-circle-pause" aria-hidden="true" />
+                <FontAwesomeIcon icon={faCirclePause} aria-hidden="true" />
               )}
               Defer
             </button>

@@ -7,6 +7,13 @@ import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
 import { callTool } from "../lib/api";
 import { CommentsThread } from "./CommentsThread";
 import { DependencySection } from "./DependencySection";
+import {
+  FontAwesomeIcon,
+  faArrowLeft,
+  faCirclePause,
+  faCirclePlay,
+  faCircleXmark,
+} from "./Icon";
 import { LabelBadge } from "./LabelBadge";
 import { LabelPicker } from "./LabelPicker";
 import { Markdown } from "./Markdown";
@@ -243,7 +250,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
       {/* Header */}
       <div className="flex items-center gap-2">
         <Link to="/issues" className="btn btn-ghost btn-sm">
-          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
           Back
         </Link>
         <span className="font-mono text-base-content/60 text-sm">
@@ -391,10 +398,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   {deferring ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
-                    <i
-                      className="fa-solid fa-circle-pause"
-                      aria-hidden="true"
-                    />
+                    <FontAwesomeIcon icon={faCirclePause} aria-hidden="true" />
                   )}
                   Confirm Defer
                 </button>
@@ -417,7 +421,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
               className="btn btn-outline btn-warning btn-sm"
               onClick={() => setShowDeferForm(true)}
             >
-              <i className="fa-solid fa-circle-pause" aria-hidden="true" />
+              <FontAwesomeIcon icon={faCirclePause} aria-hidden="true" />
               Defer Issue
             </button>
           )}
@@ -436,7 +440,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             {undeferring ? (
               <span className="loading loading-spinner loading-xs" />
             ) : (
-              <i className="fa-solid fa-circle-play" aria-hidden="true" />
+              <FontAwesomeIcon icon={faCirclePlay} aria-hidden="true" />
             )}
             Undefer Issue
           </button>
@@ -484,7 +488,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   className="btn btn-error btn-sm"
                   onClick={handleClose}
                 >
-                  <i className="fa-solid fa-circle-xmark" aria-hidden="true" />
+                  <FontAwesomeIcon icon={faCircleXmark} aria-hidden="true" />
                   Confirm Close
                 </button>
                 <button
@@ -502,7 +506,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
               className="btn btn-outline btn-error btn-sm"
               onClick={() => setShowCloseForm(true)}
             >
-              <i className="fa-solid fa-circle-xmark" aria-hidden="true" />
+              <FontAwesomeIcon icon={faCircleXmark} aria-hidden="true" />
               Close Issue
             </button>
           )}

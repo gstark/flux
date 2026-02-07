@@ -1,4 +1,5 @@
 import { useRouteContext } from "@tanstack/react-router";
+import { FontAwesomeIcon, faBars } from "./Icon";
 import { OrchestratorStatus } from "./OrchestratorStatus";
 
 export function Navbar() {
@@ -12,7 +13,11 @@ export function Navbar() {
           aria-label="open sidebar"
           className="btn btn-square btn-ghost"
         >
-          <i className="fa-solid fa-bars text-xl" aria-hidden="true" />
+          <FontAwesomeIcon
+            icon={faBars}
+            className="text-xl"
+            aria-hidden="true"
+          />
         </label>
       </div>
       <div className="flex-1 px-4 font-bold text-lg">Flux</div>

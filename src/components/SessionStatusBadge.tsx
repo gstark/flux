@@ -1,4 +1,5 @@
 import { SessionStatus } from "$convex/schema";
+import { Icon } from "./Icon";
 
 type Status = (typeof SessionStatus)[keyof typeof SessionStatus];
 
@@ -37,7 +38,7 @@ export function SessionStatusBadge({ status }: { status: Status }) {
   const config = statusConfig(status);
   return (
     <span className={`badge badge-sm gap-1 ${config.className}`}>
-      <i className={`fa-solid ${config.icon}`} aria-hidden="true" />
+      <Icon name={config.icon} />
       {config.label}
     </span>
   );

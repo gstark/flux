@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { IssueStatus } from "$convex/schema";
+import { FontAwesomeIcon, faPlus, faXmark } from "./Icon";
 import { StatusBadge } from "./StatusBadge";
 
 type DepDirection = "blockers" | "blocks";
@@ -152,7 +153,7 @@ function DepList({
             className="btn btn-ghost btn-xs"
             onClick={onStartAdd}
           >
-            <i className="fa-solid fa-plus" aria-hidden="true" />
+            <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
             Add
           </button>
         )}
@@ -182,7 +183,7 @@ function DepList({
                     onClick={() => onRemove(blockerId, blockedId)}
                     title="Remove dependency"
                   >
-                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                    <FontAwesomeIcon icon={faXmark} aria-hidden="true" />
                   </button>
                 )}
               </li>

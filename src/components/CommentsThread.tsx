@@ -4,6 +4,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { CommentAuthor } from "$convex/schema";
 import { formatRelativeTime } from "../lib/format";
+import { FontAwesomeIcon, faPaperPlane, Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 
 type CommentAuthorValue = (typeof CommentAuthor)[keyof typeof CommentAuthor];
@@ -68,10 +69,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
               <div key={comment._id} className="rounded-lg bg-base-200 p-3">
                 <div className="mb-1 flex items-center gap-2">
                   <span className={`badge badge-sm gap-1 ${badge.className}`}>
-                    <i
-                      className={`fa-solid ${badge.icon}`}
-                      aria-hidden="true"
-                    />
+                    <Icon name={badge.icon} />
                     {badge.label}
                   </span>
                   <span className="text-base-content/40 text-xs">
@@ -120,7 +118,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
               <span className="loading loading-spinner loading-xs" />
             ) : (
               <>
-                <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+                <FontAwesomeIcon icon={faPaperPlane} aria-hidden="true" />
                 Comment
               </>
             )}

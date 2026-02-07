@@ -10,6 +10,13 @@ import {
 } from "$convex/schema";
 import { formatDuration, phaseLabel, typeLabel } from "../lib/format";
 import { type ParsedLine, parseStreamLine } from "../lib/parseStreamLine";
+import {
+  FontAwesomeIcon,
+  faArrowLeft,
+  faCircleCheck,
+  faScrewdriverWrench,
+  Icon,
+} from "./Icon";
 import { Markdown } from "./Markdown";
 import { SessionStatusBadge } from "./SessionStatusBadge";
 
@@ -60,7 +67,7 @@ function OutputContent({ parsed }: { parsed: ParsedLine }) {
     case "tool_use":
       return (
         <div className="flex items-center gap-2 text-info">
-          <i className="fa-solid fa-screwdriver-wrench" aria-hidden="true" />
+          <FontAwesomeIcon icon={faScrewdriverWrench} aria-hidden="true" />
           <span className="font-semibold">{parsed.toolName}</span>
         </div>
       );
@@ -68,7 +75,7 @@ function OutputContent({ parsed }: { parsed: ParsedLine }) {
       return (
         <details className="group">
           <summary className="cursor-pointer select-none text-success">
-            <i className="fa-solid fa-circle-check" aria-hidden="true" />{" "}
+            <FontAwesomeIcon icon={faCircleCheck} aria-hidden="true" />{" "}
             <span className="text-neutral-content/60 text-xs">Tool result</span>
           </summary>
           <div className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded bg-base-300/20 p-2 text-xs">
@@ -146,7 +153,7 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
       {/* Header */}
       <div className="flex items-center gap-2">
         <Link to="/sessions" className="btn btn-ghost btn-sm">
-          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
           Sessions
         </Link>
       </div>
@@ -174,7 +181,7 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">Disposition:</span>
             <span className={`badge badge-sm gap-1 ${dispo?.className}`}>
-              <i className={`fa-solid ${dispo?.icon}`} aria-hidden="true" />
+              {dispo && <Icon name={dispo.icon} />}
               {dispo?.label}
             </span>
           </div>

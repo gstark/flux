@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { FontAwesomeIcon, faPen, faPlus, faTrash } from "./Icon";
 
 const DEFAULT_COLORS: [string, ...string[]] = [
   "#ef4444", // red
@@ -252,7 +253,7 @@ function LabelRow({
             onClick={startEdit}
             title="Edit label"
           >
-            <i className="fa-solid fa-pen" aria-hidden="true" />
+            <FontAwesomeIcon icon={faPen} aria-hidden="true" />
           </button>
           {confirmDelete ? (
             <>
@@ -278,7 +279,7 @@ function LabelRow({
               onClick={() => setConfirmDelete(true)}
               title="Delete label"
             >
-              <i className="fa-solid fa-trash" aria-hidden="true" />
+              <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -310,7 +311,7 @@ export function LabelsList() {
             className="btn btn-primary btn-sm"
             onClick={() => setShowCreate(true)}
           >
-            <i className="fa-solid fa-plus" aria-hidden="true" />
+            <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
             New Label
           </button>
         )}

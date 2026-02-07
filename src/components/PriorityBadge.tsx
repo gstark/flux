@@ -1,4 +1,5 @@
 import { IssuePriority } from "$convex/schema";
+import { Icon } from "./Icon";
 
 const PRIORITY_CONFIG = {
   [IssuePriority.Critical]: {
@@ -29,7 +30,7 @@ export function PriorityBadge({ priority }: { priority: Priority }) {
   const config = PRIORITY_CONFIG[priority];
   return (
     <span className={`badge badge-sm badge-outline gap-1 ${config.className}`}>
-      <i className={`fa-solid ${config.icon}`} aria-hidden="true" />
+      <Icon name={config.icon} />
       {config.label}
     </span>
   );

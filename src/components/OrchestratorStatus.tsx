@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { callTool } from "../lib/api";
+import { FontAwesomeIcon, faPlay, faSkull, faStop } from "./Icon";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ export function OrchestratorStatus({
             <span className="loading loading-spinner loading-xs" />
           ) : (
             <>
-              <i className="fa-solid fa-play" aria-hidden="true" />
+              <FontAwesomeIcon icon={faPlay} aria-hidden="true" />
               Enable
             </>
           )}
@@ -187,7 +188,7 @@ export function OrchestratorStatus({
             <span className="loading loading-spinner loading-xs" />
           ) : (
             <>
-              <i className="fa-solid fa-stop" aria-hidden="true" />
+              <FontAwesomeIcon icon={faStop} aria-hidden="true" />
               Stop
             </>
           )}
@@ -205,7 +206,7 @@ export function OrchestratorStatus({
             <span className="loading loading-spinner loading-xs" />
           ) : (
             <>
-              <i className="fa-solid fa-skull" aria-hidden="true" />
+              <FontAwesomeIcon icon={faSkull} aria-hidden="true" />
               Kill
             </>
           )}

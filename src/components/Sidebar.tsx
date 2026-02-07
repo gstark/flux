@@ -1,4 +1,12 @@
 import { Link } from "@tanstack/react-router";
+import {
+  FontAwesomeIcon,
+  faCircleDot,
+  faClockRotateLeft,
+  faGear,
+  faTags,
+  faTerminal,
+} from "./Icon";
 
 export function Sidebar() {
   return (
@@ -9,7 +17,7 @@ export function Sidebar() {
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
-          <i className="fa-solid fa-circle-dot" aria-hidden="true" />
+          <FontAwesomeIcon icon={faCircleDot} aria-hidden="true" />
           Issues
         </Link>
       </li>
@@ -19,7 +27,7 @@ export function Sidebar() {
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
-          <i className="fa-solid fa-tags" aria-hidden="true" />
+          <FontAwesomeIcon icon={faTags} aria-hidden="true" />
           Labels
         </Link>
       </li>
@@ -29,7 +37,7 @@ export function Sidebar() {
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
-          <i className="fa-solid fa-terminal" aria-hidden="true" />
+          <FontAwesomeIcon icon={faTerminal} aria-hidden="true" />
           Activity
         </Link>
       </li>
@@ -39,7 +47,7 @@ export function Sidebar() {
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
-          <i className="fa-solid fa-clock-rotate-left" aria-hidden="true" />
+          <FontAwesomeIcon icon={faClockRotateLeft} aria-hidden="true" />
           Sessions
         </Link>
       </li>
@@ -49,7 +57,7 @@ export function Sidebar() {
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
-          <i className="fa-solid fa-gear" aria-hidden="true" />
+          <FontAwesomeIcon icon={faGear} aria-hidden="true" />
           Settings
         </Link>
       </li>

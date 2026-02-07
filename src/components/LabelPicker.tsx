@@ -3,6 +3,7 @@ import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { FontAwesomeIcon, faTag } from "./Icon";
 import { LabelBadge } from "./LabelBadge";
 
 export function LabelPicker({
@@ -55,7 +56,7 @@ export function LabelPicker({
         disabled={disabled}
         aria-expanded={open}
       >
-        <i className="fa-solid fa-tag" aria-hidden="true" />
+        <FontAwesomeIcon icon={faTag} aria-hidden="true" />
         Edit
       </button>
 
