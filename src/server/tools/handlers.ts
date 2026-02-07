@@ -98,7 +98,7 @@ const issues_update: ToolHandler = async (args, ctx) => {
     issueId: string;
     title?: string;
     description?: string;
-    status?: "open" | "in_progress" | "closed";
+    status?: "open" | "in_progress" | "closed" | "deferred" | "stuck";
     priority?: "critical" | "high" | "medium" | "low";
     assignee?: string;
   };
@@ -298,6 +298,65 @@ const issues_retry: ToolHandler = async (args, ctx) => {
   }
 };
 
+const issues_defer: ToolHandler = async (args, ctx) => {
+  const { issueId, note } = args as { issueId: string; note: string };
+
+  const issue = await ctx.convex.query(api.issues.get, {
+    issueId: issueId as Id<"issues">,
+  });
+  if (!issue) {
+    return error(
+      `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
+    );
+  }
+  if (issue.status === "deferred") {
+    return error(`Issue ${issue.shortId} is already deferred.`);
+  }
+  if (issue.status === "closed") {
+    return error(`Cannot defer a closed issue (${issue.shortId}).`);
+  }
+
+  const updated = await ctx.convex.mutation(api.issues.update, {
+    issueId: issueId as Id<"issues">,
+    status: "deferred",
+  });
+  await ctx.convex.mutation(api.comments.create, {
+    issueId: issueId as Id<"issues">,
+    content: `Deferred: ${note}`,
+    author: "flux",
+  });
+  return ok(ctx, { issue: updated });
+};
+
+const issues_undefer: ToolHandler = async (args, ctx) => {
+  const { issueId, note } = args as { issueId: string; note: string };
+
+  const issue = await ctx.convex.query(api.issues.get, {
+    issueId: issueId as Id<"issues">,
+  });
+  if (!issue) {
+    return error(
+      `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
+    );
+  }
+  if (issue.status !== "deferred") {
+    return error(
+      `Issue ${issue.shortId} is not deferred (status: ${issue.status}).`,
+    );
+  }
+
+  const updated = await ctx.convex.mutation(api.issues.update, {
+    issueId: issueId as Id<"issues">,
+    status: "open",
+  });
+  await ctx.convex.mutation(api.comments.create, {
+    issueId: issueId as Id<"issues">,
+    content: `Undeferred: ${note}`,
+    author: "flux",
+  });
+  return ok(ctx, { issue: updated });
+};
+
 const issues_search: ToolHandler = async (args, ctx) => {
   const { query, limit } = args as { query: string; limit?: number };
 
@@ -345,7 +404,7 @@ const issues_bulk_update: ToolHandler = async (args, ctx) => {
   const { updates } = args as {
     updates: Array<{
       issueId: string;
-      status?: "open" | "in_progress" | "closed";
+      status?: "open" | "in_progress" | "closed" | "deferred" | "stuck";
       priority?: "critical" | "high" | "medium" | "low";
     }>;
   };
@@ -550,6 +609,8 @@ export const handlers: Record<string, ToolHandler> = {
   issues_update,
   issues_close,
   issues_ready,
+  issues_defer,
+  issues_undefer,
   issues_unstick,
   issues_retry,
   issues_search,

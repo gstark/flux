@@ -53,7 +53,7 @@ const issues_list: ToolDef = {
     "List issues sorted by priority (critical first) then creation time (oldest first).",
   schema: {
     status: z
-      .enum(["open", "in_progress", "closed"])
+      .enum(["open", "in_progress", "closed", "deferred", "stuck"])
       .optional()
       .describe("Filter by status. Omit for all."),
     limit: z.number().optional().describe("Max results. Default 50, max 200."),
@@ -83,7 +83,7 @@ const issues_update: ToolDef = {
       .optional()
       .describe("New description. Supports markdown."),
     status: z
-      .enum(["open", "in_progress", "closed"])
+      .enum(["open", "in_progress", "closed", "deferred", "stuck"])
       .optional()
       .describe("New status."),
     priority: z
@@ -338,12 +338,14 @@ const issues_bulk_create: ToolDef = {
 const issues_bulk_update: ToolDef = {
   name: "issues_bulk_update",
   description:
-    "Update multiple issues in one call. Useful for batch defer/undefer or priority changes.",
+    "Update multiple issues in one call. Useful for batch priority changes.",
   schema: {
     updates: jsonArray(
       z.object({
         issueId: z.string(),
-        status: z.enum(["open", "in_progress", "closed"]).optional(),
+        status: z
+          .enum(["open", "in_progress", "closed", "deferred", "stuck"])
+          .optional(),
         priority: z.enum(["critical", "high", "medium", "low"]).optional(),
       }),
     ).describe("Array of issue updates. Each must include issueId."),
