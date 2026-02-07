@@ -125,6 +125,23 @@ Available categories: `component-examples`, `components`, `layouts`, `templates`
 3. Call daisyUI-Snippets with required components
 4. Build HTML using the retrieved snippets
 
+### Playwright
+
+Headless browser automation for UI validation. Available to all agents via `.mcp.json`.
+
+**Use for**: Verifying UI behavior after building/modifying frontend components. Navigate to `http://localhost:8042`, interact with elements, and confirm expected behavior.
+
+**Key tools**: `browser_navigate`, `browser_click`, `browser_snapshot` (accessibility tree), `browser_type`
+
+**Validation pattern**:
+1. `browser_navigate` to the relevant page (e.g., `http://localhost:8042/issues`)
+2. `browser_snapshot` to get the accessibility tree
+3. Verify expected elements exist (buttons, text, badges, etc.)
+4. `browser_click` / `browser_type` to test interactions
+5. `browser_snapshot` again to verify the result
+
+The accessibility tree approach means you identify elements by their role and name (e.g., "button 'Defer'") rather than CSS selectors — robust even as styles change.
+
 ### Convex
 
 Backend-as-a-service for real-time data. Functions live in `convex/` directory.
