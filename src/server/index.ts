@@ -45,7 +45,7 @@ export async function startServer(
             { status: 500 },
           );
         }
-        return Response.json({ convexUrl });
+        return Response.json({ convexUrl, projectId });
       },
 
       "/mcp": (req) => handleMcp(req),
