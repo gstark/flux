@@ -141,8 +141,8 @@ export function OrchestratorStatus({
   const activeSessionId = status?.activeSession?.sessionId ?? null;
 
   // Button visibility
-  const showEnable = state !== "busy" && !enabled;
-  const showStop = enabled;
+  const showEnable = state === "stopped";
+  const showStop = state === "idle" || state === "busy";
   const showKill = state === "busy";
 
   // ── Render ───────────────────────────────────────────────────────
