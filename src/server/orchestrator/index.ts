@@ -537,6 +537,13 @@ class Orchestrator {
           err,
         );
       }
+      // Review creates a new session (different tmp path). Clean up work
+      // tmp file now — it would otherwise be orphaned.
+      try {
+        await active.monitor.cleanupTmpFile();
+      } catch {
+        // Non-fatal: best-effort cleanup
+      }
       await this.startReviewLoop();
     }
     return true;
@@ -582,6 +589,13 @@ class Orchestrator {
     }
 
     // Always proceed to review, regardless of retro outcome
+    // Review creates a new session (different tmp path). Clean up the
+    // work/retro tmp file now — it would otherwise be orphaned.
+    try {
+      await active.monitor.cleanupTmpFile();
+    } catch {
+      // Non-fatal: best-effort cleanup
+    }
     await this.startReviewLoop();
     return true;
   }
