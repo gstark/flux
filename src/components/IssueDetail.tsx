@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
+import { callTool } from "../lib/api";
 import { CommentsThread } from "./CommentsThread";
 import { DependencySection } from "./DependencySection";
 import { LabelBadge } from "./LabelBadge";
@@ -50,6 +51,11 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   );
   const [closeReason, setCloseReason] = useState("");
 
+  const [showDeferForm, setShowDeferForm] = useState(false);
+  const [deferNote, setDeferNote] = useState("");
+  const [deferring, setDeferring] = useState(false);
+  const [undeferring, setUndeferring] = useState(false);
+
   const [mutationError, setMutationError] = useState<string | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -93,6 +99,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   // Captured after null checks — safe to use in handlers without non-null assertions
   const currentIssue = issue;
   const isClosed = currentIssue.status === IssueStatus.Closed;
+  const isDeferred = currentIssue.status === IssueStatus.Deferred;
 
   // Build a lookup map for label data
   const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
@@ -184,6 +191,36 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
       setCloseReason("");
     } catch (err) {
       showError(err);
+    }
+  }
+
+  async function handleDefer() {
+    setDeferring(true);
+    try {
+      await callTool("issues_defer", {
+        issueId,
+        note: deferNote.trim() || "Deferred from UI",
+      });
+      setShowDeferForm(false);
+      setDeferNote("");
+    } catch (err) {
+      showError(err);
+    } finally {
+      setDeferring(false);
+    }
+  }
+
+  async function handleUndefer() {
+    setUndeferring(true);
+    try {
+      await callTool("issues_undefer", {
+        issueId,
+        note: "Undeferred from UI",
+      });
+    } catch (err) {
+      showError(err);
+    } finally {
+      setUndeferring(false);
     }
   }
 
@@ -330,6 +367,73 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           </button>
         )}
       </div>
+
+      {/* Defer action */}
+      {!isClosed && !isDeferred && (
+        <div>
+          {showDeferForm ? (
+            <div className="flex flex-col gap-3 rounded-lg border border-warning/30 bg-base-200 p-4">
+              <h3 className="font-medium">Defer Issue</h3>
+              <textarea
+                className="textarea textarea-bordered"
+                placeholder="Reason for deferring (optional)"
+                value={deferNote}
+                onChange={(e) => setDeferNote(e.target.value)}
+                rows={2}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-warning btn-sm"
+                  onClick={handleDefer}
+                  disabled={deferring}
+                >
+                  {deferring && (
+                    <span className="loading loading-spinner loading-xs" />
+                  )}
+                  Confirm Defer
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setShowDeferForm(false);
+                    setDeferNote("");
+                  }}
+                  disabled={deferring}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline btn-warning btn-sm"
+              onClick={() => setShowDeferForm(true)}
+            >
+              Defer Issue
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Undefer action */}
+      {isDeferred && (
+        <div>
+          <button
+            type="button"
+            className="btn btn-outline btn-info btn-sm"
+            onClick={handleUndefer}
+            disabled={undeferring}
+          >
+            {undeferring && (
+              <span className="loading loading-spinner loading-xs" />
+            )}
+            Undefer Issue
+          </button>
+        </div>
+      )}
 
       {/* Close action */}
       {!isClosed && (

@@ -1,8 +1,10 @@
 import { Link, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
+import type { Id } from "$convex/_generated/dataModel";
 import { IssueStatus } from "$convex/schema";
+import { callTool } from "../lib/api";
 import { CreateIssueModal } from "./CreateIssueModal";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
@@ -21,6 +23,62 @@ const TABS: { label: string; value: StatusFilter }[] = [
 export function IssueList() {
   const { projectId } = useRouteContext({ from: "__root__" });
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
+
+  // Defer modal state
+  const [deferTargetId, setDeferTargetId] = useState<Id<"issues"> | null>(null);
+  const [deferNote, setDeferNote] = useState("");
+  const [deferring, setDeferring] = useState(false);
+  const [deferError, setDeferError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (deferTargetId) noteRef.current?.focus();
+  }, [deferTargetId]);
+
+  function openDeferModal(issueId: Id<"issues">) {
+    setDeferTargetId(issueId);
+    setDeferNote("");
+    setDeferError(null);
+    dialogRef.current?.showModal();
+  }
+
+  function closeDeferModal() {
+    dialogRef.current?.close();
+    setDeferTargetId(null);
+    setDeferNote("");
+    setDeferError(null);
+  }
+
+  async function handleDefer() {
+    if (!deferTargetId) return;
+    setDeferring(true);
+    setDeferError(null);
+    try {
+      await callTool("issues_defer", {
+        issueId: deferTargetId,
+        note: deferNote.trim() || "Deferred from UI",
+      });
+      closeDeferModal();
+    } catch (err) {
+      setDeferError(
+        err instanceof Error ? err.message : "Failed to defer issue",
+      );
+    } finally {
+      setDeferring(false);
+    }
+  }
+
+  async function handleUndefer(issueId: Id<"issues">) {
+    try {
+      await callTool("issues_undefer", {
+        issueId,
+        note: "Undeferred from UI",
+      });
+    } catch {
+      // Error is visible via status not changing — realtime subscription handles UI update
+    }
+  }
 
   const issues = useQuery(api.issues.list, {
     projectId,
@@ -72,6 +130,7 @@ export function IssueList() {
                 <th>Title</th>
                 <th>Status</th>
                 <th>Priority</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -101,12 +160,78 @@ export function IssueList() {
                   <td>
                     <PriorityBadge priority={issue.priority} />
                   </td>
+                  <td>
+                    {issue.status === IssueStatus.Deferred ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => handleUndefer(issue._id)}
+                      >
+                        Undefer
+                      </button>
+                    ) : issue.status !== IssueStatus.Closed ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => openDeferModal(issue._id)}
+                      >
+                        Defer
+                      </button>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Defer modal */}
+      <dialog ref={dialogRef} className="modal" onClose={closeDeferModal}>
+        <div className="modal-box">
+          <h3 className="mb-4 font-bold text-lg">Defer Issue</h3>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Reason (optional)</legend>
+            <textarea
+              ref={noteRef}
+              className="textarea textarea-bordered w-full"
+              placeholder="Why is this being deferred?"
+              value={deferNote}
+              onChange={(e) => setDeferNote(e.target.value)}
+              rows={3}
+            />
+          </fieldset>
+          {deferError && (
+            <div role="alert" className="alert alert-error mt-3 text-sm">
+              {deferError}
+            </div>
+          )}
+          <div className="modal-action">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={closeDeferModal}
+              disabled={deferring}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-warning"
+              onClick={handleDefer}
+              disabled={deferring}
+            >
+              {deferring && (
+                <span className="loading loading-spinner loading-sm" />
+              )}
+              Defer
+            </button>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button type="submit">close</button>
+        </form>
+      </dialog>
     </div>
   );
 }
