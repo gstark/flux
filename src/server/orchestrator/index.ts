@@ -377,7 +377,11 @@ class Orchestrator {
       // Isolated try-catch: a filesystem error here must NOT propagate to
       // the outer catch, which calls finalize() — that would orphan an
       // in-flight retro/review session.
-      if (cleanExit) {
+      // Guard: only clean up if the lifecycle ended (finalize ran). When
+      // work→retro or retro→review transitions occur, activeSession is still
+      // set — the new phase's monitor may share the same tmp path (retro
+      // reuses the work session ID). Cleaning here would delete its active file.
+      if (cleanExit && this.activeSession === null) {
         try {
           await monitor.cleanupTmpFile();
         } catch (cleanupErr) {
