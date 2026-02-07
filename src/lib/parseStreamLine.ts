@@ -29,13 +29,7 @@ export function summarizeToolInput(
 
   switch (toolName) {
     case "Read":
-      return typeof input.file_path === "string"
-        ? input.file_path.replace(/.*\//, "")
-        : null;
     case "Write":
-      return typeof input.file_path === "string"
-        ? input.file_path.replace(/.*\//, "")
-        : null;
     case "Edit":
       return typeof input.file_path === "string"
         ? input.file_path.replace(/.*\//, "")
