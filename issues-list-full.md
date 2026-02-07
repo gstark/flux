@@ -1,0 +1,1148 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: Flux
+      - 'status "Orchestrator: Review FLUX-80" [ref=e40]':
+        - generic [ref=e12]: Review FLUX-80
+        - button "Kill" [ref=e13] [cursor=pointer]
+    - main [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - heading "Issues" [level=2] [ref=e18]
+            - generic [ref=e41]: 100 issues
+          - button "New Issue" [ref=e19] [cursor=pointer]: New Issue
+          - option "Critical"
+          - option "High"
+          - option "Medium" [selected]
+          - option "Low"
+        - tablist [ref=e21]:
+          - tab "All" [ref=e22] [cursor=pointer]
+          - tab "Open" [ref=e23] [cursor=pointer]
+          - tab "In Progress" [ref=e24] [cursor=pointer]
+          - tab "Closed" [ref=e25] [cursor=pointer]
+          - tab "Stuck" [ref=e26] [cursor=pointer]
+          - tab "Deferred" [ref=e27] [cursor=pointer]
+        - table [ref=e42]:
+          - rowgroup [ref=e43]:
+            - row "ID Title Status Priority" [ref=e44]:
+              - columnheader "ID" [ref=e45]
+              - columnheader "Title" [ref=e46]
+              - columnheader "Status" [ref=e47]
+              - columnheader "Priority" [ref=e48]
+          - rowgroup [ref=e49]:
+            - row "FLUX-22 scheduleNext race condition allows parallel agent spawns Closed Critical" [ref=e50]:
+              - cell "FLUX-22" [ref=e51]:
+                - link "FLUX-22" [ref=e52] [cursor=pointer]:
+                  - /url: /issues/jh7ahm4c3mbr91n7te44bx7zq180pwe3
+              - cell "scheduleNext race condition allows parallel agent spawns" [ref=e53]:
+                - link "scheduleNext race condition allows parallel agent spawns" [ref=e54] [cursor=pointer]:
+                  - /url: /issues/jh7ahm4c3mbr91n7te44bx7zq180pwe3
+              - cell "Closed" [ref=e55]:
+                - generic [ref=e56]: Closed
+              - cell "Critical" [ref=e57]:
+                - generic [ref=e58]: Critical
+            - row "FLUX-27 Exit handler crash wedges orchestrator in Busy state forever Closed Critical" [ref=e59]:
+              - cell "FLUX-27" [ref=e60]:
+                - link "FLUX-27" [ref=e61] [cursor=pointer]:
+                  - /url: /issues/jh79z114xjg2w8mz73ya4tr0cs80q9qz
+              - cell "Exit handler crash wedges orchestrator in Busy state forever" [ref=e62]:
+                - link "Exit handler crash wedges orchestrator in Busy state forever" [ref=e63] [cursor=pointer]:
+                  - /url: /issues/jh79z114xjg2w8mz73ya4tr0cs80q9qz
+              - cell "Closed" [ref=e64]:
+                - generic [ref=e65]: Closed
+              - cell "Critical" [ref=e66]:
+                - generic [ref=e67]: Critical
+            - 'row "FLUX-45 Monitor `flushToConvex` throw kills interval timer — events silently stop flushing Closed Critical" [ref=e68]':
+              - cell "FLUX-45" [ref=e69]:
+                - link "FLUX-45" [ref=e70] [cursor=pointer]:
+                  - /url: /issues/jh742178f6aa134yrnj6hgyvx580ppc2
+              - 'cell "Monitor `flushToConvex` throw kills interval timer — events silently stop flushing" [ref=e71]':
+                - 'link "Monitor `flushToConvex` throw kills interval timer — events silently stop flushing" [ref=e72] [cursor=pointer]':
+                  - /url: /issues/jh742178f6aa134yrnj6hgyvx580ppc2
+              - cell "Closed" [ref=e73]:
+                - generic [ref=e74]: Closed
+              - cell "Critical" [ref=e75]:
+                - generic [ref=e76]: Critical
+            - row "FLUX-2 Add sessions table and session enums to Convex schema Closed High" [ref=e77]:
+              - cell "FLUX-2" [ref=e78]:
+                - link "FLUX-2" [ref=e79] [cursor=pointer]:
+                  - /url: /issues/jh702xan9ahkwmxvmjb1bn43hn80px22
+              - cell "Add sessions table and session enums to Convex schema" [ref=e80]:
+                - link "Add sessions table and session enums to Convex schema" [ref=e81] [cursor=pointer]:
+                  - /url: /issues/jh702xan9ahkwmxvmjb1bn43hn80px22
+              - cell "Closed" [ref=e82]:
+                - generic [ref=e83]: Closed
+              - cell "High" [ref=e84]:
+                - generic [ref=e85]: High
+            - row "FLUX-3 Add issues_claim atomic mutation Closed High" [ref=e86]:
+              - cell "FLUX-3" [ref=e87]:
+                - link "FLUX-3" [ref=e88] [cursor=pointer]:
+                  - /url: /issues/jh7cn7q0pnnwwp0zsf1y09rd0x80q4zj
+              - cell "Add issues_claim atomic mutation" [ref=e89]:
+                - link "Add issues_claim atomic mutation" [ref=e90] [cursor=pointer]:
+                  - /url: /issues/jh7cn7q0pnnwwp0zsf1y09rd0x80q4zj
+              - cell "Closed" [ref=e91]:
+                - generic [ref=e92]: Closed
+              - cell "High" [ref=e93]:
+                - generic [ref=e94]: High
+            - row "FLUX-4 Add sessions Convex functions (create, update, list) Closed High" [ref=e95]:
+              - cell "FLUX-4" [ref=e96]:
+                - link "FLUX-4" [ref=e97] [cursor=pointer]:
+                  - /url: /issues/jh7bwrcbjc6tt2at3ft3dzmxy180psvj
+              - cell "Add sessions Convex functions (create, update, list)" [ref=e98]:
+                - link "Add sessions Convex functions (create, update, list)" [ref=e99] [cursor=pointer]:
+                  - /url: /issues/jh7bwrcbjc6tt2at3ft3dzmxy180psvj
+              - cell "Closed" [ref=e100]:
+                - generic [ref=e101]: Closed
+              - cell "High" [ref=e102]:
+                - generic [ref=e103]: High
+            - row "FLUX-5 Implement AgentProvider interface and ClaudeCodeProvider Closed High" [ref=e104]:
+              - cell "FLUX-5" [ref=e105]:
+                - link "FLUX-5" [ref=e106] [cursor=pointer]:
+                  - /url: /issues/jh7932ypxyrxfzrf2whnwy0m7980p4ma
+              - cell "Implement AgentProvider interface and ClaudeCodeProvider" [ref=e107]:
+                - link "Implement AgentProvider interface and ClaudeCodeProvider" [ref=e108] [cursor=pointer]:
+                  - /url: /issues/jh7932ypxyrxfzrf2whnwy0m7980p4ma
+              - cell "Closed" [ref=e109]:
+                - generic [ref=e110]: Closed
+              - cell "High" [ref=e111]:
+                - generic [ref=e112]: High
+            - row "FLUX-6 Implement orchestrator core module (run + kill) Closed High" [ref=e113]:
+              - cell "FLUX-6" [ref=e114]:
+                - link "FLUX-6" [ref=e115] [cursor=pointer]:
+                  - /url: /issues/jh7b8c99gxqwxgyss19h25g1zx80qv90
+              - cell "Implement orchestrator core module (run + kill)" [ref=e116]:
+                - link "Implement orchestrator core module (run + kill)" [ref=e117] [cursor=pointer]:
+                  - /url: /issues/jh7b8c99gxqwxgyss19h25g1zx80qv90
+              - cell "Closed" [ref=e118]:
+                - generic [ref=e119]: Closed
+              - cell "High" [ref=e120]:
+                - generic [ref=e121]: High
+            - 'row "FLUX-7 Add MCP tools: orchestrator_run, orchestrator_kill, sessions_list Closed High" [ref=e122]':
+              - cell "FLUX-7" [ref=e123]:
+                - link "FLUX-7" [ref=e124] [cursor=pointer]:
+                  - /url: /issues/jh7edwbma8gvjg2t760nq6fb0d80qtme
+              - 'cell "Add MCP tools: orchestrator_run, orchestrator_kill, sessions_list" [ref=e125]':
+                - 'link "Add MCP tools: orchestrator_run, orchestrator_kill, sessions_list" [ref=e126] [cursor=pointer]':
+                  - /url: /issues/jh7edwbma8gvjg2t760nq6fb0d80qtme
+              - cell "Closed" [ref=e127]:
+                - generic [ref=e128]: Closed
+              - cell "High" [ref=e129]:
+                - generic [ref=e130]: High
+            - 'row "FLUX-13 git.ts: hasNewCommits, getDiff, getCommitLog use catch-log-continue anti-pattern Closed High" [ref=e131]':
+              - cell "FLUX-13" [ref=e132]:
+                - link "FLUX-13" [ref=e133] [cursor=pointer]:
+                  - /url: /issues/jh78dtbhtvkvfekrzm3v0771k980p3mr
+              - 'cell "git.ts: hasNewCommits, getDiff, getCommitLog use catch-log-continue anti-pattern" [ref=e134]':
+                - 'link "git.ts: hasNewCommits, getDiff, getCommitLog use catch-log-continue anti-pattern" [ref=e135] [cursor=pointer]':
+                  - /url: /issues/jh78dtbhtvkvfekrzm3v0771k980p3mr
+              - cell "Closed" [ref=e136]:
+                - generic [ref=e137]: Closed
+              - cell "High" [ref=e138]:
+                - generic [ref=e139]: High
+            - row "FLUX-14 MCP tools issues_search, issues_bulk_create, and comments_create return 'Not implemented' Closed High" [ref=e140]:
+              - cell "FLUX-14" [ref=e141]:
+                - link "FLUX-14" [ref=e142] [cursor=pointer]:
+                  - /url: /issues/jh71pxqrxj12q7mr0m34g52vc180qdye
+              - cell "MCP tools issues_search, issues_bulk_create, and comments_create return 'Not implemented'" [ref=e143]:
+                - link "MCP tools issues_search, issues_bulk_create, and comments_create return 'Not implemented'" [ref=e144] [cursor=pointer]:
+                  - /url: /issues/jh71pxqrxj12q7mr0m34g52vc180qdye
+              - cell "Closed" [ref=e145]:
+                - generic [ref=e146]: Closed
+              - cell "High" [ref=e147]:
+                - generic [ref=e148]: High
+            - 'row "FLUX-15 Add `epics` table to Convex schema Closed High" [ref=e149]':
+              - cell "FLUX-15" [ref=e150]:
+                - link "FLUX-15" [ref=e151] [cursor=pointer]:
+                  - /url: /issues/jh7305pya8nj13fjpyc9pbpneh80qqjs
+              - 'cell "Add `epics` table to Convex schema" [ref=e152]':
+                - 'link "Add `epics` table to Convex schema" [ref=e153] [cursor=pointer]':
+                  - /url: /issues/jh7305pya8nj13fjpyc9pbpneh80qqjs
+              - cell "Closed" [ref=e154]:
+                - generic [ref=e155]: Closed
+              - cell "High" [ref=e156]:
+                - generic [ref=e157]: High
+            - 'row "FLUX-16 Add `convex/epics.ts` — Convex functions for epic CRUD Closed High" [ref=e158]':
+              - cell "FLUX-16" [ref=e159]:
+                - link "FLUX-16" [ref=e160] [cursor=pointer]:
+                  - /url: /issues/jh73c1jdxvqknkj106zscxq4mh80pg6x
+              - 'cell "Add `convex/epics.ts` — Convex functions for epic CRUD" [ref=e161]':
+                - 'link "Add `convex/epics.ts` — Convex functions for epic CRUD" [ref=e162] [cursor=pointer]':
+                  - /url: /issues/jh73c1jdxvqknkj106zscxq4mh80pg6x
+              - cell "Closed" [ref=e163]:
+                - generic [ref=e164]: Closed
+              - cell "High" [ref=e165]:
+                - generic [ref=e166]: High
+            - 'row "FLUX-17 Add epic MCP handlers in `handlers.ts` Closed High" [ref=e167]':
+              - cell "FLUX-17" [ref=e168]:
+                - link "FLUX-17" [ref=e169] [cursor=pointer]:
+                  - /url: /issues/jh77s2bwcqq0w80nzx5zvre2vd80p6d1
+              - 'cell "Add epic MCP handlers in `handlers.ts`" [ref=e170]':
+                - 'link "Add epic MCP handlers in `handlers.ts`" [ref=e171] [cursor=pointer]':
+                  - /url: /issues/jh77s2bwcqq0w80nzx5zvre2vd80p6d1
+              - cell "Closed" [ref=e172]:
+                - generic [ref=e173]: Closed
+              - cell "High" [ref=e174]:
+                - generic [ref=e175]: High
+            - 'row "FLUX-20 MCP `comments_create` handler returns \"Not implemented\" Closed High" [ref=e176]':
+              - cell "FLUX-20" [ref=e177]:
+                - link "FLUX-20" [ref=e178] [cursor=pointer]:
+                  - /url: /issues/jh7dkkpk8vfqa7gde5bvm4jcqs80p6h0
+              - 'cell "MCP `comments_create` handler returns \"Not implemented\"" [ref=e179]':
+                - 'link "MCP `comments_create` handler returns \"Not implemented\"" [ref=e180] [cursor=pointer]':
+                  - /url: /issues/jh7dkkpk8vfqa7gde5bvm4jcqs80p6h0
+              - cell "Closed" [ref=e181]:
+                - generic [ref=e182]: Closed
+              - cell "High" [ref=e183]:
+                - generic [ref=e184]: High
+            - row "FLUX-30 Auto-commit hook interferes with agent commit flow Closed High" [ref=e185]:
+              - cell "FLUX-30" [ref=e186]:
+                - link "FLUX-30" [ref=e187] [cursor=pointer]:
+                  - /url: /issues/jh75cggspmc1p27c856jrqh9nx80qen5
+              - cell "Auto-commit hook interferes with agent commit flow" [ref=e188]:
+                - link "Auto-commit hook interferes with agent commit flow" [ref=e189] [cursor=pointer]:
+                  - /url: /issues/jh75cggspmc1p27c856jrqh9nx80qen5
+              - cell "Closed" [ref=e190]:
+                - generic [ref=e191]: Closed
+              - cell "High" [ref=e192]:
+                - generic [ref=e193]: High
+            - row "FLUX-32 issues_bulk_create MCP tool fails with Zod validation error on array argument Closed High" [ref=e194]:
+              - cell "FLUX-32" [ref=e195]:
+                - link "FLUX-32" [ref=e196] [cursor=pointer]:
+                  - /url: /issues/jh7ays7hgk31xfxxb1m5f6mvjs80p1ve
+              - cell "issues_bulk_create MCP tool fails with Zod validation error on array argument" [ref=e197]:
+                - link "issues_bulk_create MCP tool fails with Zod validation error on array argument" [ref=e198] [cursor=pointer]:
+                  - /url: /issues/jh7ays7hgk31xfxxb1m5f6mvjs80p1ve
+              - cell "Closed" [ref=e199]:
+                - generic [ref=e200]: Closed
+              - cell "High" [ref=e201]:
+                - generic [ref=e202]: High
+            - row "FLUX-33 Re-adopt live orphaned sessions after hot reload Closed High" [ref=e203]:
+              - cell "FLUX-33" [ref=e204]:
+                - link "FLUX-33" [ref=e205] [cursor=pointer]:
+                  - /url: /issues/jh702g77cafktcd7rfv9bv576580q3d4
+              - cell "Re-adopt live orphaned sessions after hot reload" [ref=e206]:
+                - link "Re-adopt live orphaned sessions after hot reload" [ref=e207] [cursor=pointer]:
+                  - /url: /issues/jh702g77cafktcd7rfv9bv576580q3d4
+              - cell "Closed" [ref=e208]:
+                - generic [ref=e209]: Closed
+              - cell "High" [ref=e210]:
+                - generic [ref=e211]: High
+            - 'row "FLUX-37 Fix biome lint errors: noAssignInExpressions in prompts.ts, noImplicitAnyLet in epics.ts Closed High" [ref=e212]':
+              - cell "FLUX-37" [ref=e213]:
+                - link "FLUX-37" [ref=e214] [cursor=pointer]:
+                  - /url: /issues/jh71rqk8dqhkqymfcz258cjpdd80q9ek
+              - 'cell "Fix biome lint errors: noAssignInExpressions in prompts.ts, noImplicitAnyLet in epics.ts" [ref=e215]':
+                - 'link "Fix biome lint errors: noAssignInExpressions in prompts.ts, noImplicitAnyLet in epics.ts" [ref=e216] [cursor=pointer]':
+                  - /url: /issues/jh71rqk8dqhkqymfcz258cjpdd80q9ek
+              - cell "Closed" [ref=e217]:
+                - generic [ref=e218]: Closed
+              - cell "High" [ref=e219]:
+                - generic [ref=e220]: High
+            - 'row "FLUX-46 `nuke.ts` misses comments, epics, sessions, and sessionEvents tables Closed High" [ref=e221]':
+              - cell "FLUX-46" [ref=e222]:
+                - link "FLUX-46" [ref=e223] [cursor=pointer]:
+                  - /url: /issues/jh7e82k98vdmgdcymds2sq001s80qyrk
+              - 'cell "`nuke.ts` misses comments, epics, sessions, and sessionEvents tables" [ref=e224]':
+                - 'link "`nuke.ts` misses comments, epics, sessions, and sessionEvents tables" [ref=e225] [cursor=pointer]':
+                  - /url: /issues/jh7e82k98vdmgdcymds2sq001s80qyrk
+              - cell "Closed" [ref=e226]:
+                - generic [ref=e227]: Closed
+              - cell "High" [ref=e228]:
+                - generic [ref=e229]: High
+            - 'row "FLUX-47 `seeds.runAll` creates duplicate labels on repeated invocation Closed High" [ref=e230]':
+              - cell "FLUX-47" [ref=e231]:
+                - link "FLUX-47" [ref=e232] [cursor=pointer]:
+                  - /url: /issues/jh7cgymxrcabrtqa7qyjmr3van80q5v0
+              - 'cell "`seeds.runAll` creates duplicate labels on repeated invocation" [ref=e233]':
+                - 'link "`seeds.runAll` creates duplicate labels on repeated invocation" [ref=e234] [cursor=pointer]':
+                  - /url: /issues/jh7cgymxrcabrtqa7qyjmr3van80q5v0
+              - cell "Closed" [ref=e235]:
+                - generic [ref=e236]: Closed
+              - cell "High" [ref=e237]:
+                - generic [ref=e238]: High
+            - 'row "FLUX-48 Session tmp files (`/tmp/flux-session-*.log`) never cleaned up Closed High" [ref=e239]':
+              - cell "FLUX-48" [ref=e240]:
+                - link "FLUX-48" [ref=e241] [cursor=pointer]:
+                  - /url: /issues/jh79x97j3y9g30mnvnwhd6qknn80qraw
+              - 'cell "Session tmp files (`/tmp/flux-session-*.log`) never cleaned up" [ref=e242]':
+                - 'link "Session tmp files (`/tmp/flux-session-*.log`) never cleaned up" [ref=e243] [cursor=pointer]':
+                  - /url: /issues/jh79x97j3y9g30mnvnwhd6qknn80qraw
+              - cell "Closed" [ref=e244]:
+                - generic [ref=e245]: Closed
+              - cell "High" [ref=e246]:
+                - generic [ref=e247]: High
+            - 'row "FLUX-58 F5a-1: Scaffold — Convex provider, /api/config, drawer layout shell Closed High" [ref=e248]':
+              - cell "FLUX-58" [ref=e249]:
+                - link "FLUX-58" [ref=e250] [cursor=pointer]:
+                  - /url: /issues/jh7dw1f2f67qgxc1r7rx1t6qcx80p83w
+              - 'cell "F5a-1: Scaffold — Convex provider, /api/config, drawer layout shell" [ref=e251]':
+                - 'link "F5a-1: Scaffold — Convex provider, /api/config, drawer layout shell" [ref=e252] [cursor=pointer]':
+                  - /url: /issues/jh7dw1f2f67qgxc1r7rx1t6qcx80p83w
+              - cell "Closed" [ref=e253]:
+                - generic [ref=e254]: Closed
+              - cell "High" [ref=e255]:
+                - generic [ref=e256]: High
+            - 'row "FLUX-59 F5a-2: TanStack Router with /issues and /issues/$issueId routes Closed High" [ref=e257]':
+              - cell "FLUX-59" [ref=e258]:
+                - link "FLUX-59" [ref=e259] [cursor=pointer]:
+                  - /url: /issues/jh7bgp2hx8tyw47mnvfhasxfxh80pmxd
+              - 'cell "F5a-2: TanStack Router with /issues and /issues/$issueId routes" [ref=e260]':
+                - 'link "F5a-2: TanStack Router with /issues and /issues/$issueId routes" [ref=e261] [cursor=pointer]':
+                  - /url: /issues/jh7bgp2hx8tyw47mnvfhasxfxh80pmxd
+              - cell "Closed" [ref=e262]:
+                - generic [ref=e263]: Closed
+              - cell "High" [ref=e264]:
+                - generic [ref=e265]: High
+            - 'row "FLUX-60 F5a-3: Issue list page with status filter and badges Closed High" [ref=e266]':
+              - cell "FLUX-60" [ref=e267]:
+                - link "FLUX-60" [ref=e268] [cursor=pointer]:
+                  - /url: /issues/jh71fpm9300xbvr6yvcr6ac3dn80p1dx
+              - 'cell "F5a-3: Issue list page with status filter and badges" [ref=e269]':
+                - 'link "F5a-3: Issue list page with status filter and badges" [ref=e270] [cursor=pointer]':
+                  - /url: /issues/jh71fpm9300xbvr6yvcr6ac3dn80p1dx
+              - cell "Closed" [ref=e271]:
+                - generic [ref=e272]: Closed
+              - cell "High" [ref=e273]:
+                - generic [ref=e274]: High
+            - 'row "FLUX-61 F5a-4: Issue detail page with edit and close Closed High" [ref=e275]':
+              - cell "FLUX-61" [ref=e276]:
+                - link "FLUX-61" [ref=e277] [cursor=pointer]:
+                  - /url: /issues/jh70vxf5qwjzc1wwsp15q3rf9n80pdnv
+              - 'cell "F5a-4: Issue detail page with edit and close" [ref=e278]':
+                - 'link "F5a-4: Issue detail page with edit and close" [ref=e279] [cursor=pointer]':
+                  - /url: /issues/jh70vxf5qwjzc1wwsp15q3rf9n80pdnv
+              - cell "Closed" [ref=e280]:
+                - generic [ref=e281]: Closed
+              - cell "High" [ref=e282]:
+                - generic [ref=e283]: High
+            - 'row "FLUX-62 F5a-5: Create issue modal Closed High" [ref=e284]':
+              - cell "FLUX-62" [ref=e285]:
+                - link "FLUX-62" [ref=e286] [cursor=pointer]:
+                  - /url: /issues/jh7ebkzgz5e6vnzbdr0k8fnfhs80q0va
+              - 'cell "F5a-5: Create issue modal" [ref=e287]':
+                - 'link "F5a-5: Create issue modal" [ref=e288] [cursor=pointer]':
+                  - /url: /issues/jh7ebkzgz5e6vnzbdr0k8fnfhs80q0va
+              - cell "Closed" [ref=e289]:
+                - generic [ref=e290]: Closed
+              - cell "High" [ref=e291]:
+                - generic [ref=e292]: High
+            - 'row "FLUX-63 F5a-6: Orchestrator status bar and enable/stop/kill controls Closed High" [ref=e293]':
+              - cell "FLUX-63" [ref=e294]:
+                - link "FLUX-63" [ref=e295] [cursor=pointer]:
+                  - /url: /issues/jh7147fgr3mvhy1rsjmb9p8mcx80ptb2
+              - 'cell "F5a-6: Orchestrator status bar and enable/stop/kill controls" [ref=e296]':
+                - 'link "F5a-6: Orchestrator status bar and enable/stop/kill controls" [ref=e297] [cursor=pointer]':
+                  - /url: /issues/jh7147fgr3mvhy1rsjmb9p8mcx80ptb2
+              - cell "Closed" [ref=e298]:
+                - generic [ref=e299]: Closed
+              - cell "High" [ref=e300]:
+                - generic [ref=e301]: High
+            - row "FLUX-72 Morph edit_file MCP tool fails with \"name is not defined\" when creating new files Closed High" [ref=e302]:
+              - cell "FLUX-72" [ref=e303]:
+                - link "FLUX-72" [ref=e304] [cursor=pointer]:
+                  - /url: /issues/jh79a8876r0s26t9pfwt2823yh80qjhv
+              - cell "Morph edit_file MCP tool fails with \"name is not defined\" when creating new files" [ref=e305]:
+                - link "Morph edit_file MCP tool fails with \"name is not defined\" when creating new files" [ref=e306] [cursor=pointer]:
+                  - /url: /issues/jh79a8876r0s26t9pfwt2823yh80qjhv
+              - cell "Closed" [ref=e307]:
+                - generic [ref=e308]: Closed
+              - cell "High" [ref=e309]:
+                - generic [ref=e310]: High
+            - 'row "FLUX-78 F5b: Live activity stream component with SSE connection to /sse/activity Closed High" [ref=e311]':
+              - cell "FLUX-78" [ref=e312]:
+                - link "FLUX-78" [ref=e313] [cursor=pointer]:
+                  - /url: /issues/jh76gs5gc762rnf5tbpawqwgs580pw4b
+              - 'cell "F5b: Live activity stream component with SSE connection to /sse/activity" [ref=e314]':
+                - 'link "F5b: Live activity stream component with SSE connection to /sse/activity" [ref=e315] [cursor=pointer]':
+                  - /url: /issues/jh76gs5gc762rnf5tbpawqwgs580pw4b
+              - cell "Closed" [ref=e316]:
+                - generic [ref=e317]: Closed
+              - cell "High" [ref=e318]:
+                - generic [ref=e319]: High
+            - 'row "FLUX-79 F5b: Sessions list page with status, issue ref, and timing Stuck High" [ref=e320]':
+              - cell "FLUX-79" [ref=e321]:
+                - link "FLUX-79" [ref=e322] [cursor=pointer]:
+                  - /url: /issues/jh73ph15cy30tgmgnkmgygtse980pqyb
+              - 'cell "F5b: Sessions list page with status, issue ref, and timing" [ref=e323]':
+                - 'link "F5b: Sessions list page with status, issue ref, and timing" [ref=e324] [cursor=pointer]':
+                  - /url: /issues/jh73ph15cy30tgmgnkmgygtse980pqyb
+              - cell "Stuck" [ref=e325]:
+                - generic [ref=e326]: Stuck
+              - cell "High" [ref=e327]:
+                - generic [ref=e328]: High
+            - 'row "FLUX-80 F5b: Session detail page with transcript and disposition In Progress High" [ref=e329]':
+              - cell "FLUX-80" [ref=e330]:
+                - link "FLUX-80" [ref=e331] [cursor=pointer]:
+                  - /url: /issues/jh79s9gnh0bsg2ffhxhnqzk0t180pfjv
+              - 'cell "F5b: Session detail page with transcript and disposition" [ref=e332]':
+                - 'link "F5b: Session detail page with transcript and disposition" [ref=e333] [cursor=pointer]':
+                  - /url: /issues/jh79s9gnh0bsg2ffhxhnqzk0t180pfjv
+              - cell "In Progress" [ref=e334]:
+                - generic [ref=e335]: In Progress
+              - cell "High" [ref=e336]:
+                - generic [ref=e337]: High
+            - 'row "FLUX-82 F5c: Comments thread on issue detail page Open High" [ref=e338]':
+              - cell "FLUX-82" [ref=e339]:
+                - link "FLUX-82" [ref=e340] [cursor=pointer]:
+                  - /url: /issues/jh7agd0jnwsp6re3436vajhbq980ps8v
+              - 'cell "F5c: Comments thread on issue detail page" [ref=e341]':
+                - 'link "F5c: Comments thread on issue detail page" [ref=e342] [cursor=pointer]':
+                  - /url: /issues/jh7agd0jnwsp6re3436vajhbq980ps8v
+              - cell "Open" [ref=e343]:
+                - generic [ref=e344]: Open
+              - cell "High" [ref=e345]:
+                - generic [ref=e346]: High
+            - 'row "FLUX-89 F5b: Session detail page Open High" [ref=e347]':
+              - cell "FLUX-89" [ref=e348]:
+                - link "FLUX-89" [ref=e349] [cursor=pointer]:
+                  - /url: /issues/jh7aqgxhayqs9mh8tq0rs27xtx80pvqv
+              - 'cell "F5b: Session detail page" [ref=e350]':
+                - 'link "F5b: Session detail page" [ref=e351] [cursor=pointer]':
+                  - /url: /issues/jh7aqgxhayqs9mh8tq0rs27xtx80pvqv
+              - cell "Open" [ref=e352]:
+                - generic [ref=e353]: Open
+              - cell "High" [ref=e354]:
+                - generic [ref=e355]: High
+            - 'row "FLUX-90 Issue detail: description and close reason don''t render markdown Open High" [ref=e356]':
+              - cell "FLUX-90" [ref=e357]:
+                - link "FLUX-90" [ref=e358] [cursor=pointer]:
+                  - /url: /issues/jh72zjf81czdpntzdwsnxktv6980pmv3
+              - 'cell "Issue detail: description and close reason don''t render markdown" [ref=e359]':
+                - 'link "Issue detail: description and close reason don''t render markdown" [ref=e360] [cursor=pointer]':
+                  - /url: /issues/jh72zjf81czdpntzdwsnxktv6980pmv3
+              - cell "Open" [ref=e361]:
+                - generic [ref=e362]: Open
+              - cell "High" [ref=e363]:
+                - generic [ref=e364]: High
+            - row "FLUX-91 Activity stream renders raw JSON instead of formatted output Open High" [ref=e365]:
+              - cell "FLUX-91" [ref=e366]:
+                - link "FLUX-91" [ref=e367] [cursor=pointer]:
+                  - /url: /issues/jh72w3zpm0dyv2f2y5mdvb512s80p705
+              - cell "Activity stream renders raw JSON instead of formatted output" [ref=e368]:
+                - link "Activity stream renders raw JSON instead of formatted output" [ref=e369] [cursor=pointer]:
+                  - /url: /issues/jh72w3zpm0dyv2f2y5mdvb512s80p705
+              - cell "Open" [ref=e370]:
+                - generic [ref=e371]: Open
+              - cell "High" [ref=e372]:
+                - generic [ref=e373]: High
+            - row "FLUX-102 Session detail transcript renders raw JSON for output events Open High" [ref=e374]:
+              - cell "FLUX-102" [ref=e375]:
+                - link "FLUX-102" [ref=e376] [cursor=pointer]:
+                  - /url: /issues/jh736t3npm914emqn95m0b5crh80qj06
+              - cell "Session detail transcript renders raw JSON for output events" [ref=e377]:
+                - link "Session detail transcript renders raw JSON for output events" [ref=e378] [cursor=pointer]:
+                  - /url: /issues/jh736t3npm914emqn95m0b5crh80qj06
+              - cell "Open" [ref=e379]:
+                - generic [ref=e380]: Open
+              - cell "High" [ref=e381]:
+                - generic [ref=e382]: High
+            - row "FLUX-1 Test issue from MCP Closed Medium" [ref=e383]:
+              - cell "FLUX-1" [ref=e384]:
+                - link "FLUX-1" [ref=e385] [cursor=pointer]:
+                  - /url: /issues/jh7ddbbkzfgsbh7pb1qe01dd9h80p0p1
+              - cell "Test issue from MCP" [ref=e386]:
+                - link "Test issue from MCP" [ref=e387] [cursor=pointer]:
+                  - /url: /issues/jh7ddbbkzfgsbh7pb1qe01dd9h80p0p1
+              - cell "Closed" [ref=e388]:
+                - generic [ref=e389]: Closed
+              - cell "Medium" [ref=e390]:
+                - generic [ref=e391]: Medium
+            - row "FLUX-10 F3d smoke test issue Closed Medium" [ref=e392]:
+              - cell "FLUX-10" [ref=e393]:
+                - link "FLUX-10" [ref=e394] [cursor=pointer]:
+                  - /url: /issues/jh73qj3th2k5tkkwmnbjq3etqx80pq2x
+              - cell "F3d smoke test issue" [ref=e395]:
+                - link "F3d smoke test issue" [ref=e396] [cursor=pointer]:
+                  - /url: /issues/jh73qj3th2k5tkkwmnbjq3etqx80pq2x
+              - cell "Closed" [ref=e397]:
+                - generic [ref=e398]: Closed
+              - cell "Medium" [ref=e399]:
+                - generic [ref=e400]: Medium
+            - 'row "FLUX-12 E2E validation: add @returns tag to getCurrentHead in git.ts Closed Medium" [ref=e401]':
+              - cell "FLUX-12" [ref=e402]:
+                - link "FLUX-12" [ref=e403] [cursor=pointer]:
+                  - /url: /issues/jh7agr14fes8abdvb91xgkygsn80ps73
+              - 'cell "E2E validation: add @returns tag to getCurrentHead in git.ts" [ref=e404]':
+                - 'link "E2E validation: add @returns tag to getCurrentHead in git.ts" [ref=e405] [cursor=pointer]':
+                  - /url: /issues/jh7agr14fes8abdvb91xgkygsn80ps73
+              - cell "Closed" [ref=e406]:
+                - generic [ref=e407]: Closed
+              - cell "Medium" [ref=e408]:
+                - generic [ref=e409]: Medium
+            - 'row "FLUX-18 MCP `comments_create` handler returns ''Not implemented'' Closed Medium" [ref=e410]':
+              - cell "FLUX-18" [ref=e411]:
+                - link "FLUX-18" [ref=e412] [cursor=pointer]:
+                  - /url: /issues/jh7bpex4h03n3cvhrsjm45t1kn80pfes
+              - 'cell "MCP `comments_create` handler returns ''Not implemented''" [ref=e413]':
+                - 'link "MCP `comments_create` handler returns ''Not implemented''" [ref=e414] [cursor=pointer]':
+                  - /url: /issues/jh7bpex4h03n3cvhrsjm45t1kn80pfes
+              - cell "Closed" [ref=e415]:
+                - generic [ref=e416]: Closed
+              - cell "Medium" [ref=e417]:
+                - generic [ref=e418]: Medium
+            - 'row "FLUX-19 Add `by_epic` index to issues table for efficient epic→issues queries Closed Medium" [ref=e419]':
+              - cell "FLUX-19" [ref=e420]:
+                - link "FLUX-19" [ref=e421] [cursor=pointer]:
+                  - /url: /issues/jh79b8h5yxq9px0w8g4njj69ph80q50j
+              - 'cell "Add `by_epic` index to issues table for efficient epic→issues queries" [ref=e422]':
+                - 'link "Add `by_epic` index to issues table for efficient epic→issues queries" [ref=e423] [cursor=pointer]':
+                  - /url: /issues/jh79b8h5yxq9px0w8g4njj69ph80q50j
+              - cell "Closed" [ref=e424]:
+                - generic [ref=e425]: Closed
+              - cell "Medium" [ref=e426]:
+                - generic [ref=e427]: Medium
+            - 'row "FLUX-24 `issues.list` take-before-filter bug: status filter returns fewer results than limit Closed Medium" [ref=e428]':
+              - cell "FLUX-24" [ref=e429]:
+                - link "FLUX-24" [ref=e430] [cursor=pointer]:
+                  - /url: /issues/jh77nk1petktfkfsy89b2rgsfn80qw44
+              - 'cell "`issues.list` take-before-filter bug: status filter returns fewer results than limit" [ref=e431]':
+                - 'link "`issues.list` take-before-filter bug: status filter returns fewer results than limit" [ref=e432] [cursor=pointer]':
+                  - /url: /issues/jh77nk1petktfkfsy89b2rgsfn80qw44
+              - cell "Closed" [ref=e433]:
+                - generic [ref=e434]: Closed
+              - cell "Medium" [ref=e435]:
+                - generic [ref=e436]: Medium
+            - row "FLUX-25 Orphan recovery reopens already-closed issues Closed Medium" [ref=e437]:
+              - cell "FLUX-25" [ref=e438]:
+                - link "FLUX-25" [ref=e439] [cursor=pointer]:
+                  - /url: /issues/jh7d3avjygt2yd6f322ddm1c2s80p28w
+              - cell "Orphan recovery reopens already-closed issues" [ref=e440]:
+                - link "Orphan recovery reopens already-closed issues" [ref=e441] [cursor=pointer]:
+                  - /url: /issues/jh7d3avjygt2yd6f322ddm1c2s80p28w
+              - cell "Closed" [ref=e442]:
+                - generic [ref=e443]: Closed
+              - cell "Medium" [ref=e444]:
+                - generic [ref=e445]: Medium
+            - row "FLUX-28 issues_search description claims title+description but only searches title Closed Medium" [ref=e446]:
+              - cell "FLUX-28" [ref=e447]:
+                - link "FLUX-28" [ref=e448] [cursor=pointer]:
+                  - /url: /issues/jh72g9rqzyzmtzyp8x489cpmqx80pptd
+              - cell "issues_search description claims title+description but only searches title" [ref=e449]:
+                - link "issues_search description claims title+description but only searches title" [ref=e450] [cursor=pointer]:
+                  - /url: /issues/jh72g9rqzyzmtzyp8x489cpmqx80pptd
+              - cell "Closed" [ref=e451]:
+                - generic [ref=e452]: Closed
+              - cell "Medium" [ref=e453]:
+                - generic [ref=e454]: Medium
+            - row "FLUX-29 issues_bulk_create makes 2N round-trips to Convex instead of batching Open Medium" [ref=e455]:
+              - cell "FLUX-29" [ref=e456]:
+                - link "FLUX-29" [ref=e457] [cursor=pointer]:
+                  - /url: /issues/jh7a6pwv3d44aaerfynmz99nmh80pxn0
+              - cell "issues_bulk_create makes 2N round-trips to Convex instead of batching" [ref=e458]:
+                - link "issues_bulk_create makes 2N round-trips to Convex instead of batching" [ref=e459] [cursor=pointer]:
+                  - /url: /issues/jh7a6pwv3d44aaerfynmz99nmh80pxn0
+              - cell "Open" [ref=e460]:
+                - generic [ref=e461]: Open
+              - cell "Medium" [ref=e462]:
+                - generic [ref=e463]: Medium
+            - row "FLUX-35 issues_bulk_create handler loses partial success context on mid-loop failure Open Medium" [ref=e464]:
+              - cell "FLUX-35" [ref=e465]:
+                - link "FLUX-35" [ref=e466] [cursor=pointer]:
+                  - /url: /issues/jh7daa95c02v80dpjx99g2kg1580pd6s
+              - cell "issues_bulk_create handler loses partial success context on mid-loop failure" [ref=e467]:
+                - link "issues_bulk_create handler loses partial success context on mid-loop failure" [ref=e468] [cursor=pointer]:
+                  - /url: /issues/jh7daa95c02v80dpjx99g2kg1580pd6s
+              - cell "Open" [ref=e469]:
+                - generic [ref=e470]: Open
+              - cell "Medium" [ref=e471]:
+                - generic [ref=e472]: Medium
+            - row "FLUX-36 Suppress auto-commit while agent process is alive Open Medium" [ref=e473]:
+              - cell "FLUX-36" [ref=e474]:
+                - link "FLUX-36" [ref=e475] [cursor=pointer]:
+                  - /url: /issues/jh77frgnwceejg1kzk4cjepdt180ptge
+              - cell "Suppress auto-commit while agent process is alive" [ref=e476]:
+                - link "Suppress auto-commit while agent process is alive" [ref=e477] [cursor=pointer]:
+                  - /url: /issues/jh77frgnwceejg1kzk4cjepdt180ptge
+              - cell "Open" [ref=e478]:
+                - generic [ref=e479]: Open
+              - cell "Medium" [ref=e480]:
+                - generic [ref=e481]: Medium
+            - row "FLUX-38 AGENTS.md and CLAUDE.md are duplicate files that will drift Open Medium" [ref=e482]:
+              - cell "FLUX-38" [ref=e483]:
+                - link "FLUX-38" [ref=e484] [cursor=pointer]:
+                  - /url: /issues/jh750g9m9fwq3ax8pv417yzy0180q52d
+              - cell "AGENTS.md and CLAUDE.md are duplicate files that will drift" [ref=e485]:
+                - link "AGENTS.md and CLAUDE.md are duplicate files that will drift" [ref=e486] [cursor=pointer]:
+                  - /url: /issues/jh750g9m9fwq3ax8pv417yzy0180q52d
+              - cell "Open" [ref=e487]:
+                - generic [ref=e488]: Open
+              - cell "Medium" [ref=e489]:
+                - generic [ref=e490]: Medium
+            - row "FLUX-39 issues_bulk_update schema defined but handler not implemented Open Medium" [ref=e491]:
+              - cell "FLUX-39" [ref=e492]:
+                - link "FLUX-39" [ref=e493] [cursor=pointer]:
+                  - /url: /issues/jh7dhrytxy4d3jkwtqcee8dka180p60k
+              - cell "issues_bulk_update schema defined but handler not implemented" [ref=e494]:
+                - link "issues_bulk_update schema defined but handler not implemented" [ref=e495] [cursor=pointer]:
+                  - /url: /issues/jh7dhrytxy4d3jkwtqcee8dka180p60k
+              - cell "Open" [ref=e496]:
+                - generic [ref=e497]: Open
+              - cell "Medium" [ref=e498]:
+                - generic [ref=e499]: Medium
+            - 'row "FLUX-41 Add `phase` field to sessions schema for explicit lifecycle tracking Open Medium" [ref=e500]':
+              - cell "FLUX-41" [ref=e501]:
+                - link "FLUX-41" [ref=e502] [cursor=pointer]:
+                  - /url: /issues/jh7arr3cd5trfcgbc56q3eenf580qzd3
+              - 'cell "Add `phase` field to sessions schema for explicit lifecycle tracking" [ref=e503]':
+                - 'link "Add `phase` field to sessions schema for explicit lifecycle tracking" [ref=e504] [cursor=pointer]':
+                  - /url: /issues/jh7arr3cd5trfcgbc56q3eenf580qzd3
+              - cell "Open" [ref=e505]:
+                - generic [ref=e506]: Open
+              - cell "Medium" [ref=e507]:
+                - generic [ref=e508]: Medium
+            - row "FLUX-43 Remove non-null assertions on this.activeSession in orchestrator index.ts Open Medium" [ref=e509]:
+              - cell "FLUX-43" [ref=e510]:
+                - link "FLUX-43" [ref=e511] [cursor=pointer]:
+                  - /url: /issues/jh768f3cy7bhg218a5s2cj06xs80pzpj
+              - cell "Remove non-null assertions on this.activeSession in orchestrator index.ts" [ref=e512]:
+                - link "Remove non-null assertions on this.activeSession in orchestrator index.ts" [ref=e513] [cursor=pointer]:
+                  - /url: /issues/jh768f3cy7bhg218a5s2cj06xs80pzpj
+              - cell "Open" [ref=e514]:
+                - generic [ref=e515]: Open
+              - cell "Medium" [ref=e516]:
+                - generic [ref=e517]: Medium
+            - 'row "FLUX-49 `scheduleNext` swallows all errors — silent orchestrator failures Open Medium" [ref=e518]':
+              - cell "FLUX-49" [ref=e519]:
+                - link "FLUX-49" [ref=e520] [cursor=pointer]:
+                  - /url: /issues/jh78bt47x1vpwjwdg5ytka0b9d80pyt2
+              - 'cell "`scheduleNext` swallows all errors — silent orchestrator failures" [ref=e521]':
+                - 'link "`scheduleNext` swallows all errors — silent orchestrator failures" [ref=e522] [cursor=pointer]':
+                  - /url: /issues/jh78bt47x1vpwjwdg5ytka0b9d80pyt2
+              - cell "Open" [ref=e523]:
+                - generic [ref=e524]: Open
+              - cell "Medium" [ref=e525]:
+                - generic [ref=e526]: Medium
+            - row "FLUX-50 Agent stderr piped but never consumed — potential process deadlock Open Medium" [ref=e527]:
+              - cell "FLUX-50" [ref=e528]:
+                - link "FLUX-50" [ref=e529] [cursor=pointer]:
+                  - /url: /issues/jh77fwzr9cq0b28x5h9jpq30zn80p9qn
+              - cell "Agent stderr piped but never consumed — potential process deadlock" [ref=e530]:
+                - link "Agent stderr piped but never consumed — potential process deadlock" [ref=e531] [cursor=pointer]:
+                  - /url: /issues/jh77fwzr9cq0b28x5h9jpq30zn80p9qn
+              - cell "Open" [ref=e532]:
+                - generic [ref=e533]: Open
+              - cell "Medium" [ref=e534]:
+                - generic [ref=e535]: Medium
+            - 'row "FLUX-51 `setup.ts` uses blocking `prompt()` — crashes in headless environments Open Medium" [ref=e536]':
+              - cell "FLUX-51" [ref=e537]:
+                - link "FLUX-51" [ref=e538] [cursor=pointer]:
+                  - /url: /issues/jh72a7ex0k2d2mv74prwaqants80qmpt
+              - 'cell "`setup.ts` uses blocking `prompt()` — crashes in headless environments" [ref=e539]':
+                - 'link "`setup.ts` uses blocking `prompt()` — crashes in headless environments" [ref=e540] [cursor=pointer]':
+                  - /url: /issues/jh72a7ex0k2d2mv74prwaqants80qmpt
+              - cell "Open" [ref=e541]:
+                - generic [ref=e542]: Open
+              - cell "Medium" [ref=e543]:
+                - generic [ref=e544]: Medium
+            - row "FLUX-52 Dependencies table and mutations not implemented (design gap) Open Medium" [ref=e545]:
+              - cell "FLUX-52" [ref=e546]:
+                - link "FLUX-52" [ref=e547] [cursor=pointer]:
+                  - /url: /issues/jh73d8qr9xy9jddp9qew2cx2yn80p4fc
+              - cell "Dependencies table and mutations not implemented (design gap)" [ref=e548]:
+                - link "Dependencies table and mutations not implemented (design gap)" [ref=e549] [cursor=pointer]:
+                  - /url: /issues/jh73d8qr9xy9jddp9qew2cx2yn80p4fc
+              - cell "Open" [ref=e550]:
+                - generic [ref=e551]: Open
+              - cell "Medium" [ref=e552]:
+                - generic [ref=e553]: Medium
+            - 'row "FLUX-53 `issues.get` returns soft-deleted issues without filtering Open Medium" [ref=e554]':
+              - cell "FLUX-53" [ref=e555]:
+                - link "FLUX-53" [ref=e556] [cursor=pointer]:
+                  - /url: /issues/jh74993x2k86jzbmd8qzkf538n80p5n6
+              - 'cell "`issues.get` returns soft-deleted issues without filtering" [ref=e557]':
+                - 'link "`issues.get` returns soft-deleted issues without filtering" [ref=e558] [cursor=pointer]':
+                  - /url: /issues/jh74993x2k86jzbmd8qzkf538n80p5n6
+              - cell "Open" [ref=e559]:
+                - generic [ref=e560]: Open
+              - cell "Medium" [ref=e561]:
+                - generic [ref=e562]: Medium
+            - 'row "FLUX-54 `comments.create` doesn''t update parent issue''s `updatedAt` Open Medium" [ref=e563]':
+              - cell "FLUX-54" [ref=e564]:
+                - link "FLUX-54" [ref=e565] [cursor=pointer]:
+                  - /url: /issues/jh718964kxpep35c47nqzsn84d80p8rb
+              - 'cell "`comments.create` doesn''t update parent issue''s `updatedAt`" [ref=e566]':
+                - 'link "`comments.create` doesn''t update parent issue''s `updatedAt`" [ref=e567] [cursor=pointer]':
+                  - /url: /issues/jh718964kxpep35c47nqzsn84d80p8rb
+              - cell "Open" [ref=e568]:
+                - generic [ref=e569]: Open
+              - cell "Medium" [ref=e570]:
+                - generic [ref=e571]: Medium
+            - 'row "FLUX-55 `orchestratorConfig.enable` defaults `maxReviewIterations` to 2 — should be 5 Open Medium" [ref=e572]':
+              - cell "FLUX-55" [ref=e573]:
+                - link "FLUX-55" [ref=e574] [cursor=pointer]:
+                  - /url: /issues/jh7axgm9qfa72waxtpkdgjt98980pbcs
+              - 'cell "`orchestratorConfig.enable` defaults `maxReviewIterations` to 2 — should be 5" [ref=e575]':
+                - 'link "`orchestratorConfig.enable` defaults `maxReviewIterations` to 2 — should be 5" [ref=e576] [cursor=pointer]':
+                  - /url: /issues/jh7axgm9qfa72waxtpkdgjt98980pbcs
+              - cell "Open" [ref=e577]:
+                - generic [ref=e578]: Open
+              - cell "Medium" [ref=e579]:
+                - generic [ref=e580]: Medium
+            - row "FLUX-56 No session timeout enforcement — hung agents block orchestrator forever Open Medium" [ref=e581]:
+              - cell "FLUX-56" [ref=e582]:
+                - link "FLUX-56" [ref=e583] [cursor=pointer]:
+                  - /url: /issues/jh7d63gje0zbqz6ezcpcjr8ma980p6q3
+              - cell "No session timeout enforcement — hung agents block orchestrator forever" [ref=e584]:
+                - link "No session timeout enforcement — hung agents block orchestrator forever" [ref=e585] [cursor=pointer]:
+                  - /url: /issues/jh7d63gje0zbqz6ezcpcjr8ma980p6q3
+              - cell "Open" [ref=e586]:
+                - generic [ref=e587]: Open
+              - cell "Medium" [ref=e588]:
+                - generic [ref=e589]: Medium
+            - row "FLUX-64 Audit Convex queries for full-table scans replaceable by indexes Open Medium" [ref=e590]:
+              - cell "FLUX-64" [ref=e591]:
+                - link "FLUX-64" [ref=e592] [cursor=pointer]:
+                  - /url: /issues/jh75m1s7dj6q18qvj91z0nfcx580qemm
+              - cell "Audit Convex queries for full-table scans replaceable by indexes" [ref=e593]:
+                - link "Audit Convex queries for full-table scans replaceable by indexes" [ref=e594] [cursor=pointer]:
+                  - /url: /issues/jh75m1s7dj6q18qvj91z0nfcx580qemm
+              - cell "Open" [ref=e595]:
+                - generic [ref=e596]: Open
+              - cell "Medium" [ref=e597]:
+                - generic [ref=e598]: Medium
+            - row "FLUX-65 SessionMonitor.shutdown() is not idempotent — concurrent calls can race Open Medium" [ref=e599]:
+              - cell "FLUX-65" [ref=e600]:
+                - link "FLUX-65" [ref=e601] [cursor=pointer]:
+                  - /url: /issues/jh73waavfmqe4n2rpqs4e2a28x80qe0k
+              - cell "SessionMonitor.shutdown() is not idempotent — concurrent calls can race" [ref=e602]:
+                - link "SessionMonitor.shutdown() is not idempotent — concurrent calls can race" [ref=e603] [cursor=pointer]:
+                  - /url: /issues/jh73waavfmqe4n2rpqs4e2a28x80qe0k
+              - cell "Open" [ref=e604]:
+                - generic [ref=e605]: Open
+              - cell "Medium" [ref=e606]:
+                - generic [ref=e607]: Medium
+            - row "FLUX-66 flushToConvex silently loses event batch on max-failure throw Open Medium" [ref=e608]:
+              - cell "FLUX-66" [ref=e609]:
+                - link "FLUX-66" [ref=e610] [cursor=pointer]:
+                  - /url: /issues/jh7d3a6gda1czh88gcy0kp595d80q0hh
+              - cell "flushToConvex silently loses event batch on max-failure throw" [ref=e611]:
+                - link "flushToConvex silently loses event batch on max-failure throw" [ref=e612] [cursor=pointer]:
+                  - /url: /issues/jh7d3a6gda1czh88gcy0kp595d80q0hh
+              - cell "Open" [ref=e613]:
+                - generic [ref=e614]: Open
+              - cell "Medium" [ref=e615]:
+                - generic [ref=e616]: Medium
+            - 'row "FLUX-67 `nuke.ts` table list can silently drift from schema Open Medium" [ref=e617]':
+              - cell "FLUX-67" [ref=e618]:
+                - link "FLUX-67" [ref=e619] [cursor=pointer]:
+                  - /url: /issues/jh7bcn5retz1dzjdqz0s90yw1s80p5fp
+              - 'cell "`nuke.ts` table list can silently drift from schema" [ref=e620]':
+                - 'link "`nuke.ts` table list can silently drift from schema" [ref=e621] [cursor=pointer]':
+                  - /url: /issues/jh7bcn5retz1dzjdqz0s90yw1s80p5fp
+              - cell "Open" [ref=e622]:
+                - generic [ref=e623]: Open
+              - cell "Medium" [ref=e624]:
+                - generic [ref=e625]: Medium
+            - 'row "FLUX-68 SessionMonitor: shutdown() during active consume() is unsound Open Medium" [ref=e626]':
+              - cell "FLUX-68" [ref=e627]:
+                - link "FLUX-68" [ref=e628] [cursor=pointer]:
+                  - /url: /issues/jh75wjnygqpw56944z68emf11580pjbp
+              - 'cell "SessionMonitor: shutdown() during active consume() is unsound" [ref=e629]':
+                - 'link "SessionMonitor: shutdown() during active consume() is unsound" [ref=e630] [cursor=pointer]':
+                  - /url: /issues/jh75wjnygqpw56944z68emf11580pjbp
+              - cell "Open" [ref=e631]:
+                - generic [ref=e632]: Open
+              - cell "Medium" [ref=e633]:
+                - generic [ref=e634]: Medium
+            - 'row "FLUX-69 Fix `projectId as any` cast in src/index.ts Open Medium" [ref=e635]':
+              - cell "FLUX-69" [ref=e636]:
+                - link "FLUX-69" [ref=e637] [cursor=pointer]:
+                  - /url: /issues/jh79em745wzan17pxmbzrp5y9d80qyp2
+              - 'cell "Fix `projectId as any` cast in src/index.ts" [ref=e638]':
+                - 'link "Fix `projectId as any` cast in src/index.ts" [ref=e639] [cursor=pointer]':
+                  - /url: /issues/jh79em745wzan17pxmbzrp5y9d80qyp2
+              - cell "Open" [ref=e640]:
+                - generic [ref=e641]: Open
+              - cell "Medium" [ref=e642]:
+                - generic [ref=e643]: Medium
+            - row "FLUX-73 F5a validation requires browser automation tools not available to agents Closed Medium" [ref=e644]:
+              - cell "FLUX-73" [ref=e645]:
+                - link "FLUX-73" [ref=e646] [cursor=pointer]:
+                  - /url: /issues/jh7b6jh0g6xtxdp26gc3f44yg580qvmx
+              - cell "F5a validation requires browser automation tools not available to agents" [ref=e647]:
+                - link "F5a validation requires browser automation tools not available to agents" [ref=e648] [cursor=pointer]:
+                  - /url: /issues/jh7b6jh0g6xtxdp26gc3f44yg580qvmx
+              - cell "Closed" [ref=e649]:
+                - generic [ref=e650]: Closed
+              - cell "Medium" [ref=e651]:
+                - generic [ref=e652]: Medium
+            - row "FLUX-74 Document biome a11y patterns for UI component development Open Medium" [ref=e653]:
+              - cell "FLUX-74" [ref=e654]:
+                - link "FLUX-74" [ref=e655] [cursor=pointer]:
+                  - /url: /issues/jh75ahjg481evgdd9tbagypvfd80p0v4
+              - cell "Document biome a11y patterns for UI component development" [ref=e656]:
+                - link "Document biome a11y patterns for UI component development" [ref=e657] [cursor=pointer]:
+                  - /url: /issues/jh75ahjg481evgdd9tbagypvfd80p0v4
+              - cell "Open" [ref=e658]:
+                - generic [ref=e659]: Open
+              - cell "Medium" [ref=e660]:
+                - generic [ref=e661]: Medium
+            - row "FLUX-75 Add React error boundary for Convex mutation failures Open Medium" [ref=e662]:
+              - cell "FLUX-75" [ref=e663]:
+                - link "FLUX-75" [ref=e664] [cursor=pointer]:
+                  - /url: /issues/jh7bh4dj67c8ysn4athtfe9md580qm1n
+              - cell "Add React error boundary for Convex mutation failures" [ref=e665]:
+                - link "Add React error boundary for Convex mutation failures" [ref=e666] [cursor=pointer]:
+                  - /url: /issues/jh7bh4dj67c8ysn4athtfe9md580qm1n
+              - cell "Open" [ref=e667]:
+                - generic [ref=e668]: Open
+              - cell "Medium" [ref=e669]:
+                - generic [ref=e670]: Medium
+            - row "FLUX-77 Add PreToolUse hook to auto-mkdir for Morph edit_file new file creation Open Medium" [ref=e671]:
+              - cell "FLUX-77" [ref=e672]:
+                - link "FLUX-77" [ref=e673] [cursor=pointer]:
+                  - /url: /issues/jh7fkz8d6hrx0x2fcbvjvartsn80q44e
+              - cell "Add PreToolUse hook to auto-mkdir for Morph edit_file new file creation" [ref=e674]:
+                - link "Add PreToolUse hook to auto-mkdir for Morph edit_file new file creation" [ref=e675] [cursor=pointer]:
+                  - /url: /issues/jh7fkz8d6hrx0x2fcbvjvartsn80q44e
+              - cell "Open" [ref=e676]:
+                - generic [ref=e677]: Open
+              - cell "Medium" [ref=e678]:
+                - generic [ref=e679]: Medium
+            - 'row "FLUX-83 F5c: Labels management page and issue label assignment Open Medium" [ref=e680]':
+              - cell "FLUX-83" [ref=e681]:
+                - link "FLUX-83" [ref=e682] [cursor=pointer]:
+                  - /url: /issues/jh77njshe5sdvgd24n9c5mhek180q9yg
+              - 'cell "F5c: Labels management page and issue label assignment" [ref=e683]':
+                - 'link "F5c: Labels management page and issue label assignment" [ref=e684] [cursor=pointer]':
+                  - /url: /issues/jh77njshe5sdvgd24n9c5mhek180q9yg
+              - cell "Open" [ref=e685]:
+                - generic [ref=e686]: Open
+              - cell "Medium" [ref=e687]:
+                - generic [ref=e688]: Medium
+            - 'row "FLUX-84 F5c: Dependencies view on issue detail (blockers/blocked-by) Open Medium" [ref=e689]':
+              - cell "FLUX-84" [ref=e690]:
+                - link "FLUX-84" [ref=e691] [cursor=pointer]:
+                  - /url: /issues/jh7fwm2v5k6myj680dkkx4vaw180qgv4
+              - 'cell "F5c: Dependencies view on issue detail (blockers/blocked-by)" [ref=e692]':
+                - 'link "F5c: Dependencies view on issue detail (blockers/blocked-by)" [ref=e693] [cursor=pointer]':
+                  - /url: /issues/jh7fwm2v5k6myj680dkkx4vaw180qgv4
+              - cell "Open" [ref=e694]:
+                - generic [ref=e695]: Open
+              - cell "Medium" [ref=e696]:
+                - generic [ref=e697]: Medium
+            - 'row "FLUX-85 F5c: Defer/Undefer issue actions with optional note Open Medium" [ref=e698]':
+              - cell "FLUX-85" [ref=e699]:
+                - link "FLUX-85" [ref=e700] [cursor=pointer]:
+                  - /url: /issues/jh75mpjx56d4w5r0z81knjzt0n80pxzs
+              - 'cell "F5c: Defer/Undefer issue actions with optional note" [ref=e701]':
+                - 'link "F5c: Defer/Undefer issue actions with optional note" [ref=e702] [cursor=pointer]':
+                  - /url: /issues/jh75mpjx56d4w5r0z81knjzt0n80pxzs
+              - cell "Open" [ref=e703]:
+                - generic [ref=e704]: Open
+              - cell "Medium" [ref=e705]:
+                - generic [ref=e706]: Medium
+            - 'row "FLUX-86 F5c: Settings page for project and scheduler configuration Open Medium" [ref=e707]':
+              - cell "FLUX-86" [ref=e708]:
+                - link "FLUX-86" [ref=e709] [cursor=pointer]:
+                  - /url: /issues/jh74zkab9vmfnax2xxwspnqq0180pw9n
+              - 'cell "F5c: Settings page for project and scheduler configuration" [ref=e710]':
+                - 'link "F5c: Settings page for project and scheduler configuration" [ref=e711] [cursor=pointer]':
+                  - /url: /issues/jh74zkab9vmfnax2xxwspnqq0180pw9n
+              - cell "Open" [ref=e712]:
+                - generic [ref=e713]: Open
+              - cell "Medium" [ref=e714]:
+                - generic [ref=e715]: Medium
+            - row "FLUX-88 SSE endpoint should keep connection open when idle instead of closing Open Medium" [ref=e716]:
+              - cell "FLUX-88" [ref=e717]:
+                - link "FLUX-88" [ref=e718] [cursor=pointer]:
+                  - /url: /issues/jh7aaarrjkw8ep014zt8yze7d980qtes
+              - cell "SSE endpoint should keep connection open when idle instead of closing" [ref=e719]:
+                - link "SSE endpoint should keep connection open when idle instead of closing" [ref=e720] [cursor=pointer]:
+                  - /url: /issues/jh7aaarrjkw8ep014zt8yze7d980qtes
+              - cell "Open" [ref=e721]:
+                - generic [ref=e722]: Open
+              - cell "Medium" [ref=e723]:
+                - generic [ref=e724]: Medium
+            - 'row "FLUX-92 UI: FontAwesome Pro icons underutilized and possibly not rendering Open Medium" [ref=e725]':
+              - cell "FLUX-92" [ref=e726]:
+                - link "FLUX-92" [ref=e727] [cursor=pointer]:
+                  - /url: /issues/jh7d2d20zmsd4ve9jztm5jxynx80qftt
+              - 'cell "UI: FontAwesome Pro icons underutilized and possibly not rendering" [ref=e728]':
+                - 'link "UI: FontAwesome Pro icons underutilized and possibly not rendering" [ref=e729] [cursor=pointer]':
+                  - /url: /issues/jh7d2d20zmsd4ve9jztm5jxynx80qftt
+              - cell "Open" [ref=e730]:
+                - generic [ref=e731]: Open
+              - cell "Medium" [ref=e732]:
+                - generic [ref=e733]: Medium
+            - 'row "FLUX-94 Sessions table: Session column shows meaningless truncated doc IDs Open Medium" [ref=e734]':
+              - cell "FLUX-94" [ref=e735]:
+                - link "FLUX-94" [ref=e736] [cursor=pointer]:
+                  - /url: /issues/jh7e9vrdgdmf1e77h40yvffyz580qgpf
+              - 'cell "Sessions table: Session column shows meaningless truncated doc IDs" [ref=e737]':
+                - 'link "Sessions table: Session column shows meaningless truncated doc IDs" [ref=e738] [cursor=pointer]':
+                  - /url: /issues/jh7e9vrdgdmf1e77h40yvffyz580qgpf
+              - cell "Open" [ref=e739]:
+                - generic [ref=e740]: Open
+              - cell "Medium" [ref=e741]:
+                - generic [ref=e742]: Medium
+            - row "FLUX-95 Orchestrator status bar shows only a dot on mobile — no context Open Medium" [ref=e743]:
+              - cell "FLUX-95" [ref=e744]:
+                - link "FLUX-95" [ref=e745] [cursor=pointer]:
+                  - /url: /issues/jh7exqzsna4jyys1971b5xbf3s80pg3v
+              - cell "Orchestrator status bar shows only a dot on mobile — no context" [ref=e746]:
+                - link "Orchestrator status bar shows only a dot on mobile — no context" [ref=e747] [cursor=pointer]:
+                  - /url: /issues/jh7exqzsna4jyys1971b5xbf3s80pg3v
+              - cell "Open" [ref=e748]:
+                - generic [ref=e749]: Open
+              - cell "Medium" [ref=e750]:
+                - generic [ref=e751]: Medium
+            - row "FLUX-98 Extract shared time/date formatting utilities to src/lib/format.ts Open Medium" [ref=e752]:
+              - cell "FLUX-98" [ref=e753]:
+                - link "FLUX-98" [ref=e754] [cursor=pointer]:
+                  - /url: /issues/jh7exex0cz1ah6xva3q6pryv0x80q6zp
+              - cell "Extract shared time/date formatting utilities to src/lib/format.ts" [ref=e755]:
+                - link "Extract shared time/date formatting utilities to src/lib/format.ts" [ref=e756] [cursor=pointer]:
+                  - /url: /issues/jh7exex0cz1ah6xva3q6pryv0x80q6zp
+              - cell "Open" [ref=e757]:
+                - generic [ref=e758]: Open
+              - cell "Medium" [ref=e759]:
+                - generic [ref=e760]: Medium
+            - row "FLUX-100 No styled 404 page for invalid routes Open Medium" [ref=e761]:
+              - cell "FLUX-100" [ref=e762]:
+                - link "FLUX-100" [ref=e763] [cursor=pointer]:
+                  - /url: /issues/jh7ec456q1zxhkfg58251pjgpx80p14y
+              - cell "No styled 404 page for invalid routes" [ref=e764]:
+                - link "No styled 404 page for invalid routes" [ref=e765] [cursor=pointer]:
+                  - /url: /issues/jh7ec456q1zxhkfg58251pjgpx80p14y
+              - cell "Open" [ref=e766]:
+                - generic [ref=e767]: Open
+              - cell "Medium" [ref=e768]:
+                - generic [ref=e769]: Medium
+            - 'row "FLUX-8 Test: Add module header comment to orchestrator/index.ts Closed Low" [ref=e770]':
+              - cell "FLUX-8" [ref=e771]:
+                - link "FLUX-8" [ref=e772] [cursor=pointer]:
+                  - /url: /issues/jh7cawef0pef35vj44xyzgmr8d80qhc8
+              - 'cell "Test: Add module header comment to orchestrator/index.ts" [ref=e773]':
+                - 'link "Test: Add module header comment to orchestrator/index.ts" [ref=e774] [cursor=pointer]':
+                  - /url: /issues/jh7cawef0pef35vj44xyzgmr8d80qhc8
+              - cell "Closed" [ref=e775]:
+                - generic [ref=e776]: Closed
+              - cell "Low" [ref=e777]:
+                - generic [ref=e778]: Low
+            - row "FLUX-9 Add a comment to the top of src/server/tools/schema.ts describing the module Closed Low" [ref=e779]:
+              - cell "FLUX-9" [ref=e780]:
+                - link "FLUX-9" [ref=e781] [cursor=pointer]:
+                  - /url: /issues/jh7f02z0kscx74zez1gj5w5r1d80q4b9
+              - cell "Add a comment to the top of src/server/tools/schema.ts describing the module" [ref=e782]:
+                - link "Add a comment to the top of src/server/tools/schema.ts describing the module" [ref=e783] [cursor=pointer]:
+                  - /url: /issues/jh7f02z0kscx74zez1gj5w5r1d80q4b9
+              - cell "Closed" [ref=e784]:
+                - generic [ref=e785]: Closed
+              - cell "Low" [ref=e786]:
+                - generic [ref=e787]: Low
+            - row "FLUX-11 Add comment to autoCommitDirtyTree explaining the commit message format Closed Low" [ref=e788]:
+              - cell "FLUX-11" [ref=e789]:
+                - link "FLUX-11" [ref=e790] [cursor=pointer]:
+                  - /url: /issues/jh77r8t5861ytdexbkq58rsp5580ph77
+              - cell "Add comment to autoCommitDirtyTree explaining the commit message format" [ref=e791]:
+                - link "Add comment to autoCommitDirtyTree explaining the commit message format" [ref=e792] [cursor=pointer]:
+                  - /url: /issues/jh77r8t5861ytdexbkq58rsp5580ph77
+              - cell "Closed" [ref=e793]:
+                - generic [ref=e794]: Closed
+              - cell "Low" [ref=e795]:
+                - generic [ref=e796]: Low
+            - 'row "FLUX-21 Add `by_epic` index on issues table for efficient epic→issue lookups Closed Low" [ref=e797]':
+              - cell "FLUX-21" [ref=e798]:
+                - link "FLUX-21" [ref=e799] [cursor=pointer]:
+                  - /url: /issues/jh7basxydqw5hadrqj40p3q04180q4g1
+              - 'cell "Add `by_epic` index on issues table for efficient epic→issue lookups" [ref=e800]':
+                - 'link "Add `by_epic` index on issues table for efficient epic→issue lookups" [ref=e801] [cursor=pointer]':
+                  - /url: /issues/jh7basxydqw5hadrqj40p3q04180q4g1
+              - cell "Closed" [ref=e802]:
+                - generic [ref=e803]: Closed
+              - cell "Low" [ref=e804]:
+                - generic [ref=e805]: Low
+            - 'row "FLUX-23 Add `by_epic` index to issues table for `epics.show` query Closed Low" [ref=e806]':
+              - cell "FLUX-23" [ref=e807]:
+                - link "FLUX-23" [ref=e808] [cursor=pointer]:
+                  - /url: /issues/jh7cd2ddnp0wmsaj38bhta7krs80p5vt
+              - 'cell "Add `by_epic` index to issues table for `epics.show` query" [ref=e809]':
+                - 'link "Add `by_epic` index to issues table for `epics.show` query" [ref=e810] [cursor=pointer]':
+                  - /url: /issues/jh7cd2ddnp0wmsaj38bhta7krs80p5vt
+              - cell "Closed" [ref=e811]:
+                - generic [ref=e812]: Closed
+              - cell "Low" [ref=e813]:
+                - generic [ref=e814]: Low
+            - 'row "FLUX-26 Drop `duration` and `createdIssueIds` from sessions schema Open Low" [ref=e815]':
+              - cell "FLUX-26" [ref=e816]:
+                - link "FLUX-26" [ref=e817] [cursor=pointer]:
+                  - /url: /issues/jh70q273dgkd01dbw27pyev0hh80qjma
+              - 'cell "Drop `duration` and `createdIssueIds` from sessions schema" [ref=e818]':
+                - 'link "Drop `duration` and `createdIssueIds` from sessions schema" [ref=e819] [cursor=pointer]':
+                  - /url: /issues/jh70q273dgkd01dbw27pyev0hh80qjma
+              - cell "Open" [ref=e820]:
+                - generic [ref=e821]: Open
+              - cell "Low" [ref=e822]:
+                - generic [ref=e823]: Low
+            - row "FLUX-31 Stale 'stubs' section comments in tools/schema.ts for implemented tools Open Low" [ref=e824]:
+              - cell "FLUX-31" [ref=e825]:
+                - link "FLUX-31" [ref=e826] [cursor=pointer]:
+                  - /url: /issues/jh75gmwvjqkrx2gcf9235cf4w180q274
+              - cell "Stale 'stubs' section comments in tools/schema.ts for implemented tools" [ref=e827]:
+                - link "Stale 'stubs' section comments in tools/schema.ts for implemented tools" [ref=e828] [cursor=pointer]:
+                  - /url: /issues/jh75gmwvjqkrx2gcf9235cf4w180q274
+              - cell "Open" [ref=e829]:
+                - generic [ref=e830]: Open
+              - cell "Low" [ref=e831]:
+                - generic [ref=e832]: Low
+            - 'row "FLUX-34 Orchestrator: agentSessionId persist uses catch-log-continue anti-pattern Open Low" [ref=e833]':
+              - cell "FLUX-34" [ref=e834]:
+                - link "FLUX-34" [ref=e835] [cursor=pointer]:
+                  - /url: /issues/jh762qdgeqc93h75mptzcc29kx80q6hn
+              - 'cell "Orchestrator: agentSessionId persist uses catch-log-continue anti-pattern" [ref=e836]':
+                - 'link "Orchestrator: agentSessionId persist uses catch-log-continue anti-pattern" [ref=e837] [cursor=pointer]':
+                  - /url: /issues/jh762qdgeqc93h75mptzcc29kx80q6hn
+              - cell "Open" [ref=e838]:
+                - generic [ref=e839]: Open
+              - cell "Low" [ref=e840]:
+                - generic [ref=e841]: Low
+            - row "FLUX-40 Add MCP schema validation flow comment to mcp.ts registerTools Open Low" [ref=e842]:
+              - cell "FLUX-40" [ref=e843]:
+                - link "FLUX-40" [ref=e844] [cursor=pointer]:
+                  - /url: /issues/jh707qrcbc6cvkxxdt2wtxhxjn80qwy5
+              - cell "Add MCP schema validation flow comment to mcp.ts registerTools" [ref=e845]:
+                - link "Add MCP schema validation flow comment to mcp.ts registerTools" [ref=e846] [cursor=pointer]:
+                  - /url: /issues/jh707qrcbc6cvkxxdt2wtxhxjn80qwy5
+              - cell "Open" [ref=e847]:
+                - generic [ref=e848]: Open
+              - cell "Low" [ref=e849]:
+                - generic [ref=e850]: Low
+            - 'row "FLUX-42 Add compound index `by_project_status` on sessions table Open Low" [ref=e851]':
+              - cell "FLUX-42" [ref=e852]:
+                - link "FLUX-42" [ref=e853] [cursor=pointer]:
+                  - /url: /issues/jh7c1gsxx33md3qmg46qrzq81980qvp1
+              - 'cell "Add compound index `by_project_status` on sessions table" [ref=e854]':
+                - 'link "Add compound index `by_project_status` on sessions table" [ref=e855] [cursor=pointer]':
+                  - /url: /issues/jh7c1gsxx33md3qmg46qrzq81980qvp1
+              - cell "Open" [ref=e856]:
+                - generic [ref=e857]: Open
+              - cell "Low" [ref=e858]:
+                - generic [ref=e859]: Low
+            - row "FLUX-44 Configure biome to ignore convex/_generated directory Open Low" [ref=e860]:
+              - cell "FLUX-44" [ref=e861]:
+                - link "FLUX-44" [ref=e862] [cursor=pointer]:
+                  - /url: /issues/jh720v6hph52qn2rj8v0g7hgc580pvmb
+              - cell "Configure biome to ignore convex/_generated directory" [ref=e863]:
+                - link "Configure biome to ignore convex/_generated directory" [ref=e864] [cursor=pointer]:
+                  - /url: /issues/jh720v6hph52qn2rj8v0g7hgc580pvmb
+              - cell "Open" [ref=e865]:
+                - generic [ref=e866]: Open
+              - cell "Low" [ref=e867]:
+                - generic [ref=e868]: Low
+            - 'row "FLUX-57 `issues_list` MCP status filter missing `deferred` and `stuck` values Open Low" [ref=e869]':
+              - cell "FLUX-57" [ref=e870]:
+                - link "FLUX-57" [ref=e871] [cursor=pointer]:
+                  - /url: /issues/jh71gm7c9q0ah2v1bt6mn159wh80py5w
+              - 'cell "`issues_list` MCP status filter missing `deferred` and `stuck` values" [ref=e872]':
+                - 'link "`issues_list` MCP status filter missing `deferred` and `stuck` values" [ref=e873] [cursor=pointer]':
+                  - /url: /issues/jh71gm7c9q0ah2v1bt6mn159wh80py5w
+              - cell "Open" [ref=e874]:
+                - generic [ref=e875]: Open
+              - cell "Low" [ref=e876]:
+                - generic [ref=e877]: Low
+            - row "FLUX-70 Replace non-null assertions on activeSession in orchestrator Open Low" [ref=e878]:
+              - cell "FLUX-70" [ref=e879]:
+                - link "FLUX-70" [ref=e880] [cursor=pointer]:
+                  - /url: /issues/jh78swr12n5cqdyz1pd9mwfbjn80qbv5
+              - cell "Replace non-null assertions on activeSession in orchestrator" [ref=e881]:
+                - link "Replace non-null assertions on activeSession in orchestrator" [ref=e882] [cursor=pointer]:
+                  - /url: /issues/jh78swr12n5cqdyz1pd9mwfbjn80qbv5
+              - cell "Open" [ref=e883]:
+                - generic [ref=e884]: Open
+              - cell "Low" [ref=e885]:
+                - generic [ref=e886]: Low
+            - 'row "FLUX-71 Review sessions don''t capture `agentSessionId` Open Low" [ref=e887]':
+              - cell "FLUX-71" [ref=e888]:
+                - link "FLUX-71" [ref=e889] [cursor=pointer]:
+                  - /url: /issues/jh73h25y32fzchqpyw7zdmpa6s80pwm6
+              - 'cell "Review sessions don''t capture `agentSessionId`" [ref=e890]':
+                - 'link "Review sessions don''t capture `agentSessionId`" [ref=e891] [cursor=pointer]':
+                  - /url: /issues/jh73h25y32fzchqpyw7zdmpa6s80pwm6
+              - cell "Open" [ref=e892]:
+                - generic [ref=e893]: Open
+              - cell "Low" [ref=e894]:
+                - generic [ref=e895]: Low
+            - 'row "FLUX-76 OrchestratorStatus: Replace polling with SSE subscription for instant state updates Open Low" [ref=e896]':
+              - cell "FLUX-76" [ref=e897]:
+                - link "FLUX-76" [ref=e898] [cursor=pointer]:
+                  - /url: /issues/jh76tfam2frvfd1tsmdsycshkh80ptz4
+              - 'cell "OrchestratorStatus: Replace polling with SSE subscription for instant state updates" [ref=e899]':
+                - 'link "OrchestratorStatus: Replace polling with SSE subscription for instant state updates" [ref=e900] [cursor=pointer]':
+                  - /url: /issues/jh76tfam2frvfd1tsmdsycshkh80ptz4
+              - cell "Open" [ref=e901]:
+                - generic [ref=e902]: Open
+              - cell "Low" [ref=e903]:
+                - generic [ref=e904]: Low
+            - row "FLUX-81 issues_search description scan won't scale for large projects Open Low" [ref=e905]:
+              - cell "FLUX-81" [ref=e906]:
+                - link "FLUX-81" [ref=e907] [cursor=pointer]:
+                  - /url: /issues/jh77xm4ey6gg36szxxemnpgcs180qjnq
+              - cell "issues_search description scan won't scale for large projects" [ref=e908]:
+                - link "issues_search description scan won't scale for large projects" [ref=e909] [cursor=pointer]:
+                  - /url: /issues/jh77xm4ey6gg36szxxemnpgcs180qjnq
+              - cell "Open" [ref=e910]:
+                - generic [ref=e911]: Open
+              - cell "Low" [ref=e912]:
+                - generic [ref=e913]: Low
+            - 'row "FLUX-87 F5c: Browser notifications for stuck and completed issues Open Low" [ref=e914]':
+              - cell "FLUX-87" [ref=e915]:
+                - link "FLUX-87" [ref=e916] [cursor=pointer]:
+                  - /url: /issues/jh7e54y08c6btwtndwckd8a94s80p51n
+              - 'cell "F5c: Browser notifications for stuck and completed issues" [ref=e917]':
+                - 'link "F5c: Browser notifications for stuck and completed issues" [ref=e918] [cursor=pointer]':
+                  - /url: /issues/jh7e54y08c6btwtndwckd8a94s80p51n
+              - cell "Open" [ref=e919]:
+                - generic [ref=e920]: Open
+              - cell "Low" [ref=e921]:
+                - generic [ref=e922]: Low
+            - row "FLUX-93 Issues/Sessions tabs should show counts inline Open Low" [ref=e923]:
+              - cell "FLUX-93" [ref=e924]:
+                - link "FLUX-93" [ref=e925] [cursor=pointer]:
+                  - /url: /issues/jh70kvmk36xqjnzmfgv8460r2180qmvh
+              - cell "Issues/Sessions tabs should show counts inline" [ref=e926]:
+                - link "Issues/Sessions tabs should show counts inline" [ref=e927] [cursor=pointer]:
+                  - /url: /issues/jh70kvmk36xqjnzmfgv8460r2180qmvh
+              - cell "Open" [ref=e928]:
+                - generic [ref=e929]: Open
+              - cell "Low" [ref=e930]:
+                - generic [ref=e931]: Low
+            - row "FLUX-96 Issues list default tab should be \"Open\" not \"All\" Open Low" [ref=e932]:
+              - cell "FLUX-96" [ref=e933]:
+                - link "FLUX-96" [ref=e934] [cursor=pointer]:
+                  - /url: /issues/jh70ynqrknnbfdnqze10mas3sx80ptcp
+              - cell "Issues list default tab should be \"Open\" not \"All\"" [ref=e935]:
+                - link "Issues list default tab should be \"Open\" not \"All\"" [ref=e936] [cursor=pointer]:
+                  - /url: /issues/jh70ynqrknnbfdnqze10mas3sx80ptcp
+              - cell "Open" [ref=e937]:
+                - generic [ref=e938]: Open
+              - cell "Low" [ref=e939]:
+                - generic [ref=e940]: Low
+            - 'row "FLUX-97 Badges should use DaisyUI `badge-soft` style for better visual hierarchy Open Low" [ref=e941]':
+              - cell "FLUX-97" [ref=e942]:
+                - link "FLUX-97" [ref=e943] [cursor=pointer]:
+                  - /url: /issues/jh7c1b2z4hv0rptbpjhtb6cz3180q82c
+              - 'cell "Badges should use DaisyUI `badge-soft` style for better visual hierarchy" [ref=e944]':
+                - 'link "Badges should use DaisyUI `badge-soft` style for better visual hierarchy" [ref=e945] [cursor=pointer]':
+                  - /url: /issues/jh7c1b2z4hv0rptbpjhtb6cz3180q82c
+              - cell "Open" [ref=e946]:
+                - generic [ref=e947]: Open
+              - cell "Low" [ref=e948]:
+                - generic [ref=e949]: Low
+  - generic [ref=e29]:
+    - generic "close sidebar"
+    - list [ref=e30]:
+      - listitem [ref=e31]:
+        - link "Issues" [ref=e32] [cursor=pointer]:
+          - /url: /issues
+          - text: Issues
+      - listitem [ref=e34]:
+        - link "Activity" [ref=e35] [cursor=pointer]:
+          - /url: /activity
+          - text: Activity
+      - listitem [ref=e37]:
+        - link "Sessions" [ref=e38] [cursor=pointer]:
+          - /url: /sessions
+          - text: Sessions
