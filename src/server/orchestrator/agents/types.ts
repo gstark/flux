@@ -57,7 +57,6 @@ export interface ResumeOptions {
 export interface AgentProcess {
   pid: number;
   stdout: ReadableStream<Uint8Array>;
-  stderr: ReadableStream<Uint8Array>;
   kill(): void;
   wait(): Promise<{ exitCode: number }>;
 }

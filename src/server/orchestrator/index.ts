@@ -1146,7 +1146,6 @@ class Orchestrator {
     const stubProcess: AgentProcess = {
       pid,
       stdout: new ReadableStream<Uint8Array>(),
-      stderr: new ReadableStream<Uint8Array>(),
       kill: () => {
         try {
           process.kill(pid, 9);

@@ -29,7 +29,7 @@ export class ClaudeCodeProvider implements AgentProvider {
       {
         cwd: opts.cwd,
         stdout: "pipe",
-        stderr: "pipe",
+        stderr: "ignore",
       },
     );
 
@@ -51,7 +51,7 @@ export class ClaudeCodeProvider implements AgentProvider {
       {
         cwd: opts.cwd,
         stdout: "pipe",
-        stderr: "pipe",
+        stderr: "ignore",
       },
     );
 
@@ -75,7 +75,6 @@ function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
   return {
     pid: proc.pid,
     stdout: proc.stdout as ReadableStream<Uint8Array>,
-    stderr: proc.stderr as ReadableStream<Uint8Array>,
     kill: () => proc.kill(),
     wait: async () => {
       const exitCode = await proc.exited;
