@@ -23,10 +23,19 @@ export async function ensureProject(): Promise<{
     return { projectId: existing._id, projectSlug: existing.slug };
   }
 
-  // Project doesn't exist — prompt for details
-  const slug = prompt(`Project slug [${inferredSlug}]:`) || inferredSlug;
-  const defaultName = titleize(slug);
-  const name = prompt(`Project name [${defaultName}]:`) || defaultName;
+  // Project doesn't exist — create with inferred defaults or interactive input
+  let slug: string;
+  let name: string;
+
+  if (process.stdin.isTTY) {
+    slug = prompt(`Project slug [${inferredSlug}]:`) || inferredSlug;
+    const defaultName = titleize(slug);
+    name = prompt(`Project name [${defaultName}]:`) || defaultName;
+  } else {
+    slug = inferredSlug;
+    name = titleize(slug);
+    console.log(`Non-interactive mode: creating project "${name}" (${slug}).`);
+  }
 
   const projectId = await client.mutation(api.projects.create, { slug, name });
   console.log(`Project "${name}" created. Seeds scheduled.`);
