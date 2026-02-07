@@ -2,6 +2,14 @@ import type { ConvexClient } from "convex/browser";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { Orchestrator } from "../orchestrator";
+import type {
+  CloseTypeValue,
+  CommentAuthorValue,
+  EpicStatusValue,
+  IssuePriorityValue,
+  IssueStatusValue,
+  SessionStatusValue,
+} from "./schema";
 
 export type ToolContext = {
   convex: ConvexClient;
@@ -48,7 +56,7 @@ const issues_create: ToolHandler = async (args, ctx) => {
   const { title, description, priority } = args as {
     title: string;
     description?: string;
-    priority?: "critical" | "high" | "medium" | "low";
+    priority?: IssuePriorityValue;
   };
 
   const issueId = await ctx.convex.mutation(api.issues.create, {
@@ -65,7 +73,7 @@ const issues_create: ToolHandler = async (args, ctx) => {
 
 const issues_list: ToolHandler = async (args, ctx) => {
   const { status, limit } = args as {
-    status?: "open" | "in_progress" | "closed" | "deferred" | "stuck";
+    status?: IssueStatusValue;
     limit?: number;
   };
 
@@ -98,8 +106,8 @@ const issues_update: ToolHandler = async (args, ctx) => {
     issueId: string;
     title?: string;
     description?: string;
-    status?: "open" | "in_progress" | "closed" | "deferred" | "stuck";
-    priority?: "critical" | "high" | "medium" | "low";
+    status?: IssueStatusValue;
+    priority?: IssuePriorityValue;
     assignee?: string;
   };
 
@@ -183,7 +191,7 @@ const orchestrator_stop: ToolHandler = async (_args, ctx) => {
 
 const sessions_list: ToolHandler = async (args, ctx) => {
   const { status } = args as {
-    status?: "running" | "completed" | "failed";
+    status?: SessionStatusValue;
   };
 
   const sessions = await ctx.convex.query(api.sessions.list, {
@@ -256,7 +264,7 @@ const sessions_show: ToolHandler = async (args, ctx) => {
 const issues_close: ToolHandler = async (args, ctx) => {
   const { issueId, closeType, reason } = args as {
     issueId: string;
-    closeType: "completed" | "noop" | "duplicate" | "wontfix";
+    closeType: CloseTypeValue;
     reason?: string;
   };
 
@@ -381,7 +389,7 @@ const comments_create: ToolHandler = async (args, ctx) => {
   const { issueId, content, author } = args as {
     issueId: string;
     content: string;
-    author?: "user" | "agent" | "flux";
+    author?: CommentAuthorValue;
   };
 
   const commentId = await ctx.convex.mutation(api.comments.create, {
@@ -397,7 +405,7 @@ const issues_bulk_create: ToolHandler = async (args, ctx) => {
     issues: Array<{
       title: string;
       description?: string;
-      priority?: "critical" | "high" | "medium" | "low";
+      priority?: IssuePriorityValue;
     }>;
   };
 
@@ -412,8 +420,8 @@ const issues_bulk_update: ToolHandler = async (args, ctx) => {
   const { updates } = args as {
     updates: Array<{
       issueId: string;
-      status?: "open" | "in_progress" | "closed" | "deferred" | "stuck";
-      priority?: "critical" | "high" | "medium" | "low";
+      status?: IssueStatusValue;
+      priority?: IssuePriorityValue;
     }>;
   };
 
@@ -469,7 +477,7 @@ const comments_list: ToolHandler = async (args, ctx) => {
 
 const epics_list: ToolHandler = async (args, ctx) => {
   const { status, limit } = args as {
-    status?: "open" | "closed";
+    status?: EpicStatusValue;
     limit?: number;
   };
 

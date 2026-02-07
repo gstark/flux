@@ -1,5 +1,42 @@
 // Tool schema definitions — single source of truth for all MCP tool names, descriptions, and input schemas.
 import { z } from "zod";
+import {
+  CloseType,
+  CommentAuthor,
+  EpicStatus,
+  IssuePriority,
+  IssueStatus,
+  SessionStatus,
+} from "$convex/schema";
+
+// ── Derived Zod enums (single source of truth from Convex schema) ────
+const issueStatusEnum = z.enum(
+  Object.values(IssueStatus) as [string, ...string[]],
+);
+const issuePriorityEnum = z.enum(
+  Object.values(IssuePriority) as [string, ...string[]],
+);
+const epicStatusEnum = z.enum(
+  Object.values(EpicStatus) as [string, ...string[]],
+);
+const commentAuthorEnum = z.enum(
+  Object.values(CommentAuthor) as [string, ...string[]],
+);
+const closeTypeEnum = z.enum(Object.values(CloseType) as [string, ...string[]]);
+const sessionStatusEnum = z.enum(
+  Object.values(SessionStatus) as [string, ...string[]],
+);
+
+// ── Derived TypeScript types for handler type assertions ─────────────
+export type IssueStatusValue = (typeof IssueStatus)[keyof typeof IssueStatus];
+export type IssuePriorityValue =
+  (typeof IssuePriority)[keyof typeof IssuePriority];
+export type EpicStatusValue = (typeof EpicStatus)[keyof typeof EpicStatus];
+export type CommentAuthorValue =
+  (typeof CommentAuthor)[keyof typeof CommentAuthor];
+export type CloseTypeValue = (typeof CloseType)[keyof typeof CloseType];
+export type SessionStatusValue =
+  (typeof SessionStatus)[keyof typeof SessionStatus];
 
 export interface ToolDef {
   name: string;
@@ -38,8 +75,7 @@ const issues_create: ToolDef = {
       .string()
       .optional()
       .describe("Detailed description. Supports markdown."),
-    priority: z
-      .enum(["critical", "high", "medium", "low"])
+    priority: issuePriorityEnum
       .optional()
       .describe(
         "Defaults to 'medium'. Use 'critical' only for drop-everything issues.",
@@ -52,8 +88,7 @@ const issues_list: ToolDef = {
   description:
     "List issues sorted by priority (critical first) then creation time (oldest first).",
   schema: {
-    status: z
-      .enum(["open", "in_progress", "closed", "deferred", "stuck"])
+    status: issueStatusEnum
       .optional()
       .describe("Filter by status. Omit for all."),
     limit: z.number().optional().describe("Max results. Default 50, max 200."),
@@ -82,14 +117,8 @@ const issues_update: ToolDef = {
       .string()
       .optional()
       .describe("New description. Supports markdown."),
-    status: z
-      .enum(["open", "in_progress", "closed", "deferred", "stuck"])
-      .optional()
-      .describe("New status."),
-    priority: z
-      .enum(["critical", "high", "medium", "low"])
-      .optional()
-      .describe("New priority."),
+    status: issueStatusEnum.optional().describe("New status."),
+    priority: issuePriorityEnum.optional().describe("New priority."),
     assignee: z.string().optional().describe("Assign to an agent or person."),
   },
 };
@@ -102,9 +131,7 @@ const issues_close: ToolDef = {
     "Close an issue with a specific close type. Use this instead of issues_update for closing.",
   schema: {
     issueId: z.string().describe("The issue's document ID."),
-    closeType: z
-      .enum(["completed", "noop", "duplicate", "wontfix"])
-      .describe("How the issue was resolved."),
+    closeType: closeTypeEnum.describe("How the issue was resolved."),
     reason: z
       .string()
       .optional()
@@ -188,8 +215,7 @@ const comments_create: ToolDef = {
   schema: {
     issueId: z.string().describe("The issue's document ID."),
     content: z.string().describe("The comment text. Supports markdown."),
-    author: z
-      .enum(["user", "agent", "flux"])
+    author: commentAuthorEnum
       .optional()
       .describe("Comment author type. Defaults to 'agent'."),
   },
@@ -201,8 +227,7 @@ const epics_list: ToolDef = {
   name: "epics_list",
   description: "List epics with optional status filter.",
   schema: {
-    status: z
-      .enum(["open", "closed"])
+    status: epicStatusEnum
       .optional()
       .describe("Filter by status. Omit for all."),
     limit: z.number().optional().describe("Max results. Default 50, max 200."),
@@ -329,7 +354,7 @@ const issues_bulk_create: ToolDef = {
       z.object({
         title: z.string(),
         description: z.string().optional(),
-        priority: z.enum(["critical", "high", "medium", "low"]).optional(),
+        priority: issuePriorityEnum.optional(),
       }),
     ).describe("Array of issues to create."),
   },
@@ -343,10 +368,8 @@ const issues_bulk_update: ToolDef = {
     updates: jsonArray(
       z.object({
         issueId: z.string(),
-        status: z
-          .enum(["open", "in_progress", "closed", "deferred", "stuck"])
-          .optional(),
-        priority: z.enum(["critical", "high", "medium", "low"]).optional(),
+        status: issueStatusEnum.optional(),
+        priority: issuePriorityEnum.optional(),
       }),
     ).describe("Array of issue updates. Each must include issueId."),
   },
@@ -359,8 +382,7 @@ const sessions_list: ToolDef = {
   description:
     "List orchestrator sessions, optionally filtered by status. Sorted by most recent first.",
   schema: {
-    status: z
-      .enum(["running", "completed", "failed"])
+    status: sessionStatusEnum
       .optional()
       .describe("Filter by session status. Omit for all."),
   },
