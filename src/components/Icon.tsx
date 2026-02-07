@@ -2,6 +2,7 @@ import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowDown,
   faArrowLeft,
+  faArrowRotateLeft,
   faArrowUp,
   faBars,
   faBolt,
@@ -46,6 +47,7 @@ import {
 const ICON_MAP: Record<string, IconDefinition> = {
   "fa-arrow-down": faArrowDown,
   "fa-arrow-left": faArrowLeft,
+  "fa-arrow-rotate-left": faArrowRotateLeft,
   "fa-arrow-up": faArrowUp,
   "fa-bars": faBars,
   "fa-bolt": faBolt,
@@ -126,6 +128,7 @@ export {
   FontAwesomeIcon,
   faArrowDown,
   faArrowLeft,
+  faArrowRotateLeft,
   faArrowUp,
   faBars,
   faBolt,

@@ -11,6 +11,7 @@ import { DependencySection } from "./DependencySection";
 import {
   FontAwesomeIcon,
   faArrowLeft,
+  faArrowRotateLeft,
   faCirclePause,
   faCirclePlay,
   faCircleXmark,
@@ -42,6 +43,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const issue = useQuery(api.issues.get, { issueId });
   const allLabels = useQuery(api.labels.list, { projectId });
   const updateIssue = useMutation(api.issues.update);
+  const unstickIssue = useMutation(api.issues.unstick);
   const closeIssue = useMutation(api.issues.close);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -59,6 +61,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const [deferNote, setDeferNote] = useState("");
   const [deferring, setDeferring] = useState(false);
   const [undeferring, setUndeferring] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const [mutationError, setMutationError] = useState<string | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -104,6 +107,8 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const currentIssue = issue;
   const isClosed = currentIssue.status === IssueStatus.Closed;
   const isDeferred = currentIssue.status === IssueStatus.Deferred;
+  const isInProgress = currentIssue.status === IssueStatus.InProgress;
+  const isStuck = currentIssue.status === IssueStatus.Stuck;
 
   // Build a lookup map for label data
   const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
@@ -225,6 +230,21 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
       showError(err);
     } finally {
       setUndeferring(false);
+    }
+  }
+
+  async function handleResetToOpen() {
+    setResetting(true);
+    try {
+      if (isStuck) {
+        await unstickIssue({ issueId });
+      } else {
+        await updateIssue({ issueId, status: IssueStatus.Open });
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -371,6 +391,25 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           </button>
         )}
       </div>
+
+      {/* Reset to Open — for in_progress (stranded) or stuck issues */}
+      {(isInProgress || isStuck) && (
+        <div>
+          <button
+            type="button"
+            className="btn btn-outline btn-info btn-sm"
+            onClick={handleResetToOpen}
+            disabled={resetting}
+          >
+            {resetting ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <FontAwesomeIcon icon={faArrowRotateLeft} aria-hidden="true" />
+            )}
+            Reset to Open
+          </button>
+        </div>
+      )}
 
       {/* Defer action */}
       {!isClosed && !isDeferred && (
