@@ -45,16 +45,16 @@ export function SettingsForm() {
     const failures = Number(maxFailures);
     const timeoutMin = Number(sessionTimeoutMin);
 
-    if (!Number.isFinite(reviewIter) || reviewIter < 1) {
-      setError("Max Review Iterations must be a positive number");
+    if (!Number.isInteger(reviewIter) || reviewIter < 1) {
+      setError("Max Review Iterations must be a positive integer");
       return;
     }
-    if (!Number.isFinite(failures) || failures < 1) {
-      setError("Max Failures must be a positive number");
+    if (!Number.isInteger(failures) || failures < 1) {
+      setError("Max Failures must be a positive integer");
       return;
     }
-    if (!Number.isFinite(timeoutMin) || timeoutMin < 1) {
-      setError("Session Timeout must be at least 1 minute");
+    if (!Number.isInteger(timeoutMin) || timeoutMin < 1) {
+      setError("Session Timeout must be a positive integer (minutes)");
       return;
     }
 
@@ -161,6 +161,7 @@ export function SettingsForm() {
                 type="number"
                 className="input input-bordered w-full"
                 min={1}
+                step={1}
                 value={maxReviewIterations}
                 onChange={(e) => {
                   setMaxReviewIterations(e.target.value);
@@ -177,6 +178,7 @@ export function SettingsForm() {
                 type="number"
                 className="input input-bordered w-full"
                 min={1}
+                step={1}
                 value={maxFailures}
                 onChange={(e) => {
                   setMaxFailures(e.target.value);
@@ -193,6 +195,7 @@ export function SettingsForm() {
                 type="number"
                 className="input input-bordered w-full"
                 min={1}
+                step={1}
                 value={sessionTimeoutMin}
                 onChange={(e) => {
                   setSessionTimeoutMin(e.target.value);
