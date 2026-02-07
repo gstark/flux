@@ -388,10 +388,14 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
                   onClick={handleDefer}
                   disabled={deferring}
                 >
-                  {deferring && (
+                  {deferring ? (
                     <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <i
+                      className="fa-solid fa-circle-pause"
+                      aria-hidden="true"
+                    />
                   )}
-                  <i className="fa-solid fa-circle-pause" aria-hidden="true" />
                   Confirm Defer
                 </button>
                 <button
@@ -429,10 +433,11 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             onClick={handleUndefer}
             disabled={undeferring}
           >
-            {undeferring && (
+            {undeferring ? (
               <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <i className="fa-solid fa-circle-play" aria-hidden="true" />
             )}
-            <i className="fa-solid fa-circle-play" aria-hidden="true" />
             Undefer Issue
           </button>
         </div>

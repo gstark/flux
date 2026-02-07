@@ -202,13 +202,14 @@ export function IssueList() {
                         onClick={() => handleUndefer(issue._id)}
                         disabled={undeferringId === issue._id}
                       >
-                        {undeferringId === issue._id && (
+                        {undeferringId === issue._id ? (
                           <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          <i
+                            className="fa-solid fa-circle-play"
+                            aria-hidden="true"
+                          />
                         )}
-                        <i
-                          className="fa-solid fa-circle-play"
-                          aria-hidden="true"
-                        />
                         Undefer
                       </button>
                     ) : issue.status !== IssueStatus.Closed ? (
@@ -267,10 +268,11 @@ export function IssueList() {
               onClick={handleDefer}
               disabled={deferring}
             >
-              {deferring && (
+              {deferring ? (
                 <span className="loading loading-spinner loading-sm" />
+              ) : (
+                <i className="fa-solid fa-circle-pause" aria-hidden="true" />
               )}
-              <i className="fa-solid fa-circle-pause" aria-hidden="true" />
               Defer
             </button>
           </div>
