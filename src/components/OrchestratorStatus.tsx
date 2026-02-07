@@ -114,9 +114,10 @@ export function OrchestratorStatus({
   const showPing = state === "busy";
 
   // State label
+  const activePhase = status?.activeSession?.phase;
   const stateLabel =
-    state === "busy"
-      ? `${PHASE_LABELS[status!.activeSession!.phase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`
+    state === "busy" && activePhase
+      ? `${PHASE_LABELS[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`
       : state === "idle"
         ? enabled
           ? "Idle"
@@ -131,7 +132,10 @@ export function OrchestratorStatus({
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <div className="flex items-center gap-2">
+    <output
+      className="flex items-center gap-2"
+      aria-label={`Orchestrator: ${stateLabel}`}
+    >
       {/* Status dot */}
       <div className="inline-grid *:[grid-area:1/1]">
         {showPing && (
@@ -140,10 +144,7 @@ export function OrchestratorStatus({
             aria-hidden
           />
         )}
-        <div
-          className={`status status-lg ${dotClass}`}
-          aria-label={`Orchestrator ${state}`}
-        />
+        <div className={`status status-lg ${dotClass}`} aria-hidden />
       </div>
 
       {/* State label */}
@@ -201,6 +202,6 @@ export function OrchestratorStatus({
           )}
         </button>
       )}
-    </div>
+    </output>
   );
 }
