@@ -519,8 +519,9 @@ class Orchestrator {
       throw new Error("No active session to kill.");
     }
 
-    // Clear timeout timer — manual kill takes precedence
+    // Clear timeout timer and PID watchdog — manual kill takes precedence
     this.clearSessionTimeout();
+    this.clearPidWatchdog();
 
     // Mark as killed so the exit handler knows this was intentional
     this.activeSession.killed = true;
