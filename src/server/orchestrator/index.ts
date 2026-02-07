@@ -987,7 +987,18 @@ class Orchestrator {
         try {
           await this.run(issue._id);
           return; // Successfully started
-        } catch {}
+        } catch (err) {
+          const isClaim =
+            err instanceof Error && err.message.startsWith("Failed to claim");
+          if (!isClaim) {
+            console.error(
+              `[Orchestrator] Unexpected error running issue ${issue._id}:`,
+              err,
+            );
+            return; // Stop trying — something is broken
+          }
+          // Claim race lost — try the next issue
+        }
       }
     };
     tryNext();
