@@ -3,6 +3,17 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__morph-mcp__edit_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-mkdir.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|mcp__morph-mcp__edit_file",
