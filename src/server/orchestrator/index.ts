@@ -100,6 +100,7 @@ class Orchestrator {
   private maxFailures = 3;
   private maxReviewIterations = 10;
   private sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes default
+  private pidWatchdogTimer: ReturnType<typeof setInterval> | null = null;
   private lifecycleListeners = new Set<
     (event: OrchestratorLifecycleEvent) => void
   >();
@@ -395,6 +396,9 @@ class Orchestrator {
     // 12. Start session timeout enforcement
     this.startSessionTimeout();
 
+    // 13. Start PID watchdog to detect silently-dead processes (e.g. laptop sleep)
+    this.startPidWatchdog();
+
     return { sessionId: session._id, pid: agentProcess.pid };
   }
 
@@ -467,6 +471,44 @@ class Orchestrator {
     }
   }
 
+  // ── PID watchdog ────────────────────────────────────────────────────
+
+  /** Interval between PID liveness checks (15 seconds). */
+  private static readonly PID_WATCHDOG_INTERVAL_MS = 15_000;
+
+  /**
+   * Start a periodic PID liveness check. Detects silently-dead agent processes
+   * (e.g. OS killed child during laptop sleep but exit event was never delivered).
+   * Reads activeSession.process.pid each tick, so phase transitions that replace
+   * the process are tracked automatically.
+   */
+  private startPidWatchdog(): void {
+    this.clearPidWatchdog();
+    this.pidWatchdogTimer = setInterval(() => {
+      const session = this.activeSession;
+      if (!session) {
+        this.clearPidWatchdog();
+        return;
+      }
+      const pid = session.process.pid;
+      if (!isProcessAlive(pid)) {
+        this.clearPidWatchdog();
+        console.warn(
+          `[Orchestrator] PID watchdog: process ${pid} is dead, triggering handleExit(-1)`,
+        );
+        this.handleExit(-1);
+      }
+    }, Orchestrator.PID_WATCHDOG_INTERVAL_MS);
+  }
+
+  /** Clear the PID watchdog timer. */
+  private clearPidWatchdog(): void {
+    if (this.pidWatchdogTimer) {
+      clearInterval(this.pidWatchdogTimer);
+      this.pidWatchdogTimer = null;
+    }
+  }
+
   /**
    * Kill the running agent immediately.
    * The exit handler will detect the `killed` flag and apply hand-off semantics:
@@ -499,6 +541,9 @@ class Orchestrator {
 
     // Clear session timeout timer — the process has exited
     this.clearSessionTimeout();
+
+    // Clear PID watchdog — no longer needed once exit is being handled
+    this.clearPidWatchdog();
 
     // Wait for monitor to finish draining stdout before finalizing
     try {
@@ -1189,6 +1234,9 @@ class Orchestrator {
    * state based on pendingStop and subscription status.
    */
   private finalize(): void {
+    // Clear PID watchdog before nulling the session
+    this.clearPidWatchdog();
+
     this.activeSession = null;
 
     if (this.pendingStop || !this.unsubscribeReady) {
