@@ -30,5 +30,3 @@ export function App() {
     </AppShell>
   );
 }
-
-export default App;

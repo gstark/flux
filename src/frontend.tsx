@@ -25,8 +25,22 @@ async function start() {
   );
 }
 
+function handleStartupError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  const root = document.getElementById("root");
+  if (root) {
+    root.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh">
+        <pre style="color:red;max-width:600px;white-space:pre-wrap">Startup failed: ${msg}</pre>
+      </div>`;
+  }
+  throw err;
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start);
+  document.addEventListener("DOMContentLoaded", () =>
+    start().catch(handleStartupError),
+  );
 } else {
-  start();
+  start().catch(handleStartupError);
 }
