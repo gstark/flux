@@ -50,6 +50,8 @@ interface ActiveSession {
   monitor: SessionMonitor;
   monitorDone: Promise<void>;
   killed: boolean;
+  /** Set when the session was killed due to timeout (vs manual kill) */
+  timedOut: boolean;
   /** Git HEAD when the work session started */
   startHead: string;
   /** Claude session UUID captured from stream-json output */
@@ -58,6 +60,8 @@ interface ActiveSession {
   issue: WorkPromptContext;
   /** Current phase of the issue lifecycle */
   phase: SessionPhaseValue;
+  /** Handle for the session timeout timer (cleared on normal exit) */
+  timeoutTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /** Orchestrator manages claiming issues, spawning agents, and session lifecycle. */
@@ -71,6 +75,7 @@ class Orchestrator {
   private readyIssues: Array<{ _id: Id<"issues"> }> = [];
   private maxFailures = 3;
   private maxReviewIterations = 10;
+  private sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes default
 
   constructor(projectId: Id<"projects">, provider?: AgentProvider) {
     this.projectId = projectId;
@@ -147,6 +152,7 @@ class Orchestrator {
     if (config) {
       this.maxFailures = config.maxFailures;
       this.maxReviewIterations = config.maxReviewIterations;
+      this.sessionTimeoutMs = config.sessionTimeoutMs;
     }
 
     // Recover orphaned sessions before subscribing
@@ -285,10 +291,12 @@ class Orchestrator {
       monitor,
       monitorDone,
       killed: false,
+      timedOut: false,
       startHead,
       agentSessionId: null,
       issue: issueCtx,
       phase: SessionPhase.Work,
+      timeoutTimer: null,
     };
 
     // 9. Wire up agentSessionId extraction from stream-json
@@ -325,7 +333,79 @@ class Orchestrator {
       () => this.handleExit(1),
     );
 
+    // 11. Start session timeout enforcement
+    this.startSessionTimeout();
+
     return { sessionId: session._id, pid: agentProcess.pid };
+  }
+
+  // ── Session timeout enforcement ───────────────────────────────────
+
+  /**
+   * Start a timeout timer for the active session. On timeout:
+   * 1. SIGTERM (graceful shutdown attempt)
+   * 2. Wait 10 seconds
+   * 3. SIGKILL if still running
+   * 4. handleExit runs with timedOut=true → session failed, disposition "fault"
+   *
+   * @param startedAt - If provided (e.g., re-adopted sessions), calculates
+   *   remaining time from when the session originally started.
+   */
+  private startSessionTimeout(startedAt?: number): void {
+    const active = this.requireActiveSession("startSessionTimeout");
+
+    // Clear any existing timer (e.g., phase transition)
+    this.clearSessionTimeout();
+
+    // Calculate delay: full timeout for new sessions, remaining time for re-adopted
+    let delay = this.sessionTimeoutMs;
+    if (startedAt !== undefined) {
+      const elapsed = Date.now() - startedAt;
+      delay = Math.max(0, this.sessionTimeoutMs - elapsed);
+      if (delay === 0) {
+        // Already timed out — kill immediately
+        console.warn(
+          `[Orchestrator] Re-adopted session for ${active.issue.shortId} already exceeded timeout, killing`,
+        );
+      }
+    }
+
+    active.timeoutTimer = setTimeout(() => {
+      if (!this.activeSession || this.activeSession.killed) return;
+
+      console.error(
+        `[Orchestrator] Session timeout (${this.sessionTimeoutMs}ms) for ${active.issue.shortId} phase=${active.phase} — sending SIGTERM`,
+      );
+
+      this.activeSession.timedOut = true;
+      this.activeSession.killed = true;
+
+      // SIGTERM first (graceful)
+      this.activeSession.process.kill();
+
+      // SIGKILL after 10s if still running
+      const pid = this.activeSession.process.pid;
+      setTimeout(() => {
+        if (isProcessAlive(pid)) {
+          console.error(
+            `[Orchestrator] Agent PID ${pid} still alive after 10s grace period — sending SIGKILL`,
+          );
+          try {
+            process.kill(pid, 9); // SIGKILL
+          } catch {
+            // Already dead — race between natural exit and our kill
+          }
+        }
+      }, 10_000);
+    }, delay);
+  }
+
+  /** Clear the session timeout timer (called on normal exit or manual kill). */
+  private clearSessionTimeout(): void {
+    if (this.activeSession?.timeoutTimer) {
+      clearTimeout(this.activeSession.timeoutTimer);
+      this.activeSession.timeoutTimer = null;
+    }
   }
 
   /**
@@ -337,6 +417,9 @@ class Orchestrator {
     if (this.state !== OrchestratorState.Busy || !this.activeSession) {
       throw new Error("No active session to kill.");
     }
+
+    // Clear timeout timer — manual kill takes precedence
+    this.clearSessionTimeout();
 
     // Mark as killed so the exit handler knows this was intentional
     this.activeSession.killed = true;
@@ -355,6 +438,9 @@ class Orchestrator {
   private async handleExit(exitCode: number): Promise<void> {
     if (!this.activeSession) return;
 
+    // Clear session timeout timer — the process has exited
+    this.clearSessionTimeout();
+
     // Wait for monitor to finish draining stdout before finalizing
     try {
       await this.activeSession.monitorDone;
@@ -366,16 +452,36 @@ class Orchestrator {
     // Capture monitor ref before phase handlers call finalize() (which nulls activeSession)
     const monitor = this.activeSession.monitor;
 
-    // Kill path: hand-off to human — session failed, issue stays in_progress
+    // Kill path: session was terminated externally (manual kill or timeout).
     // Keep tmp file for debugging.
     if (this.activeSession.killed) {
       const convex = getConvexClient();
+      const { sessionId, issueId, timedOut, issue } = this.activeSession;
+
       await convex.mutation(api.sessions.update, {
-        sessionId: this.activeSession.sessionId,
+        sessionId,
         status: SessionStatus.Failed,
         endedAt: Date.now(),
         exitCode,
+        // Timeout kills get an explicit fault disposition for traceability
+        disposition: timedOut ? Disposition.Fault : undefined,
+        note: timedOut
+          ? `Session timed out after ${this.sessionTimeoutMs}ms (phase: ${this.activeSession.phase})`
+          : undefined,
       });
+
+      // Timeout: increment failure count so the circuit breaker can trip.
+      // Manual kills leave the issue in_progress for human review.
+      if (timedOut) {
+        console.error(
+          `[Orchestrator] Session timed out for ${issue.shortId} — incrementing failure count`,
+        );
+        await convex.mutation(api.issues.incrementFailure, {
+          issueId,
+          maxFailures: this.maxFailures,
+        });
+      }
+
       this.finalize();
       return;
     }
@@ -854,6 +960,9 @@ class Orchestrator {
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
     );
+
+    // Restart timeout for the new phase
+    this.startSessionTimeout();
   }
 
   /**
@@ -968,6 +1077,9 @@ class Orchestrator {
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
     );
+
+    // Restart timeout for the new phase
+    this.startSessionTimeout();
   }
 
   // ── Scheduling ───────────────────────────────────────────────────────
@@ -1090,6 +1202,7 @@ class Orchestrator {
       phase?: string;
       agentSessionId?: string;
       startHead?: string;
+      startedAt: number;
     },
     pid: number,
   ): Promise<boolean> {
@@ -1148,7 +1261,7 @@ class Orchestrator {
       stdout: new ReadableStream<Uint8Array>(),
       kill: () => {
         try {
-          process.kill(pid, 9);
+          process.kill(pid); // SIGTERM (default)
         } catch {
           // Already dead
         }
@@ -1163,6 +1276,7 @@ class Orchestrator {
       monitor: stubMonitor,
       monitorDone: Promise.resolve(), // No stream to drain
       killed: false,
+      timedOut: false,
       startHead: session.startHead ?? "",
       agentSessionId: session.agentSessionId ?? null,
       issue: {
@@ -1171,6 +1285,7 @@ class Orchestrator {
         description: issue.description,
       },
       phase,
+      timeoutTimer: null,
     };
 
     // Poll PID liveness and trigger exit handler when it dies
@@ -1182,12 +1297,17 @@ class Orchestrator {
       () => this.handleExit(1),
     );
 
+    // Start timeout enforcement for re-adopted sessions.
+    // Uses remaining time based on session.startedAt, not the full timeout,
+    // since the process has already been running.
+    this.startSessionTimeout(session.startedAt);
+
     return true;
   }
 
   /**
    * Poll a PID's liveness at 2s intervals. When the PID dies:
-   * 1. Load output from the tmp log file into the monitor's buffer
+   * 1. Load output from the tmp log file into the monitor buffer
    * 2. Resolve the exit promise (which triggers handleExit via the wait() chain)
    */
   private pollPidAndHandleExit(
