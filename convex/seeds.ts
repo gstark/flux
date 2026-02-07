@@ -38,24 +38,38 @@ export const runAll = internalMutation({
 
     let labelsAdded = 0;
     for (const label of labels) {
-      await ctx.db.insert("labels", { ...label, projectId });
-      labelsAdded++;
+      const existing = await ctx.db
+        .query("labels")
+        .withIndex("by_project_name", (q) =>
+          q.eq("projectId", projectId).eq("name", label.name),
+        )
+        .first();
+      if (!existing) {
+        await ctx.db.insert("labels", { ...label, projectId });
+        labelsAdded++;
+      }
     }
 
     // --- Orchestrator Config ---
-    await ctx.db.insert("orchestratorConfig", {
-      projectId,
-      enabled: false,
-      agent: "claude",
-      sessionTimeoutMs: 1800000, // 30 min
-      maxFailures: 3,
-      maxReviewIterations: 5,
-    });
+    const existingConfig = await ctx.db
+      .query("orchestratorConfig")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
+    if (!existingConfig) {
+      await ctx.db.insert("orchestratorConfig", {
+        projectId,
+        enabled: false,
+        agent: "claude",
+        sessionTimeoutMs: 1800000, // 30 min
+        maxFailures: 3,
+        maxReviewIterations: 5,
+      });
+    }
 
     return {
       llmCostsAdded,
       labelsAdded,
-      orchestratorConfigCreated: true,
+      orchestratorConfigCreated: !existingConfig,
     };
   },
 });
