@@ -87,6 +87,8 @@ export const update = mutation({
     if (args.title !== undefined) updates.title = args.title;
     if (args.description !== undefined) updates.description = args.description;
 
+    if (Object.keys(updates).length === 0) return epic;
+
     await ctx.db.patch(args.epicId, updates);
     return await ctx.db.get(args.epicId);
   },
