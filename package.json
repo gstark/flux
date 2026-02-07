@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/index.ts",
-    "convex": "convex dev",
+    "dev": "concurrently \"bun --hot src/index.ts\" \"convex dev\"",
     "start": "NODE_ENV=production bun src/index.ts",
     "check": "biome check --write",
     "typecheck": "tsc --noEmit"
@@ -29,6 +28,7 @@
     "@types/bun": "latest",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "daisyui": "^5.5.18"
   }
 }
