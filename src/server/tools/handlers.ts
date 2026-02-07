@@ -65,7 +65,7 @@ const issues_create: ToolHandler = async (args, ctx) => {
 
 const issues_list: ToolHandler = async (args, ctx) => {
   const { status, limit } = args as {
-    status?: "open" | "in_progress" | "closed";
+    status?: "open" | "in_progress" | "closed" | "deferred" | "stuck";
     limit?: number;
   };
 
