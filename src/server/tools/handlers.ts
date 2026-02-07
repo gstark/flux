@@ -341,6 +341,27 @@ const issues_bulk_create: ToolHandler = async (args, ctx) => {
   return ok(ctx, { issues: created, count: created.length });
 };
 
+const issues_bulk_update: ToolHandler = async (args, ctx) => {
+  const { updates } = args as {
+    updates: Array<{
+      issueId: string;
+      status?: "open" | "in_progress" | "closed";
+      priority?: "critical" | "high" | "medium" | "low";
+    }>;
+  };
+
+  const results = await Promise.all(
+    updates.map((update) => {
+      const { issueId, ...fields } = update;
+      return ctx.convex.mutation(api.issues.update, {
+        issueId: issueId as Id<"issues">,
+        ...fields,
+      });
+    }),
+  );
+  return ok(ctx, { issues: results, count: results.length });
+};
+
 const comments_list: ToolHandler = async (args, ctx) => {
   const { issueId, limit } = args as { issueId: string; limit?: number };
 
@@ -505,6 +526,7 @@ export const handlers: Record<string, ToolHandler> = {
   issues_retry,
   issues_search,
   issues_bulk_create,
+  issues_bulk_update,
   comments_create,
   comments_list,
   epics_list,
