@@ -21,16 +21,43 @@ export interface StatusEvent {
 
 export type StreamEvent = SessionStartEvent | ActivityEvent | StatusEvent;
 
+/** StreamEvent with a unique monotonic id for stable React keys. */
+export type KeyedStreamEvent = StreamEvent & { id: number };
+
 export interface ActivityStreamState {
-  events: StreamEvent[];
+  events: KeyedStreamEvent[];
   connected: boolean;
 }
 
+let nextEventId = 0;
+
 const MAX_EVENTS = 2000;
 
-function appendEvent(prev: StreamEvent[], event: StreamEvent): StreamEvent[] {
-  const next = [...prev, event];
+function appendEvent(
+  prev: KeyedStreamEvent[],
+  event: StreamEvent,
+): KeyedStreamEvent[] {
+  const next = [...prev, { ...event, id: nextEventId++ }];
   return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
+}
+
+/** Parse SSE JSON payload, returning null (and surfacing the error) on failure. */
+function parseSSE<T>(
+  e: MessageEvent,
+  eventName: string,
+  setEvents: React.Dispatch<React.SetStateAction<KeyedStreamEvent[]>>,
+): T | null {
+  try {
+    return JSON.parse(e.data) as T;
+  } catch {
+    setEvents((prev) =>
+      appendEvent(prev, {
+        type: "activity",
+        content: `[ERROR] Malformed ${eventName} payload: ${e.data}`,
+      }),
+    );
+    return null;
+  }
 }
 
 /**
@@ -40,7 +67,7 @@ function appendEvent(prev: StreamEvent[], event: StreamEvent): StreamEvent[] {
 export function useActivityStream(): ActivityStreamState & {
   clear: () => void;
 } {
-  const [events, setEvents] = useState<StreamEvent[]>([]);
+  const [events, setEvents] = useState<KeyedStreamEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const retryDelay = useRef(1000);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,18 +88,12 @@ export function useActivityStream(): ActivityStreamState & {
       });
 
       es.addEventListener("session_start", (e: MessageEvent) => {
-        let data: { sessionId: string; issueId: string; pid: number };
-        try {
-          data = JSON.parse(e.data);
-        } catch {
-          setEvents((prev) =>
-            appendEvent(prev, {
-              type: "activity",
-              content: `[ERROR] Malformed session_start payload: ${e.data}`,
-            }),
-          );
-          return;
-        }
+        const data = parseSSE<{
+          sessionId: string;
+          issueId: string;
+          pid: number;
+        }>(e, "session_start", setEvents);
+        if (!data) return;
         setEvents((prev) =>
           appendEvent(prev, {
             type: "session_start" as const,
@@ -84,18 +105,12 @@ export function useActivityStream(): ActivityStreamState & {
       });
 
       es.addEventListener("activity", (e: MessageEvent) => {
-        let data: { type: string; content: string };
-        try {
-          data = JSON.parse(e.data);
-        } catch {
-          setEvents((prev) =>
-            appendEvent(prev, {
-              type: "activity",
-              content: `[ERROR] Malformed activity payload: ${e.data}`,
-            }),
-          );
-          return;
-        }
+        const data = parseSSE<{ type: string; content: string }>(
+          e,
+          "activity",
+          setEvents,
+        );
+        if (!data) return;
         setEvents((prev) =>
           appendEvent(prev, {
             type: "activity" as const,
@@ -105,18 +120,11 @@ export function useActivityStream(): ActivityStreamState & {
       });
 
       es.addEventListener("status", (e: MessageEvent) => {
-        let data: { state: "stopped" | "idle" | "busy"; message: string };
-        try {
-          data = JSON.parse(e.data);
-        } catch {
-          setEvents((prev) =>
-            appendEvent(prev, {
-              type: "activity",
-              content: `[ERROR] Malformed status payload: ${e.data}`,
-            }),
-          );
-          return;
-        }
+        const data = parseSSE<{
+          state: "stopped" | "idle" | "busy";
+          message: string;
+        }>(e, "status", setEvents);
+        if (!data) return;
         setEvents((prev) =>
           appendEvent(prev, {
             type: "status" as const,

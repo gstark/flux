@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import {
-  type StreamEvent,
+  type KeyedStreamEvent,
   useActivityStream,
 } from "../hooks/useActivityStream";
 
-function EventLine({ event }: { event: StreamEvent }) {
+function EventLine({ event }: { event: KeyedStreamEvent }) {
   switch (event.type) {
     case "session_start":
       return (
@@ -40,6 +40,7 @@ export function ActivityPage() {
   }
 
   // Auto-scroll to bottom when new events arrive
+  // biome-ignore lint/correctness/useExhaustiveDependencies: events.length triggers scroll on new events
   useEffect(() => {
     if (autoScroll.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -61,7 +62,7 @@ export function ActivityPage() {
             {events.length} events
           </span>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={clear}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={clear}>
           Clear
         </button>
       </div>
@@ -79,7 +80,7 @@ export function ActivityPage() {
               : "Connecting to activity stream..."}
           </div>
         ) : (
-          events.map((event, i) => <EventLine key={i} event={event} />)
+          events.map((event) => <EventLine key={event.id} event={event} />)
         )}
       </div>
     </div>
