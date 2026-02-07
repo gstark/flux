@@ -157,6 +157,8 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             onBlur={saveTitle}
             onKeyDown={handleTitleKeyDown}
           />
+        ) : isClosed ? (
+          <h1 className="font-semibold text-xl">{currentIssue.title}</h1>
         ) : (
           <button
             type="button"
@@ -205,6 +207,14 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             onBlur={saveDesc}
             onKeyDown={handleDescKeyDown}
           />
+        ) : isClosed ? (
+          <div className="whitespace-pre-wrap rounded-lg bg-base-200 p-4">
+            {currentIssue.description || (
+              <span className="text-base-content/40 italic">
+                No description.
+              </span>
+            )}
+          </div>
         ) : (
           <button
             type="button"
