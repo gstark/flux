@@ -22,8 +22,8 @@ function EventLine({ event }: { event: KeyedStreamEvent }) {
       if (items.length === 0) return null;
       return (
         <>
-          {items.map((parsed) => (
-            <StreamContent key={parsedLineKey(parsed)} parsed={parsed} />
+          {items.map((parsed, i) => (
+            <StreamContent key={parsedLineKey(parsed, i)} parsed={parsed} />
           ))}
         </>
       );
