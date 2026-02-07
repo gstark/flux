@@ -61,6 +61,12 @@ export const update = mutation({
     if (!config) {
       throw new Error(`No orchestrator config found for project ${projectId}`);
     }
+    // Validate numeric fields are positive integers
+    for (const [k, val] of Object.entries(patch)) {
+      if (val !== undefined && (!Number.isInteger(val) || val < 1)) {
+        throw new Error(`${k} must be a positive integer, got ${val}`);
+      }
+    }
     // Strip undefined values from numeric fields
     const updates: Record<string, unknown> = {};
     for (const [k, val] of Object.entries(patch)) {
