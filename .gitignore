@@ -35,4 +35,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Playwright screenshots & debug snapshots (dumped at repo root)
 /*.png
-*-snapshot.md
+/*-snapshot.md
