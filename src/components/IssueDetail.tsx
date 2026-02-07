@@ -5,6 +5,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
 import { CommentsThread } from "./CommentsThread";
+import { Markdown } from "./Markdown";
 import { StatusBadge } from "./StatusBadge";
 
 type CloseTypeValue = (typeof CloseType)[keyof typeof CloseType];
@@ -209,25 +210,23 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
             onKeyDown={handleDescKeyDown}
           />
         ) : isClosed ? (
-          <div className="whitespace-pre-wrap rounded-lg bg-base-200 p-4">
-            {currentIssue.description || (
-              <span className="text-base-content/40 italic">
-                No description.
-              </span>
-            )}
+          <div className="rounded-lg bg-base-200 p-4">
+            <Markdown
+              content={currentIssue.description}
+              placeholder="No description."
+            />
           </div>
         ) : (
           <button
             type="button"
-            className="w-full cursor-pointer whitespace-pre-wrap rounded-lg bg-base-200 p-4 text-left hover:ring-1 hover:ring-primary/30"
+            className="w-full cursor-pointer rounded-lg bg-base-200 p-4 text-left hover:ring-1 hover:ring-primary/30"
             onClick={startEditDesc}
             title="Click to edit"
           >
-            {currentIssue.description || (
-              <span className="text-base-content/40 italic">
-                No description. Click to add one.
-              </span>
-            )}
+            <Markdown
+              content={currentIssue.description}
+              placeholder="No description. Click to add one."
+            />
           </button>
         )}
       </div>
@@ -302,7 +301,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           <h3 className="mb-1 font-medium text-base-content/60 text-sm">
             Close Reason
           </h3>
-          <p className="whitespace-pre-wrap">{currentIssue.closeReason}</p>
+          <Markdown content={currentIssue.closeReason} />
         </div>
       )}
 

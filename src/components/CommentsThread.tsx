@@ -4,6 +4,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { CommentAuthor } from "$convex/schema";
 import { formatRelativeTime } from "../lib/format";
+import { Markdown } from "./Markdown";
 
 type CommentAuthorValue = (typeof CommentAuthor)[keyof typeof CommentAuthor];
 
@@ -73,7 +74,9 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
                     {formatRelativeTime(comment.createdAt)}
                   </span>
                 </div>
-                <p className="whitespace-pre-wrap text-sm">{comment.content}</p>
+                <div className="text-sm">
+                  <Markdown content={comment.content} />
+                </div>
               </div>
             );
           })}
