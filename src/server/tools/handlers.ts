@@ -334,19 +334,10 @@ const issues_bulk_create: ToolHandler = async (args, ctx) => {
     }>;
   };
 
-  const created = [];
-  for (const issue of issues) {
-    const issueId = await ctx.convex.mutation(api.issues.create, {
-      projectId: ctx.projectId,
-      title: issue.title,
-      description: issue.description,
-      priority: issue.priority,
-    });
-    const full = await ctx.convex.query(api.issues.get, {
-      issueId: issueId as Id<"issues">,
-    });
-    created.push(full);
-  }
+  const created = await ctx.convex.mutation(api.issues.bulkCreate, {
+    projectId: ctx.projectId,
+    issues,
+  });
   return ok(ctx, { issues: created, count: created.length });
 };
 

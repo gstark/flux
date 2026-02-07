@@ -56,6 +56,55 @@ export const create = mutation({
   },
 });
 
+export const bulkCreate = mutation({
+  args: {
+    projectId: v.id("projects"),
+    issues: v.array(
+      v.object({
+        title: v.string(),
+        description: v.optional(v.string()),
+        priority: v.optional(issuePriorityValidator),
+        sourceIssueId: v.optional(v.id("issues")),
+        epicId: v.optional(v.id("epics")),
+        labelIds: v.optional(v.array(v.id("labels"))),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error(`Project ${args.projectId} not found`);
+
+    let counter = project.issueCounter;
+    const now = Date.now();
+    const created = [];
+
+    for (const issue of args.issues) {
+      counter += 1;
+      const issueId = await ctx.db.insert("issues", {
+        projectId: args.projectId,
+        shortId: generateShortId(project.slug, counter),
+        title: issue.title,
+        description: issue.description,
+        status: IssueStatus.Open,
+        priority: issue.priority ?? IssuePriority.Medium,
+        assignee: undefined,
+        failureCount: 0,
+        reviewIterations: 0,
+        sourceIssueId: issue.sourceIssueId,
+        epicId: issue.epicId,
+        labelIds: issue.labelIds,
+        updatedAt: now,
+      });
+      const doc = await ctx.db.get(issueId);
+      created.push(doc!);
+    }
+
+    await ctx.db.patch(args.projectId, { issueCounter: counter });
+
+    return created;
+  },
+});
+
 export const list = query({
   args: {
     projectId: v.id("projects"),
