@@ -35,7 +35,15 @@ export function createApiHandler(ctx: ToolContext) {
       });
     }
 
-    const result = await handler(args ?? {}, ctx);
-    return Response.json(result);
+    try {
+      const result = await handler(args ?? {}, ctx);
+      return Response.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return Response.json({
+        content: [{ type: "text", text: message }],
+        isError: true,
+      });
+    }
   };
 }
