@@ -6,6 +6,7 @@ import { SessionStatus, SessionType } from "$convex/schema";
 import { SessionStatusBadge } from "./SessionStatusBadge";
 
 type StatusFilter = (typeof SessionStatus)[keyof typeof SessionStatus] | null;
+type SessionTypeValue = (typeof SessionType)[keyof typeof SessionType];
 
 const TABS: { label: string; value: StatusFilter }[] = [
   { label: "All", value: null },
@@ -14,13 +15,18 @@ const TABS: { label: string; value: StatusFilter }[] = [
   { label: "Failed", value: SessionStatus.Failed },
 ];
 
-const TYPE_LABELS: Record<
-  (typeof SessionType)[keyof typeof SessionType],
-  string
-> = {
-  [SessionType.Work]: "Work",
-  [SessionType.Review]: "Review",
-};
+function typeLabel(type: SessionTypeValue): string {
+  switch (type) {
+    case SessionType.Work:
+      return "Work";
+    case SessionType.Review:
+      return "Review";
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unhandled session type: ${_exhaustive}`);
+    }
+  }
+}
 
 function formatRelativeTime(ts: number): string {
   const seconds = Math.floor((Date.now() - ts) / 1000);
@@ -117,7 +123,7 @@ export function SessionList() {
                   }
                 >
                   <td className="font-mono text-sm">{session._id.slice(-8)}</td>
-                  <td>{TYPE_LABELS[session.type]}</td>
+                  <td>{typeLabel(session.type)}</td>
                   <td>
                     <SessionStatusBadge status={session.status} />
                   </td>

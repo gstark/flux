@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import {
   dispositionValidator,
@@ -6,6 +8,23 @@ import {
   sessionStatusValidator,
   sessionTypeValidator,
 } from "./schema";
+
+async function querySessions(
+  ctx: QueryCtx,
+  args: { projectId: Id<"projects">; status?: string },
+) {
+  const sessions = await ctx.db
+    .query("sessions")
+    .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+    .collect();
+
+  const filtered = args.status
+    ? sessions.filter((s) => s.status === args.status)
+    : sessions;
+
+  filtered.sort((a, b) => b.startedAt - a.startedAt);
+  return filtered;
+}
 
 export const create = mutation({
   args: {
@@ -83,18 +102,7 @@ export const list = query({
     status: v.optional(sessionStatusValidator),
   },
   handler: async (ctx, args) => {
-    let sessions = await ctx.db
-      .query("sessions")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-
-    if (args.status) {
-      sessions = sessions.filter((s) => s.status === args.status);
-    }
-
-    sessions.sort((a, b) => b.startedAt - a.startedAt);
-
-    return sessions;
+    return await querySessions(ctx, args);
   },
 });
 
@@ -111,16 +119,7 @@ export const listWithIssues = query({
     status: v.optional(sessionStatusValidator),
   },
   handler: async (ctx, args) => {
-    let sessions = await ctx.db
-      .query("sessions")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .collect();
-
-    if (args.status) {
-      sessions = sessions.filter((s) => s.status === args.status);
-    }
-
-    sessions.sort((a, b) => b.startedAt - a.startedAt);
+    const sessions = await querySessions(ctx, args);
 
     const enriched = await Promise.all(
       sessions.map(async (session) => {
