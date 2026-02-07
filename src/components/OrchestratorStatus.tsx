@@ -3,12 +3,13 @@ import { useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { SessionPhase } from "$convex/schema";
 import { callTool } from "../lib/api";
 import { FontAwesomeIcon, faPlay, faSkull, faStop } from "./Icon";
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type SessionPhase = "work" | "retro" | "review";
+type SessionPhaseValue = (typeof SessionPhase)[keyof typeof SessionPhase];
 
 type OrchestratorStatusData = {
   status: {
@@ -19,20 +20,20 @@ type OrchestratorStatusData = {
       sessionId: string;
       issueId: string;
       pid: number;
-      phase: SessionPhase;
+      phase: SessionPhaseValue;
     } | null;
   };
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-const PHASE_LABELS: Record<SessionPhase, string> = {
+const PHASE_LABELS: Record<SessionPhaseValue, string> = {
   work: "Working",
   retro: "Retro",
   review: "Review",
 };
 
-const PHASE_ABBREV: Record<SessionPhase, string> = {
+const PHASE_ABBREV: Record<SessionPhaseValue, string> = {
   work: "W",
   retro: "R",
   review: "Rev",

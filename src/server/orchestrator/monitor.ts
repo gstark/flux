@@ -5,9 +5,12 @@ import { SessionEventDirection } from "$convex/schema";
 import { getConvexClient } from "../convex";
 import { ActivityBuffer } from "./activity-buffer";
 
+type SessionEventDirectionValue =
+  (typeof SessionEventDirection)[keyof typeof SessionEventDirection];
+
 /** Pending event awaiting batch insert to Convex. */
 interface PendingEvent {
-  direction: "input" | "output";
+  direction: SessionEventDirectionValue;
   content: string;
   timestamp: number;
 }

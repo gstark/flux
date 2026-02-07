@@ -1,10 +1,10 @@
 import { extractTextFromLine } from "../../../lib/parseStreamLine";
-import type {
+import {
   Disposition,
-  DispositionResult,
-  RetroPromptContext,
-  ReviewPromptContext,
-  WorkPromptContext,
+  type DispositionResult,
+  type RetroPromptContext,
+  type ReviewPromptContext,
+  type WorkPromptContext,
 } from "./types";
 
 // ── Work Prompt ──────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ This JSON MUST be the last thing you output. Nothing after it.`;
 
 // ── Disposition Parser ───────────────────────────────────────────────
 
-const VALID_DISPOSITIONS = new Set<string>(["done", "noop", "fault"]);
+const VALID_DISPOSITIONS = new Set<string>(Object.values(Disposition));
 const DISPOSITION_PATTERN = /\{[^{}]*"disposition"[^{}]*\}/g;
 
 /**

@@ -1,7 +1,12 @@
 import type { ConvexClient } from "convex/browser";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import { CommentAuthor, IssueStatus } from "$convex/schema";
+import {
+  CommentAuthor,
+  IssueStatus,
+  SessionEventDirection,
+  SessionStatus,
+} from "$convex/schema";
 import type { Orchestrator } from "../orchestrator";
 import type {
   CloseTypeValue,
@@ -225,7 +230,7 @@ const sessions_show: ToolHandler = async (args, ctx) => {
   const orchestrator = ctx.getOrchestrator();
   const status = orchestrator.getStatus();
   if (
-    session.status === "running" &&
+    session.status === SessionStatus.Running &&
     status.activeSession?.sessionId === sessionId
   ) {
     const monitor = orchestrator.getActiveMonitor();
@@ -233,7 +238,7 @@ const sessions_show: ToolHandler = async (args, ctx) => {
       const now = Date.now();
       lines = monitor.buffer.getRecent(100).map((content, i) => ({
         sequence: i,
-        direction: "output" as const,
+        direction: SessionEventDirection.Output,
         content,
         timestamp: now,
       }));

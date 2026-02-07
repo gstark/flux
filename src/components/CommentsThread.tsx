@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import type { CommentAuthor } from "$convex/schema";
+import { CommentAuthor } from "$convex/schema";
 import { formatRelativeTime } from "../lib/format";
 import { FontAwesomeIcon, faPaperPlane, Icon } from "./Icon";
 import { Markdown } from "./Markdown";
@@ -34,7 +34,11 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await createComment({ issueId, content: trimmed, author: "user" });
+      await createComment({
+        issueId,
+        content: trimmed,
+        author: CommentAuthor.User,
+      });
       setDraft("");
     } catch (err) {
       setSubmitError(

@@ -1,6 +1,7 @@
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import {
+  CloseType,
   CommentAuthor,
   IssueStatus,
   SessionPhase,
@@ -658,7 +659,7 @@ class Orchestrator {
     if (disposition === Disposition.Noop) {
       await convex.mutation(api.issues.close, {
         issueId,
-        closeType: "noop",
+        closeType: CloseType.Noop,
         closeReason: note,
       });
       this.finalize();
@@ -686,7 +687,7 @@ class Orchestrator {
       // Agent said done but made no commits — treat as noop
       await convex.mutation(api.issues.close, {
         issueId,
-        closeType: "noop",
+        closeType: CloseType.Noop,
         closeReason: note,
       });
       this.finalize();
@@ -879,7 +880,7 @@ class Orchestrator {
     if (disposition === Disposition.Noop) {
       await convex.mutation(api.issues.close, {
         issueId,
-        closeType: "completed",
+        closeType: CloseType.Completed,
         closeReason: note || "Review passed clean — no issues found.",
       });
       this.finalize();
@@ -908,7 +909,7 @@ class Orchestrator {
       // Review done, no inline fixes — findings became follow-up issues
       await convex.mutation(api.issues.close, {
         issueId,
-        closeType: "completed",
+        closeType: CloseType.Completed,
         closeReason:
           note || "Review complete, findings captured as follow-up issues.",
       });
@@ -939,7 +940,7 @@ class Orchestrator {
       );
       await convex.mutation(api.issues.close, {
         issueId,
-        closeType: "completed",
+        closeType: CloseType.Completed,
         closeReason:
           note ||
           `Review passed on final iteration (${newIterations}/${this.maxReviewIterations}) with inline fixes. Closing based on reviewer disposition.`,
@@ -1059,7 +1060,7 @@ class Orchestrator {
         // No diff means no changes to review — close as completed
         await convex.mutation(api.issues.close, {
           issueId,
-          closeType: "completed",
+          closeType: CloseType.Completed,
           closeReason: "Work completed, no diff to review.",
         });
         this.finalize();
