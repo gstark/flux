@@ -56,10 +56,17 @@ export class SessionMonitor {
     this.tmpWriter = Bun.file(this.tmpPath).writer();
 
     // Start periodic flush and heartbeat timers
-    this.flushTimer = setInterval(
-      () => this.flushToConvex(),
-      SessionMonitor.FLUSH_INTERVAL_MS,
-    );
+    this.flushTimer = setInterval(async () => {
+      try {
+        await this.flushToConvex();
+      } catch (err) {
+        console.error(
+          "[SessionMonitor] Fatal: Convex flush failed permanently, shutting down monitor:",
+          err,
+        );
+        await this.shutdown();
+      }
+    }, SessionMonitor.FLUSH_INTERVAL_MS);
     this.heartbeatTimer = setInterval(
       () => this.updateHeartbeat(),
       SessionMonitor.HEARTBEAT_INTERVAL_MS,
@@ -204,8 +211,15 @@ export class SessionMonitor {
       this.heartbeatTimer = null;
     }
 
-    // Final flush to Convex
-    await this.flushToConvex();
+    // Final flush — best effort; don't let a Convex failure prevent cleanup
+    try {
+      await this.flushToConvex();
+    } catch (err) {
+      console.error(
+        "[SessionMonitor] Final flush failed during shutdown, events lost:",
+        err,
+      );
+    }
 
     // Close tmp file writer
     if (this.tmpWriter) {
