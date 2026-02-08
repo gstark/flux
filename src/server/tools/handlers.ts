@@ -240,9 +240,9 @@ const orchestrator_enable: ToolHandler = safeHandler(async (_args, ctx) => {
     projectId: ctx.projectId,
     state: ProjectState.Running,
   });
-  const orchestrator = ctx.getOrchestrator();
-  const status = orchestrator.getStatus();
-  return ok(ctx, { status });
+  // State change is async (watcher hasn't fired yet) — return the requested
+  // state rather than a stale getStatus() snapshot.
+  return ok(ctx, { state: ProjectState.Running });
 });
 
 const orchestrator_stop: ToolHandler = safeHandler(async (_args, ctx) => {
@@ -252,9 +252,7 @@ const orchestrator_stop: ToolHandler = safeHandler(async (_args, ctx) => {
     projectId: ctx.projectId,
     state: ProjectState.Stopped,
   });
-  const orchestrator = ctx.getOrchestrator();
-  const status = orchestrator.getStatus();
-  return ok(ctx, { status });
+  return ok(ctx, { state: ProjectState.Stopped });
 });
 
 const sessions_list = typedHandler(

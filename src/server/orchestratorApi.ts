@@ -58,8 +58,6 @@ export function createOrchestratorApiHandler(
       );
     }
 
-    const orchestrator = getOrchestrator();
-
     try {
       switch (action) {
         case "enable":
@@ -69,7 +67,9 @@ export function createOrchestratorApiHandler(
             projectId,
             state: ProjectState.Running,
           });
-          return Response.json({ status: orchestrator.getStatus() });
+          // State change is async (watcher hasn't fired yet), so return
+          // the requested state — not a stale getStatus() snapshot.
+          return Response.json({ state: ProjectState.Running });
 
         case "stop":
           // Route through Convex project state — the project state watcher
@@ -78,14 +78,16 @@ export function createOrchestratorApiHandler(
             projectId,
             state: ProjectState.Stopped,
           });
-          return Response.json({ status: orchestrator.getStatus() });
+          return Response.json({ state: ProjectState.Stopped });
 
-        case "kill":
+        case "kill": {
+          const orchestrator = getOrchestrator();
           await orchestrator.kill();
           return Response.json({ message: "Session killed." });
+        }
 
         case "status":
-          return Response.json({ status: orchestrator.getStatus() });
+          return Response.json({ status: getOrchestrator().getStatus() });
 
         default: {
           const _exhaustive: never = action;
