@@ -1,8 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { Id } from "$convex/_generated/dataModel";
-import { getConvexClient } from "./convex";
-import { getOrchestrator } from "./orchestrator";
 import { allTools, handlers, type ToolContext } from "./tools";
 
 type Session = {
@@ -48,13 +45,6 @@ function registerTools(mcp: McpServer, ctx: ToolContext) {
   }
 }
 
-/** Project info needed to build a ToolContext for an MCP session. */
-export type McpProjectInfo = {
-  projectId: Id<"projects">;
-  projectSlug: string;
-  projectPath: string;
-};
-
 /**
  * Handle an MCP request scoped to a specific project.
  *
@@ -63,13 +53,13 @@ export type McpProjectInfo = {
  */
 export async function handleMcpRequest(
   req: Request,
-  project: McpProjectInfo,
+  ctx: ToolContext,
 ): Promise<Response> {
   const mcpSessionId = req.headers.get("mcp-session-id");
 
   // Existing session — route to its transport
   if (mcpSessionId) {
-    const key = sessionKey(project.projectId, mcpSessionId);
+    const key = sessionKey(ctx.projectId, mcpSessionId);
     const session = sessions.get(key);
     if (!session) {
       return Response.json(
@@ -96,14 +86,6 @@ export async function handleMcpRequest(
   }
 
   // New session — create server + transport, handle initialize
-  const ctx: ToolContext = {
-    convex: getConvexClient(),
-    projectId: project.projectId,
-    projectSlug: project.projectSlug,
-    getOrchestrator: () =>
-      getOrchestrator(project.projectId, project.projectPath),
-  };
-
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     enableJsonResponse: true,
@@ -117,11 +99,11 @@ export async function handleMcpRequest(
 
   // Store session for subsequent requests, keyed by project
   if (transport.sessionId) {
-    const key = sessionKey(project.projectId, transport.sessionId);
+    const key = sessionKey(ctx.projectId, transport.sessionId);
     sessions.set(key, { transport, server: mcp });
     transport.onclose = () => {
       if (transport.sessionId) {
-        sessions.delete(sessionKey(project.projectId, transport.sessionId));
+        sessions.delete(sessionKey(ctx.projectId, transport.sessionId));
       }
     };
   }

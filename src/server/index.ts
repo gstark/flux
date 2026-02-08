@@ -215,11 +215,13 @@ export async function startServer(projects: Project[]) {
             { status: 400 },
           );
         }
-        return handleMcpRequest(req, {
-          projectId: projectId as Id<"projects">,
-          projectSlug: project.slug,
-          projectPath,
+        const ctx = createToolContext({
+          _id: project._id,
+          slug: project.slug,
+          name: project.name,
+          path: projectPath,
         });
+        return handleMcpRequest(req, ctx);
       }
 
       default:
