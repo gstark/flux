@@ -26,7 +26,7 @@ An autonomous agent orchestrator with built-in issue tracking, realtime UI, and 
 │  │  - useMutation                          │    │      │              │
 │  └─────────────────────────────────────────┘    │      └──────────────┘
 │  ┌─────────────────────────────────────────┐    │             ▲
-│  │  MCP endpoint (/mcp)                    │    │             │
+│  │  MCP endpoint (/mcp/projects/:id)        │    │             │
 │  ├─────────────────────────────────────────┤    │─────────────┘
 │  │  Orchestrator                           │    │  (ConvexClient + onUpdate)
 │  │  ├── Scheduler → subscribe issues.ready │    │
@@ -939,7 +939,7 @@ Flux uses a **stdio MCP transport** that proxies tool calls to the Bun server vi
 Claude Code → stdio → bin/flux-mcp-stdio.ts → POST /api/tools → Bun Server → handlers
 ```
 
-**Why stdio over HTTP?** The HTTP MCP transport loses sessions on Bun hot-reload, requiring constant `/mcp` reconnects. With stdio, the MCP process is stable while the Bun server hot-reloads behind it — handler changes take effect immediately with zero reconnection.
+**Why stdio over HTTP?** The HTTP MCP transport loses sessions on Bun hot-reload, requiring constant `/mcp/projects/:id` reconnects. With stdio, the MCP process is stable while the Bun server hot-reloads behind it — handler changes take effect immediately with zero reconnection.
 
 All tool schemas are registered upfront in `src/server/tools/schema.ts`. Unimplemented tools return "Not implemented" errors. As handlers land, agents see them immediately.
 
@@ -980,7 +980,7 @@ bunx convex run issues:claim '{"issueId":"...","assignee":"agent-1"}'
 bunx convex run issues:list '{"projectId":"..."}'
 
 # Test MCP tools (once F2 is built)
-curl -X POST http://localhost:8042/mcp -d '{"tool":"issues_list"...}'
+curl -X POST http://localhost:8042/mcp/projects/<projectId> -d '{"tool":"issues_list"...}'
 ```
 
 ### Post-MVP: Automated Testing

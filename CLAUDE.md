@@ -77,7 +77,7 @@ import { IssueStatus, issueStatusValidator } from "./schema";
 ## Development Guidelines
 
 **Important**: `bun dev` starts three processes via `concurrently`:
-1. **Bun** (`:8042`) — API server (`/api/*`, `/mcp`, `/sse/*`, `/health`)
+1. **Bun** (`:8042`) — API server (`/api/*`, `/mcp/projects/*`, `/sse/*`, `/health`)
 2. **Convex** — backend sync
 3. **Vite** (`:5173`) — React SPA with HMR via `@tailwindcss/vite`
 

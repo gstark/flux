@@ -58,7 +58,7 @@ The orchestrator starts **disabled** by default. You must explicitly enable it v
 - **Stack**: React + Bun + Tailwind + DaisyUI
 - **Backend**: Convex (realtime persistence)
 - **CLI**: OpenTUI for slick terminal interface
-- **MCP**: Port 8042 (exposed at `/mcp`)
+- **MCP**: Port 8042 (exposed at `/mcp/projects/:projectId`)
 
 ## Keyboard Shortcuts
 

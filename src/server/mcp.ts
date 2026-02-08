@@ -8,9 +8,15 @@ import { allTools, handlers, type ToolContext } from "./tools";
 type Session = {
   transport: WebStandardStreamableHTTPServerTransport;
   server: McpServer;
+  projectId: string;
 };
 
+/** Sessions keyed by `${projectId}:${mcpSessionId}` to prevent cross-project collisions. */
 const sessions = new Map<string, Session>();
+
+function sessionKey(projectId: string, mcpSessionId: string): string {
+  return `${projectId}:${mcpSessionId}`;
+}
 
 // Schema validation flow inside mcp.tool():
 // The raw Zod shapes we pass are transformed by the MCP SDK before reaching our handler:
@@ -43,68 +49,87 @@ function registerTools(mcp: McpServer, ctx: ToolContext) {
   }
 }
 
-export function createMcpHandler(
-  projectId: Id<"projects">,
-  projectSlug: string,
-  projectPath: string,
-) {
+/** Project info needed to build a ToolContext for an MCP session. */
+export type McpProjectInfo = {
+  projectId: Id<"projects">;
+  projectSlug: string;
+  projectPath: string;
+};
+
+/**
+ * Handle an MCP request scoped to a specific project.
+ *
+ * Sessions are keyed by (projectId, mcp-session-id) so two projects
+ * can never share a session, even if UUIDs theoretically collide.
+ */
+export async function handleMcpRequest(
+  req: Request,
+  project: McpProjectInfo,
+): Promise<Response> {
+  const mcpSessionId = req.headers.get("mcp-session-id");
+
+  // Existing session — route to its transport
+  if (mcpSessionId) {
+    const key = sessionKey(project.projectId, mcpSessionId);
+    const session = sessions.get(key);
+    if (!session) {
+      return Response.json(
+        {
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message:
+              "Session not found. Send an initialize request to start a new session.",
+          },
+          id: null,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (req.method === "DELETE") {
+      await session.server.close();
+      sessions.delete(key);
+      return new Response(null, { status: 204 });
+    }
+
+    return session.transport.handleRequest(req);
+  }
+
+  // New session — create server + transport, handle initialize
   const ctx: ToolContext = {
     convex: getConvexClient(),
-    projectId,
-    projectSlug,
-    getOrchestrator: () => getOrchestrator(projectId, projectPath),
+    projectId: project.projectId,
+    projectSlug: project.projectSlug,
+    getOrchestrator: () =>
+      getOrchestrator(project.projectId, project.projectPath),
   };
 
-  return async function handleMcpRequest(req: Request): Promise<Response> {
-    const sessionId = req.headers.get("mcp-session-id");
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: () => crypto.randomUUID(),
+    enableJsonResponse: true,
+  });
 
-    // Existing session — route to its transport
-    if (sessionId) {
-      const session = sessions.get(sessionId);
-      if (!session) {
-        return Response.json(
-          {
-            jsonrpc: "2.0",
-            error: {
-              code: -32000,
-              message:
-                "Session not found. Send an initialize request to start a new session.",
-            },
-            id: null,
-          },
-          { status: 400 },
-        );
-      }
+  const mcp = new McpServer({ name: "flux", version: "0.1.0" });
+  registerTools(mcp, ctx);
+  await mcp.connect(transport);
 
-      if (req.method === "DELETE") {
-        await session.server.close();
-        sessions.delete(sessionId);
-        return new Response(null, { status: 204 });
-      }
+  const response = await transport.handleRequest(req);
 
-      return session.transport.handleRequest(req);
-    }
-
-    // New session — create server + transport, handle initialize
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID(),
-      enableJsonResponse: true,
+  // Store session for subsequent requests, keyed by project
+  if (transport.sessionId) {
+    const key = sessionKey(project.projectId, transport.sessionId);
+    sessions.set(key, {
+      transport,
+      server: mcp,
+      projectId: project.projectId,
     });
+    transport.onclose = () => {
+      if (transport.sessionId) {
+        sessions.delete(sessionKey(project.projectId, transport.sessionId));
+      }
+    };
+  }
 
-    const mcp = new McpServer({ name: "flux", version: "0.1.0" });
-    registerTools(mcp, ctx);
-    await mcp.connect(transport);
-
-    const response = await transport.handleRequest(req);
-
-    // Store session for subsequent requests
-    if (transport.sessionId) {
-      sessions.set(transport.sessionId, { transport, server: mcp });
-      transport.onclose = () => {
-        if (transport.sessionId) sessions.delete(transport.sessionId);
-      };
-    }
-
-    return response;
-  };
+  return response;
 }

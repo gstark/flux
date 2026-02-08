@@ -4,7 +4,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { createApiHandler, handleToolRequest } from "./api";
 import { getConvexClient } from "./convex";
-import { createMcpHandler } from "./mcp";
+import { handleMcpRequest } from "./mcp";
 import { getOrchestrator } from "./orchestrator";
 import { createOrchestratorApiHandler } from "./orchestratorApi";
 import { startProjectStateWatcher } from "./projectStateWatcher";
@@ -92,11 +92,6 @@ export async function startServer(projects: Project[]) {
   // Default context for handlers that don't yet support multi-project
   const defaultCtx = getToolContext(defaultProject._id);
 
-  const handleMcp = createMcpHandler(
-    defaultProject._id,
-    defaultProject.slug,
-    defaultProject.path,
-  );
   const handleApi = createApiHandler(defaultCtx);
   const handleProjectsApi = createProjectsApiHandler(getConvexClient());
 
@@ -216,12 +211,11 @@ export async function startServer(projects: Project[]) {
             { status: 400 },
           );
         }
-        const handler = createMcpHandler(
-          projectId as Id<"projects">,
-          project.slug,
+        return handleMcpRequest(req, {
+          projectId: projectId as Id<"projects">,
+          projectSlug: project.slug,
           projectPath,
-        );
-        return handler(req);
+        });
       }
 
       default:
@@ -262,7 +256,15 @@ export async function startServer(projects: Project[]) {
       });
     },
 
-    "/mcp": (req) => handleMcp(req),
+    // Legacy MCP endpoint — replaced by /mcp/projects/:id
+    "/mcp": () =>
+      Response.json(
+        {
+          error:
+            "This endpoint has been removed. Use POST /mcp/projects/:projectId instead.",
+        },
+        { status: 410 },
+      ),
     "/api/tools": (req) => handleApi(req),
 
     // Legacy orchestrator endpoint — replaced by /api/projects/:id/orchestrator
