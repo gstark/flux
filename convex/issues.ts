@@ -265,7 +265,10 @@ export const update = mutation({
     if (args.labelIds !== undefined) updates.labelIds = args.labelIds;
 
     await ctx.db.patch(args.issueId, updates);
-    return await ctx.db.get(args.issueId);
+    const updated = await ctx.db.get(args.issueId);
+    if (!updated)
+      throw new Error(`Failed to read back issue ${args.issueId} after update`);
+    return updated;
   },
 });
 
@@ -291,7 +294,10 @@ export const close = mutation({
       assignee: undefined,
       updatedAt: Date.now(),
     });
-    return await ctx.db.get(issueId);
+    const updated = await ctx.db.get(issueId);
+    if (!updated)
+      throw new Error(`Failed to read back issue ${issueId} after close`);
+    return updated;
   },
 });
 
@@ -327,7 +333,12 @@ export const incrementFailure = mutation({
     }
 
     await ctx.db.patch(issueId, updates);
-    return await ctx.db.get(issueId);
+    const updated = await ctx.db.get(issueId);
+    if (!updated)
+      throw new Error(
+        `Failed to read back issue ${issueId} after incrementFailure`,
+      );
+    return updated;
   },
 });
 
@@ -403,7 +414,10 @@ async function retryHandler(ctx: MutationCtx, issueId: Id<"issues">) {
     assignee: undefined,
     updatedAt: Date.now(),
   });
-  return await ctx.db.get(issueId);
+  const updated = await ctx.db.get(issueId);
+  if (!updated)
+    throw new Error(`Failed to read back issue ${issueId} after retry`);
+  return updated;
 }
 
 export const retry = mutation({
