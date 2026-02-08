@@ -262,6 +262,28 @@ function flushPending(
 
 // -- Rendering ----------------------------------------------------------------
 
+/**
+ * Custom comparator for memo(). `groupActivityNodes` returns fresh objects on
+ * every call, so the default shallow comparison always re-renders. We compare
+ * by stable key, and for tool_call nodes also check whether the result or
+ * input has changed — the only fields that mutate for a given key.
+ */
+function activityNodeEqual(
+  prev: { node: ActivityNode },
+  next: { node: ActivityNode },
+): boolean {
+  if (prev.node.key !== next.node.key) return false;
+  if (prev.node.type !== next.node.type) return false;
+  if (prev.node.type === "tool_call" && next.node.type === "tool_call") {
+    // Result can arrive after the initial tool_use
+    if (prev.node.pair.toolResult !== next.node.pair.toolResult) return false;
+    // Input can be enriched from content_block_start → full assistant message
+    if (prev.node.pair.toolUse.toolInput !== next.node.pair.toolUse.toolInput)
+      return false;
+  }
+  return true;
+}
+
 const ActivityNodeView = memo(function ActivityNodeView({
   node,
 }: {
@@ -296,7 +318,7 @@ const ActivityNodeView = memo(function ActivityNodeView({
       );
     }
   }
-});
+}, activityNodeEqual);
 
 export function ActivityPage() {
   useDocumentTitle("Activity");
