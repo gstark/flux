@@ -56,6 +56,12 @@ export function createProjectsApiHandler(convex: ConvexClient) {
       case "GET":
         return id ? handleGet(convex, id) : handleList(convex);
       case "POST":
+        if (id) {
+          return Response.json(
+            { error: "POST /api/projects does not accept an ID in the path." },
+            { status: 400 },
+          );
+        }
         return handleCreate(convex, req);
       case "PATCH":
         return handleUpdate(convex, req, id);
