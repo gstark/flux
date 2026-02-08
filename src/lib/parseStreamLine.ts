@@ -13,12 +13,20 @@ export type ParsedLine =
       toolName: string;
       toolId: string;
       toolInput: Record<string, unknown> | null;
+      /** Content block index from streaming, used for input_json_delta matching. */
+      blockIndex: number | null;
     }
   | {
       kind: "tool_result";
       toolUseId: string | null;
       toolName: string | null;
       content: string;
+    }
+  | {
+      /** Streaming tool input chunk — accumulate to enrich the matching tool_use. */
+      kind: "tool_input_delta";
+      blockIndex: number;
+      jsonDelta: string;
     }
   | { kind: "skip" };
 
@@ -133,7 +141,20 @@ export function parseStreamLine(line: string): ParsedLine[] {
     if (delta?.type === "text_delta" && typeof delta.text === "string") {
       return [{ kind: "text", text: delta.text }];
     }
-    // input_json_delta = streaming tool input — not useful to display
+    // input_json_delta = streaming tool input chunk — expose for accumulation
+    if (
+      delta?.type === "input_json_delta" &&
+      typeof delta.partial_json === "string" &&
+      typeof obj.index === "number"
+    ) {
+      return [
+        {
+          kind: "tool_input_delta",
+          blockIndex: obj.index,
+          jsonDelta: delta.partial_json,
+        },
+      ];
+    }
     return [{ kind: "skip" }];
   }
 
@@ -147,6 +168,7 @@ export function parseStreamLine(line: string): ParsedLine[] {
           toolName: (block.name as string) ?? "unknown",
           toolId: (block.id as string) ?? "",
           toolInput: extractToolInput(block.input),
+          blockIndex: typeof obj.index === "number" ? obj.index : null,
         },
       ];
     }
@@ -182,6 +204,7 @@ export function parseStreamLine(line: string): ParsedLine[] {
             toolName: (block.name as string) ?? "unknown",
             toolId: (block.id as string) ?? "",
             toolInput: extractToolInput(block.input),
+            blockIndex: null, // Full messages have complete input; no streaming index needed
           });
         }
       }
@@ -301,6 +324,8 @@ export function parsedLineKey(p: ParsedLine, index: number): string {
       return `tool_use:${p.toolId}`;
     case "tool_result":
       return `tool_result:${index}`;
+    case "tool_input_delta":
+      return `tool_input_delta:${p.blockIndex}:${index}`;
     case "text":
       return `text:${index}`;
     case "skip":

@@ -75,7 +75,7 @@ function groupTranscriptEvents(
   for (const event of events) {
     if (event.direction === SessionEventDirection.Input) {
       const items = parseStreamLine(event.content).filter(
-        (p) => p.kind !== "skip",
+        (p) => p.kind !== "skip" && p.kind !== "tool_input_delta",
       );
 
       // Check if this input event has tool_result items that match pending tool_uses
@@ -128,6 +128,7 @@ function groupTranscriptEvents(
                   toolName: result.toolName ?? "unknown",
                   toolId: id,
                   toolInput: null,
+                  blockIndex: null,
                 },
                 toolResult: result,
               },
@@ -146,6 +147,7 @@ function groupTranscriptEvents(
                 toolName: result.toolName ?? "unknown",
                 toolId: result.toolUseId ?? "",
                 toolInput: null,
+                blockIndex: null,
               },
               toolResult: result,
             },
@@ -170,6 +172,7 @@ function groupTranscriptEvents(
                   toolName: result.toolName ?? "unknown",
                   toolId: result.toolUseId ?? "",
                   toolInput: null,
+                  blockIndex: null,
                 },
                 toolResult: result,
               },
@@ -189,7 +192,7 @@ function groupTranscriptEvents(
       // Do NOT flush pending tool_uses here; they'll be matched when the next
       // input event arrives with tool_results, or flushed at end-of-stream.
       const items = parseStreamLine(event.content).filter(
-        (p) => p.kind !== "skip",
+        (p) => p.kind !== "skip" && p.kind !== "tool_input_delta",
       );
 
       // De-duplicate tool_use items by toolId — streaming events
@@ -319,7 +322,9 @@ function dispositionLabel(disposition: DispositionValue): {
 /** Check if an output event should be displayed (non-skip after parsing). */
 function isDisplayableEvent(direction: string, content: string): boolean {
   if (direction === SessionEventDirection.Input) return true;
-  return parseStreamLine(content).some((p) => p.kind !== "skip");
+  return parseStreamLine(content).some(
+    (p) => p.kind !== "skip" && p.kind !== "tool_input_delta",
+  );
 }
 
 export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {

@@ -41,6 +41,7 @@ export function StreamContent({ parsed }: { parsed: ParsedLine }) {
           </div>
         </details>
       );
+    case "tool_input_delta":
     case "skip":
       return null;
   }
