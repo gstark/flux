@@ -197,14 +197,20 @@ function groupTranscriptEvents(
 
       // De-duplicate tool_use items by toolId — streaming events
       // (content_block_start) and the full assistant message both emit the
-      // same tool_use, so only keep one.
-      const seenToolIds = new Set(pendingToolUses.map((t) => t.toolId));
-
+      // same tool_use. Prefer the one with toolInput (the full assistant
+      // message) over the empty one from content_block_start.
       for (const item of items) {
         if (item.kind === "tool_use") {
-          if (!seenToolIds.has(item.toolId)) {
+          const existingIdx = pendingToolUses.findIndex(
+            (t) => t.toolId === item.toolId,
+          );
+          if (existingIdx === -1) {
             pendingToolUses.push(item);
-            seenToolIds.add(item.toolId);
+          } else {
+            const existing = pendingToolUses[existingIdx];
+            if (existing && !existing.toolInput && item.toolInput) {
+              pendingToolUses[existingIdx] = item;
+            }
           }
         } else if (item.kind === "text") {
           nodes.push({
