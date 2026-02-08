@@ -150,11 +150,14 @@ export async function daemonInstall(): Promise<void> {
   const envVars = resolveEnvVars();
   const programArguments = [bunPath, "run", "dev"];
 
-  // Build PATH: bun's directory + standard system paths.
+  // Build PATH: bun's directory + user-local bin + standard system paths.
   // concurrently spawns children via the shell, so bun/bunx/convex must be findable.
+  // ~/.local/bin is where Claude Code and other user-installed binaries live.
   const bunDir = join(bunPath, "..");
+  const localBin = join(home, ".local/bin");
   const pathEnv = [
     bunDir,
+    localBin,
     "/usr/local/bin",
     "/usr/bin",
     "/bin",
