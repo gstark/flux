@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { StreamContent } from "../components/StreamContent";
 import {
   type KeyedStreamEvent,
@@ -125,7 +125,7 @@ function enrichToolUse(
   return { ...item, toolInput: accumulated };
 }
 
-function EventLine({
+const EventLine = memo(function EventLine({
   event,
   toolInputMap,
 }: {
@@ -169,7 +169,7 @@ function EventLine({
       );
     }
   }
-}
+});
 
 export function ActivityPage() {
   const { events, connected, clear, currentSession } = useActivityStream();
