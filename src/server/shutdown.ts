@@ -114,8 +114,11 @@ export async function gracefulShutdown(opts: {
   for (const [projectId] of orchestrators) {
     try {
       removeOrchestrator(projectId as Id<"projects">);
-    } catch {
-      // May not be stopped yet if kill path failed — best effort
+    } catch (err) {
+      console.warn(
+        `[Shutdown] Could not remove orchestrator ${projectId} (not stopped?):`,
+        err,
+      );
     }
   }
 
