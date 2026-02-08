@@ -860,7 +860,7 @@ Flux Daemon (Node) - Lean Orchestrator
 **Pros:**
 - Clean isolation per task
 - Stateless tasks = recoverable from crashes
-- **Hot-reloading for free** (fresh process per task loads latest tools)
+- **Hot-reloading is automatic** (fresh process per task loads latest tools)
 - Simple to implement and reason about
 - Aligns with "task is unit of work" philosophy
 - No persistent agent state to manage
@@ -1757,4 +1757,203 @@ $ flux anvil run fontawesome.search --query settings --limit 5
 
 ---
 
-*End of Document*
+## 10. Appendix: External Feedback Synthesis
+
+**Source:** Peer agent review of Phase 2 concepts  
+**Date:** February 2026  
+**Status:** Incorporated insights
+
+### Executive Framing
+
+Flux's MVP success strongly suggests the *product* is the closed loop:
+
+**work → retro → review → repeat**, with explicit outcomes, strong auditability, and programmatic verification. Phase 2 should widen that loop's reach (more integrations, more autonomy, more projects) **without weakening reliability**.
+
+---
+
+### 1. Anvil: CLI-First Tool Bus (Local, In-Repo)
+
+**Keep Anvil tools local (project repo + optional shared `~/.anvil`).** This is the key insight: tools become part of the application, so agents take ownership and improve them naturally.
+
+#### Conventions to Lock In
+
+**Tool roots + precedence:**
+1. `<repo>/.flux/anvil/tools/**` (project-local, highest priority)
+2. `~/.anvil/tools/**` (shared/personal)
+3. (optional later) packages/registry, but not needed initially
+
+**Shadowing is a feature:** project-local tool names override shared tools (intentional "fork & patch").
+
+**One boring I/O contract:**
+- JSON in (`--json` or stdin), JSON out on stdout
+- Logs ONLY to stderr
+- Non-zero exit on failure with a standard error envelope
+
+**Schema source of truth:**
+- Recommended: **Hybrid** = Zod for authoring DX + build a manifest for runtime
+- Runtime CLI introspection reads manifest (`flux anvil describe`) instead of executing tools just to learn schema
+
+#### Safety Model (Minimal but Real)
+
+Annotate tools as: `query | mutate | destructive`
+
+```typescript
+const tools = {
+  // Queries: Safe to auto-call/prefetch based on keywords
+  "issues.list": { type: "query", auto_call: true },
+  "git.status": { type: "query", auto_call: true },
+  "test.status": { type: "query", auto_call: true },
+  
+  // Mutations: Requires explicit invocation
+  "issues.create": { type: "mutate", auto_call: false },
+  "git.commit": { type: "mutate", auto_call: false },
+  
+  // Destructive: Requires a second explicit confirmation flag
+  "database.drop": { 
+    type: "destructive", 
+    require_explicit: true,
+    dry_run_default: true 
+  }
+};
+```
+
+This keeps "agency" while preventing accidental footguns.
+
+---
+
+### 2. Auto-Planning: WIP Refill (Not Proposal Mode)
+
+If the goal is "PRD at night → working MVP by morning," then suggestion-only planning is insufficient. The right abstraction is:
+
+**Auto-planning as queue management (Kanban WIP refill), not speculative AI planning.**
+
+#### Proven Trigger to Automate
+
+You already validated: "when nearing completion of the previous milestone, feed next section → create issues."
+
+Make that deterministic + cron-triggerable:
+
+```typescript
+if (orchestrator.enabled && project.state === 'active')
+if (readyQueue.length < floor && totalOpen < cap)
+if (currentEpic.progress >= gate || previousMilestone.closed)
+then: create a bounded batch of issues (max K)
+```
+
+**Hard budgets per planning cycle:**
+- `maxIssuesPerCycle`
+- `maxTotalOpenIssues`
+- `cooldownMs` between planning runs
+- Optional token/$ budgets for overnight runs
+
+#### Deterministic Ingestion First, Agent Enrichment Second
+
+Your milestone format ("Goal / Work / Checkpoint") is structured enough to parse without an LLM:
+- Each milestone section becomes an epic or milestone group
+- Each bullet under "Work" becomes an issue seed
+- Each "Checkpoint" becomes acceptance criteria / verification targets
+
+Then call an agent to enrich (merge/split, deps, labels, priority, better verification), but keep scope bounded by the source section + caps.
+
+#### Prevent Duplicate/Rephrase Spam (Idempotency)
+
+Add a planning fingerprint:
+- `plannedFrom: { docPath, sectionId, hash }` (on issues)
+- Hash derived from canonicalized title + sectionId + epicId, etc.
+- Planner dedupes before creating
+
+#### Make Planning Runs Auditable (Not Spooky Cron)
+
+Create a first-class run record (session-like):
+- `plannerRun` (or `sessions.type = "plan"`) with transcript + structured output
+- This makes "overnight autonomy" trustworthy when you wake up
+
+---
+
+### 3. Eliminate "Agents Write Essays but Don't Act"
+
+The core issue: generic review agents love producing text, not state changes. Flux can enforce action without killing trust.
+
+#### Extend Structured Response to Include Followups
+
+Keep disposition + note, but allow:
+```json
+{
+  "disposition": "done|noop|fault",
+  "note": "...",
+  "followups": [
+    { "title": "...", "priority": "medium", "labels": ["..."], "description": "..." }
+  ]
+}
+```
+
+Flux behavior:
+- If agent mentions a problem but doesn't fix it, it must either:
+  1. Create a follow-up issue via tool, or
+  2. Include it in `followups[]`, which Flux bulk-creates automatically, or
+  3. Explicitly justify why it is not worth tracking
+
+Optionally enforce: "review nitpicks without followups/fixes" = session `fault` / retry. Petty, effective.
+
+---
+
+### 4. Verification Should Be First-Class on Issues
+
+Add an explicit verification field on issues, so "done" always means "proved":
+
+```typescript
+verification?: {
+  kind: "command" | "anvilTool";
+  value: string;
+};
+```
+
+Rule: in lights-out mode, every issue must have verification defined (or the first step is to create the tool that can verify it).
+
+This aligns with Flux's differentiator: **"If the tool doesn't exist, the agent builds it."**
+
+---
+
+### 5. Native Agent: Postpone Until You Can Name the Repeatable Pain
+
+A Flux-native agent could be valuable (typed ambient context, push updates, learned patterns), but it's a long-term maintenance tax.
+
+**Guideline:**
+- Build native agent only when you can point to **3–5 recurring, material deltas** where Claude Code/OpenCode underperform *even with Anvil + good prompts*
+
+If built, **ephemeral per-task process** remains the most Flux-shaped architecture (isolation, hot-load "for free," recoverability).
+
+---
+
+### 6. Multi-Project: You're Close
+
+If Convex ops already take `projectId`, you're 80% there. The main blocker is reliance on `globalThis.projectId` in the UI/server.
+
+**Incremental path:**
+- UI routes include project identity: `/p/:projectSlug/*` (or equivalent)
+- Server supports listing/selecting projects; orchestrators keyed by `projectId` in a map
+- Preserve invariant: **single session per project**; allow parallelism *across* projects only
+
+This makes the always-on daemon a packaging/lifecycle step rather than a rewrite.
+
+---
+
+### Recommended Build Order (Minimal Regret)
+
+Based on the external synthesis:
+
+1. **Anvil v0** (local-only, in-repo tools) with manifest + CLI introspection + safety annotations
+2. **Planner as WIP refill** (cron-triggerable) + first-class planner run records + dedupe fingerprints
+3. **Issue verification field** + enforce "done == verified"
+4. **Followups enforcement** (structured outputs + auto-bulk-create)
+5. **Multi-project UX** (grid dashboard + project-scoped routing) + remove `globalThis` assumptions
+6. **Native agent** only if benchmarks justify
+
+---
+
+### Key Invariants to Preserve (Non-Negotiables)
+
+- No silent fallbacks; failures are explicit and actionable
+- Programmatic verification required for completion (esp. lights-out)
+- Audit trail is first-class (planner runs included)
+- Autonomy is bounded by budgets, WIP caps, and explicit scope provenance
