@@ -1357,6 +1357,11 @@ class Orchestrator {
    * Dead PIDs: mark session failed, reopen issue.
    * Live PIDs (no activeSession): re-adopt the first one found so the
    * orchestrator regains lifecycle control (exit handling, retro, review).
+   *
+   * FLUX-269: Also detects in_progress issues with no Running session.
+   * This handles the case where a session's exit handler updated the session
+   * record but failed to reset the issue status — leaving the issue stuck
+   * as in_progress with no session working on it.
    */
   private async recoverOrphanedSessions(): Promise<void> {
     const convex = getConvexClient();
@@ -1364,6 +1369,9 @@ class Orchestrator {
       projectId: this.projectId,
       status: SessionStatus.Running,
     });
+
+    // Track which issues still have live Running sessions after recovery.
+    const issuesWithLiveSessions = new Set<string>();
 
     for (const session of sessions) {
       const pid = session.pid;
@@ -1392,6 +1400,9 @@ class Orchestrator {
         continue;
       }
 
+      // This session has a live PID — its issue is legitimately in_progress.
+      issuesWithLiveSessions.add(session.issueId);
+
       // Live PID with no in-memory handle — re-adopt it.
       // Only re-adopt one; others will be picked up on the next cycle.
       if (this.activeSession === null) {
@@ -1404,6 +1415,41 @@ class Orchestrator {
         const adopted = await this.adoptOrphanedSession(session, pid);
         if (adopted) break;
       }
+    }
+
+    // FLUX-269: Detect in_progress issues with no active session.
+    // This catches the case where the session was cleaned up but the issue
+    // status was never reset (e.g., transient error in exit handler).
+    await this.recoverOrphanedIssues(convex, issuesWithLiveSessions);
+  }
+
+  /**
+   * FLUX-269: Reopen in_progress issues that have no Running session.
+   *
+   * When a session's exit handler fails to reset the issue status, the issue
+   * gets stuck as in_progress — invisible to the scheduler (which only queries
+   * open issues). This recovers those orphans by resetting them to open.
+   */
+  private async recoverOrphanedIssues(
+    convex: ReturnType<typeof getConvexClient>,
+    issuesWithLiveSessions: Set<string>,
+  ): Promise<void> {
+    const inProgressIssues = await convex.query(api.issues.list, {
+      projectId: this.projectId,
+      status: IssueStatus.InProgress,
+    });
+
+    for (const issue of inProgressIssues) {
+      if (issuesWithLiveSessions.has(issue._id)) continue;
+
+      console.warn(
+        `[Orchestrator] FLUX-269: Orphaned issue ${issue.shortId} is in_progress with no active session — reopening`,
+      );
+      await convex.mutation(api.issues.update, {
+        issueId: issue._id,
+        status: IssueStatus.Open,
+        assignee: null,
+      });
     }
   }
 
