@@ -316,13 +316,15 @@ function nullable(validator: Validator<any, "required", any>) {
  * - null      → caller wants to clear the field → include as undefined
  * - any value → caller wants to set the field → include as-is
  */
-function buildPatch(args: Record<string, unknown>): Record<string, unknown> {
+function buildPatch<T extends Record<string, unknown>>(
+  args: T,
+): { [K in keyof T]?: NonNullable<T[K]> } {
   const patch: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(args)) {
     if (val === undefined) continue; // not provided — skip
     patch[key] = val === null ? undefined : val; // null → clear, else set
   }
-  return patch;
+  return patch as { [K in keyof T]?: NonNullable<T[K]> };
 }
 
 export const update = mutation({
