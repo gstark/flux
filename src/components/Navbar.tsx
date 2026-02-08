@@ -37,7 +37,7 @@ export function Navbar({
           />
         </label>
       </div>
-      <Link to="/" className="flex-1 px-4 font-bold text-lg">
+      <Link to="/" className="flex-1 px-4 font-bold text-lg hover:opacity-80">
         Flux
       </Link>
       <div className="navbar-end flex items-center gap-2 pr-4">
