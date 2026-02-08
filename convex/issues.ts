@@ -285,9 +285,7 @@ export const bulkUpdate = mutation({
 
       const patch: Partial<Doc<"issues">> = {
         updatedAt: now,
-        ...Object.fromEntries(
-          Object.entries(rest).filter(([, v]) => v !== undefined),
-        ),
+        ...buildPatch(rest),
         ...(priority !== undefined && {
           priority,
           priorityOrder: toPriorityOrder(priority),
