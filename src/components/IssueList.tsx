@@ -1,6 +1,6 @@
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { usePaginatedQuery, useQuery } from "convex/react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { IssueStatusValue } from "$convex/schema";
@@ -8,6 +8,7 @@ import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { callTool } from "../lib/api";
 import { CreateIssueModal } from "./CreateIssueModal";
+import { DeferModal, type DeferModalHandle } from "./DeferModal";
 import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faCirclePause, faCirclePlay } from "./Icon";
 import { LabelBadge } from "./LabelBadge";
@@ -33,15 +34,7 @@ export function IssueList() {
     IssueStatus.Open,
   );
 
-  // Defer modal state
-  const [deferTargetId, setDeferTargetId] = useState<Id<"issues"> | null>(null);
-  const [deferNote, setDeferNote] = useState("");
-  const [deferring, setDeferring] = useState(false);
-  const {
-    error: deferError,
-    showError: showDeferError,
-    clearError: clearDeferError,
-  } = useDismissableError();
+  const deferRef = useRef<DeferModalHandle>(null);
   const {
     error: actionError,
     showError: showActionError,
@@ -49,43 +42,6 @@ export function IssueList() {
   } = useDismissableError();
   const [undeferringId, setUndeferringId] = useState<Id<"issues"> | null>(null);
   const navigate = useNavigate();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (deferTargetId) noteRef.current?.focus();
-  }, [deferTargetId]);
-
-  function openDeferModal(issueId: Id<"issues">) {
-    setDeferTargetId(issueId);
-    setDeferNote("");
-    clearDeferError();
-    dialogRef.current?.showModal();
-  }
-
-  function closeDeferModal() {
-    dialogRef.current?.close();
-    setDeferTargetId(null);
-    setDeferNote("");
-    clearDeferError();
-  }
-
-  async function handleDefer() {
-    if (!deferTargetId) return;
-    setDeferring(true);
-    clearDeferError();
-    try {
-      await callTool("issues_defer", {
-        issueId: deferTargetId,
-        note: deferNote.trim() || "Deferred from UI",
-      });
-      closeDeferModal();
-    } catch (err) {
-      showDeferError(err);
-    } finally {
-      setDeferring(false);
-    }
-  }
 
   async function handleUndefer(issueId: Id<"issues">) {
     setUndeferringId(issueId);
@@ -243,7 +199,7 @@ export function IssueList() {
                         className="btn btn-ghost btn-xs"
                         onClick={(e) => {
                           e.stopPropagation();
-                          openDeferModal(issue._id);
+                          deferRef.current?.open(issue._id);
                         }}
                       >
                         <FontAwesomeIcon
@@ -277,50 +233,7 @@ export function IssueList() {
         </div>
       )}
 
-      {/* Defer modal */}
-      <dialog ref={dialogRef} className="modal" onClose={closeDeferModal}>
-        <div className="modal-box">
-          <h3 className="mb-4 font-bold text-lg">Defer Issue</h3>
-          <fieldset className="fieldset">
-            <legend className="fieldset-legend">Reason (optional)</legend>
-            <textarea
-              ref={noteRef}
-              className="textarea w-full"
-              placeholder="Why is this being deferred?"
-              value={deferNote}
-              onChange={(e) => setDeferNote(e.target.value)}
-              rows={3}
-            />
-          </fieldset>
-          <ErrorBanner error={deferError} onDismiss={clearDeferError} />
-          <div className="modal-action">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={closeDeferModal}
-              disabled={deferring}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-warning"
-              onClick={handleDefer}
-              disabled={deferring}
-            >
-              {deferring ? (
-                <span className="loading loading-spinner loading-sm" />
-              ) : (
-                <FontAwesomeIcon icon={faCirclePause} aria-hidden="true" />
-              )}
-              Defer
-            </button>
-          </div>
-        </div>
-        <form method="dialog" className="modal-backdrop">
-          <button type="submit">close</button>
-        </form>
-      </dialog>
+      <DeferModal ref={deferRef} />
     </div>
   );
 }
