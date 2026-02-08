@@ -3,7 +3,10 @@
     "flux": {
       "type": "stdio",
       "command": "bun",
-      "args": ["run", "/Users/jason/Projects/flux/bin/flux-mcp-stdio.ts"]
+      "args": ["run", "/Users/jason/Projects/flux/bin/flux-mcp-stdio.ts"],
+      "env": {
+        "FLUX_PROJECT_ID": "k1772qq6f5tdn882554a8808n180phee"
+      }
     },
     "convex": {
       "type": "stdio",

@@ -58,7 +58,6 @@ export const runAll = internalMutation({
     if (!existingConfig) {
       await ctx.db.insert("orchestratorConfig", {
         projectId,
-        enabled: false,
         agent: "claude",
         sessionTimeoutMs: 1800000, // 30 min
         maxFailures: 3,

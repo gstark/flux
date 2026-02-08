@@ -2,22 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
-import type { ProjectStateValue } from "$convex/schema";
 import { AddProjectForm } from "./AddProjectForm";
 import { FontAwesomeIcon, faBolt, faCircle, faPlus } from "./Icon";
-
-const STATE_BADGE: Record<
-  ProjectStateValue,
-  { label: string; className: string }
-> = {
-  running: { label: "Running", className: "badge-success" },
-  paused: { label: "Paused", className: "badge-warning" },
-  stopped: { label: "Stopped", className: "badge-error" },
-};
-
-function stateBadge(state: ProjectStateValue | undefined) {
-  return STATE_BADGE[state ?? "stopped"];
-}
 
 export function ProjectDashboard() {
   const projects = useQuery(api.projects.listWithStats, {});
@@ -73,7 +59,7 @@ export function ProjectDashboard() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {projects.map((project) => {
-          const badge = stateBadge(project.state);
+          const isEnabled = project.enabled ?? false;
           return (
             <Link
               key={project._id}
@@ -94,13 +80,15 @@ export function ProjectDashboard() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`badge badge-sm ${badge.className}`}>
+                  <span
+                    className={`badge badge-sm ${isEnabled ? "badge-success" : "badge-error"}`}
+                  >
                     <FontAwesomeIcon
                       icon={faCircle}
                       className="mr-1 text-[0.5rem]"
                       aria-hidden="true"
                     />
-                    {badge.label}
+                    {isEnabled ? "Enabled" : "Disabled"}
                   </span>
                   <span className="text-base-content/60 text-sm">
                     {project.openIssueCount} open{" "}

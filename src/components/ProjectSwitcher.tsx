@@ -43,7 +43,7 @@ export function ProjectSwitcher() {
     <details ref={detailsRef} className="dropdown">
       <summary className="btn btn-ghost btn-sm gap-2 font-semibold">
         {current?.name ?? currentSlug}
-        {current && <ProjectStateBadge state={current.state} />}
+        {current && <ProjectStateBadge enabled={current.enabled} />}
         <svg
           className="h-3 w-3 fill-current"
           xmlns="http://www.w3.org/2000/svg"
@@ -64,7 +64,7 @@ export function ProjectSwitcher() {
                 onClick={() => switchTo(project.slug)}
               >
                 <span className="flex-1 truncate">{project.name}</span>
-                <ProjectStateBadge state={project.state} />
+                <ProjectStateBadge enabled={project.enabled} />
               </button>
             </li>
           );

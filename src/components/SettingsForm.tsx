@@ -3,34 +3,10 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import { ProjectState, type ProjectStateValue } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { useTrackedAction } from "../hooks/useTrackedAction";
 import { ErrorBanner } from "./ErrorBanner";
-
-// ── Project State Options ────────────────────────────────────────────
-const STATE_OPTIONS: {
-  value: ProjectStateValue;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: ProjectState.Running,
-    label: "Running",
-    description: "Orchestrator actively picks up issues",
-  },
-  {
-    value: ProjectState.Paused,
-    label: "Paused",
-    description: "Stops after current session finishes",
-  },
-  {
-    value: ProjectState.Stopped,
-    label: "Stopped",
-    description: "Orchestrator fully disabled",
-  },
-];
 
 export function SettingsForm() {
   const projectId = useProjectId();
@@ -190,17 +166,20 @@ export function SettingsForm() {
     saveConfig({ reviewIter, failures, timeoutMin });
   }
 
-  // ── Project state control ────────────────────────────────────────
+  // ── Project enabled toggle ──────────────────────────────────────
   const {
     error: stateError,
     showError: showStateError,
     clearError: clearStateError,
   } = useDismissableError();
 
-  async function handleStateChange(newState: ProjectStateValue) {
+  async function handleEnabledToggle() {
     clearStateError();
     try {
-      await updateProject({ projectId, state: newState });
+      await updateProject({
+        projectId,
+        enabled: !(project?.enabled ?? false),
+      });
     } catch (err) {
       showStateError(err);
     }
@@ -255,7 +234,7 @@ export function SettingsForm() {
     );
   }
 
-  const currentState = project.state ?? ProjectState.Stopped;
+  const isEnabled = project.enabled ?? false;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -431,37 +410,31 @@ export function SettingsForm() {
         </form>
       )}
 
-      {/* ── Project State ────────────────────────────────────────── */}
+      {/* ── Project Enabled ──────────────────────────────────────── */}
       <section className="rounded-lg border border-base-300 bg-base-200 p-4">
-        <h2 className="mb-3 font-semibold text-lg">Project State</h2>
-        <div className="flex flex-col gap-2">
-          {STATE_OPTIONS.map((opt) => (
-            <label
-              key={opt.value}
-              htmlFor={`state-${opt.value}`}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
-                currentState === opt.value
-                  ? "border-primary bg-primary/10"
-                  : "border-base-300 hover:bg-base-300/50"
-              }`}
-            >
-              <input
-                id={`state-${opt.value}`}
-                type="radio"
-                name="project-state"
-                className="radio radio-primary radio-sm"
-                checked={currentState === opt.value}
-                onChange={() => handleStateChange(opt.value)}
-              />
-              <div>
-                <div className="font-medium">{opt.label}</div>
-                <div className="text-base-content/60 text-sm">
-                  {opt.description}
-                </div>
-              </div>
-            </label>
-          ))}
-        </div>
+        <h2 className="mb-3 font-semibold text-lg">Scheduling</h2>
+        <label
+          htmlFor="project-enabled"
+          className="flex cursor-pointer items-center gap-3"
+        >
+          <input
+            id="project-enabled"
+            type="checkbox"
+            className="toggle toggle-success"
+            checked={isEnabled}
+            onChange={handleEnabledToggle}
+          />
+          <div>
+            <div className="font-medium">
+              {isEnabled ? "Enabled" : "Disabled"}
+            </div>
+            <div className="text-base-content/60 text-sm">
+              {isEnabled
+                ? "Orchestrator actively picks up ready issues"
+                : "Orchestrator will not pick up new issues"}
+            </div>
+          </div>
+        </label>
         <ErrorBanner error={stateError} onDismiss={clearStateError} />
       </section>
 

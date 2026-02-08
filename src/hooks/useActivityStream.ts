@@ -166,7 +166,7 @@ export function useActivityStream(): ActivityStreamState & {
           return;
         }
         // Clear the sticky session banner when no session is active
-        if (data.state === "idle" || data.state === "stopped") {
+        if (data.state === "idle") {
           setCurrentSession(null);
         }
         enqueue({

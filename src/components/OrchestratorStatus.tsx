@@ -1,22 +1,22 @@
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrchestratorState } from "@/shared/orchestrator";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { SessionPhaseValue } from "$convex/schema";
-import { ProjectState, SessionPhase } from "$convex/schema";
+import { SessionPhase } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useOrchestratorStatus } from "../hooks/useOrchestratorStatus";
 import { useProjectSlug } from "../hooks/useProjectId";
 import { killOrchestrator } from "../lib/orchestratorApi";
-import { FontAwesomeIcon, faPlay, faSkull, faStop } from "./Icon";
+import { FontAwesomeIcon, faSkull } from "./Icon";
 
 // ── Types ────────────────────────────────────────────────────────────
 
 /** A pending transition: action was accepted, waiting for state to settle. */
 type Transition = {
-  action: "stop" | "kill" | "enable";
+  action: "kill";
   /** The state we expect to leave (used to detect when transition completes). */
   fromState: OrchestratorState;
 };
@@ -35,32 +35,8 @@ const PHASE_ABBREV: Record<SessionPhaseValue, string> = {
   [SessionPhase.Review]: "Rev",
 };
 
-const TRANSITION_LABELS: Record<Transition["action"], string> = {
-  stop: "Stopping…",
-  kill: "Killing…",
-  enable: "Starting…",
-};
-
-const TRANSITION_SHORT_LABELS: Record<Transition["action"], string> = {
-  stop: "Stop…",
-  kill: "Kill…",
-  enable: "Start…",
-};
-
 /** Max time (ms) to show a transition before giving up and clearing it. */
 const TRANSITION_TIMEOUT_MS = 15_000;
-
-/**
- * Returns true when the current state indicates the transition is complete.
- * - stop/kill: complete when state is no longer the fromState (busy → idle/stopped)
- * - enable: complete when state is no longer "stopped"
- */
-function isTransitionComplete(
-  transition: Transition,
-  currentState: OrchestratorState,
-): boolean {
-  return currentState !== transition.fromState;
-}
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -93,17 +69,10 @@ export function OrchestratorStatus({
     clearActionError();
   }, [projectId]);
 
-  // Subscribe to orchestratorConfig for the `enabled` flag (real-time via Convex)
-  const config = useQuery(api.orchestratorConfig.get, { projectId });
-
-  // Convex mutation for updating project state — drives orchestrator lifecycle
-  // via the project state watcher (FLUX-307).
-  const updateProject = useMutation(api.projects.update);
-
   // Clear transition when SSE-driven status update shows new state
   useEffect(() => {
     if (!status || !transition) return;
-    if (isTransitionComplete(transition, status.state)) {
+    if (status.state !== transition.fromState) {
       setTransition(null);
     }
   }, [status, transition]);
@@ -130,45 +99,25 @@ export function OrchestratorStatus({
 
   // ── Actions ──────────────────────────────────────────────────────
 
-  const handleAction = useCallback(
-    async (action: Transition["action"], fn: () => Promise<unknown>) => {
-      const currentState = status?.state ?? "stopped";
-      setInflightAction(action);
-      try {
-        await fn();
-        clearActionError();
-        // Enter transition state — persists until SSE-driven refetch confirms new state
-        setTransition({ action, fromState: currentState });
-      } catch (err) {
-        showActionError(err);
-        // Refetch so we don't show stale state after a failed action
-        refetch();
-      } finally {
-        setInflightAction(null);
-      }
-    },
-    [refetch, status?.state, clearActionError, showActionError],
-  );
-
-  // Enable/stop route through Convex project state — the project state watcher
-  // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
-  const handleEnable = () =>
-    handleAction("enable", () =>
-      updateProject({ projectId, state: ProjectState.Running }),
-    );
-  const handleStop = () =>
-    handleAction("stop", () =>
-      updateProject({ projectId, state: ProjectState.Paused }),
-    );
-  // Kill remains a direct HTTP call — it terminates a process, not a state transition.
-  const handleKill = () =>
-    handleAction("kill", () => killOrchestrator(projectId));
+  const handleKill = useCallback(async () => {
+    const currentState = status?.state ?? "idle";
+    setInflightAction("kill");
+    try {
+      await killOrchestrator(projectId);
+      clearActionError();
+      setTransition({ action: "kill", fromState: currentState });
+    } catch (err) {
+      showActionError(err);
+      refetch();
+    } finally {
+      setInflightAction(null);
+    }
+  }, [projectId, refetch, status?.state, clearActionError, showActionError]);
 
   // ── Derived State ────────────────────────────────────────────────
 
   const error = actionError ?? statusError;
-  const state = status?.state ?? "stopped";
-  const enabled = config?.enabled ?? false;
+  const state = status?.state ?? "idle";
   const isTransitioning = transition !== null;
 
   // Determine dot color + animation
@@ -176,9 +125,7 @@ export function OrchestratorStatus({
     ? "status-warning"
     : state === "busy"
       ? "status-warning"
-      : state === "idle" && enabled
-        ? "status-success"
-        : "status-neutral";
+      : "status-success";
 
   const showPing = state === "busy" || isTransitioning;
 
@@ -188,25 +135,20 @@ export function OrchestratorStatus({
   let stateLabel: string;
   let shortLabel: string;
   if (isTransitioning) {
-    stateLabel = TRANSITION_LABELS[transition.action];
-    shortLabel = TRANSITION_SHORT_LABELS[transition.action];
+    stateLabel = "Killing…";
+    shortLabel = "Kill…";
   } else if (state === "busy" && activePhase) {
     stateLabel = `${PHASE_LABELS[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`;
     shortLabel = `${PHASE_ABBREV[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`;
-  } else if (state === "idle") {
-    stateLabel = enabled ? "Idle" : "Disabled";
-    shortLabel = stateLabel;
   } else {
-    stateLabel = "Stopped";
+    stateLabel = "Idle";
     shortLabel = stateLabel;
   }
 
   // Session link target
   const activeSessionId = status?.activeSession?.sessionId ?? null;
 
-  // Button visibility — hide all during transitions
-  const showEnable = !isTransitioning && state === "stopped";
-  const showStop = !isTransitioning && (state === "idle" || state === "busy");
+  // Kill button — only when busy and not already transitioning
   const showKill = !isTransitioning && state === "busy";
 
   // ── Render ───────────────────────────────────────────────────────
@@ -247,52 +189,14 @@ export function OrchestratorStatus({
         statusLabel
       )}
 
-      {/* Error tooltip — intentionally compact for navbar context.
-          Uses useDismissableError (auto-dismiss) for action errors but renders
-          as a tooltip rather than ErrorBanner, which would break navbar layout. */}
+      {/* Error tooltip — intentionally compact for navbar context. */}
       {error && (
         <div className="tooltip tooltip-bottom tooltip-error" data-tip={error}>
           <span className="text-error text-xs">!</span>
         </div>
       )}
 
-      {/* Controls */}
-      {showEnable && (
-        <button
-          type="button"
-          className="btn btn-xs btn-success btn-outline"
-          disabled={inflightAction !== null}
-          onClick={handleEnable}
-        >
-          {inflightAction === "enable" ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <>
-              <FontAwesomeIcon icon={faPlay} aria-hidden="true" />
-              Enable
-            </>
-          )}
-        </button>
-      )}
-
-      {showStop && (
-        <button
-          type="button"
-          className="btn btn-xs btn-warning btn-outline"
-          disabled={inflightAction !== null}
-          onClick={handleStop}
-        >
-          {inflightAction === "stop" ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <>
-              <FontAwesomeIcon icon={faStop} aria-hidden="true" />
-              Stop
-            </>
-          )}
-        </button>
-      )}
-
+      {/* Kill button */}
       {showKill && (
         <button
           type="button"

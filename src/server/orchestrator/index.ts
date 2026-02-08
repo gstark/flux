@@ -32,7 +32,7 @@ import {
 } from "./agents";
 import { SessionMonitor } from "./monitor";
 
-/** Recovery stats returned by orphan recovery on enable(). */
+/** Recovery stats returned by orphan recovery on startup. */
 export type OrphanRecoveryStats = {
   deadSessions: number;
   adoptedSessions: number;
@@ -64,7 +64,7 @@ interface ActiveSession {
 }
 
 /**
- * Lifecycle event emitted by the Orchestrator when session state changes.
+ * Lifecycle event emitted by the ProjectRunner when session state changes.
  * SSE clients subscribe to these to know when to start/stop piping monitor output.
  */
 export type OrchestratorLifecycleEvent =
@@ -77,7 +77,7 @@ export type OrchestratorLifecycleEvent =
     }
   | {
       type: "session_end";
-      state: Exclude<OrchestratorState, "busy">;
+      state: OrchestratorState;
     }
   | {
       type: "monitor_changed";
@@ -88,16 +88,21 @@ export type OrchestratorLifecycleEvent =
       state: OrchestratorState;
     };
 
-/** Orchestrator manages claiming issues, spawning agents, and session lifecycle. */
-class Orchestrator {
-  private state: OrchestratorState = OrchestratorState.Stopped;
+/**
+ * ProjectRunner manages claiming issues, spawning agents, and session lifecycle
+ * for a single project. Created/destroyed by the top-level Orchestrator.
+ *
+ * On construction, subscribes to ready issues and begins auto-scheduling.
+ * Call destroy() to unsubscribe and clean up.
+ */
+class ProjectRunner {
+  private state: OrchestratorState = OrchestratorState.Idle;
   private activeSession: ActiveSession | null = null;
   private provider: AgentProvider;
   private projectId: Id<"projects">;
   /** Filesystem path for the project — used as CWD when spawning agents. */
   private projectPath: string;
   private unsubscribeReady: (() => void) | null = null;
-  private pendingStop = false;
   private readyIssues: Array<{ _id: Id<"issues"> }> = [];
   private maxFailures = 3;
   private maxReviewIterations = 10;
@@ -106,6 +111,7 @@ class Orchestrator {
   private lifecycleListeners = new Set<
     (event: OrchestratorLifecycleEvent) => void
   >();
+  private destroyed = false;
 
   constructor(
     projectId: Id<"projects">,
@@ -122,17 +128,8 @@ class Orchestrator {
     return this.projectPath;
   }
 
-  /** Update the project's filesystem path (e.g. after PATCH /api/projects/:id).
-   *  Only safe when the orchestrator is stopped — changing the CWD mid-session
-   *  would break the running agent. */
-  updateProjectPath(newPath: string): void {
-    if (this.state !== OrchestratorState.Stopped) {
-      throw new Error(
-        `[Orchestrator] Cannot update projectPath while state is "${this.state}". ` +
-          "Stop the orchestrator first.",
-      );
-    }
-    this.projectPath = newPath;
+  getProjectId(): Id<"projects"> {
+    return this.projectId;
   }
 
   /**
@@ -142,8 +139,8 @@ class Orchestrator {
   private requireActiveSession(caller: string): ActiveSession {
     if (!this.activeSession) {
       throw new Error(
-        `[Orchestrator] ${caller}: activeSession is null — this is a bug. ` +
-          "The orchestrator should never reach this point without an active session.",
+        `[ProjectRunner] ${caller}: activeSession is null — this is a bug. ` +
+          "The runner should never reach this point without an active session.",
       );
     }
     return this.activeSession;
@@ -152,7 +149,6 @@ class Orchestrator {
   getStatus(): OrchestratorStatusData["status"] {
     return {
       state: this.state,
-      schedulerEnabled: this.unsubscribeReady !== null,
       readyCount: this.readyIssues.length,
       activeSession: this.activeSession
         ? {
@@ -184,12 +180,8 @@ class Orchestrator {
       try {
         listener(event);
       } catch (err) {
-        // Explicit fallback: a broken listener is removed so it cannot block
-        // future lifecycle events. Other listeners still receive this event
-        // (the loop continues), and the orchestrator pipeline proceeds
-        // uninterrupted — one misbehaving listener must not stall the lifecycle.
         console.error(
-          `[Orchestrator] Lifecycle listener threw on ${event.type} — removing:`,
+          `[ProjectRunner] Lifecycle listener threw on ${event.type} — removing:`,
           err,
         );
         this.lifecycleListeners.delete(listener);
@@ -198,20 +190,14 @@ class Orchestrator {
   }
 
   /**
-   * Enable the auto-scheduler: persist config, recover orphans, subscribe to ready issues.
-   * Transitions from Stopped → Idle and begins watching for work.
+   * Subscribe to ready issues and begin auto-scheduling.
+   * Fetches config thresholds and recovers orphaned sessions.
    */
-  async enable(): Promise<OrphanRecoveryStats> {
-    if (this.state === OrchestratorState.Busy) {
-      throw new Error(
-        "Cannot enable scheduler while busy. Wait for current session to complete.",
-      );
-    }
-
+  async subscribe(): Promise<OrphanRecoveryStats> {
     const convex = getConvexClient();
 
-    // Persist to DB (upsert handled by the mutation)
-    await convex.mutation(api.orchestratorConfig.enable, {
+    // Ensure config row exists (upsert)
+    await convex.mutation(api.orchestratorConfig.ensureExists, {
       projectId: this.projectId,
     });
 
@@ -229,7 +215,6 @@ class Orchestrator {
     const stats = await this.recoverOrphanedSessions();
 
     // Subscribe to ready issues
-    this.pendingStop = false;
     this.unsubscribeReady = convex.onUpdate(
       api.issues.ready,
       { projectId: this.projectId, maxFailures: this.maxFailures },
@@ -239,66 +224,53 @@ class Orchestrator {
       },
     );
 
-    this.state = OrchestratorState.Idle;
-
-    // Notify SSE clients of the state transition
-    this.emitLifecycle({ type: "state_change", state: this.state });
-
     return stats;
   }
 
   /**
-   * Stop the auto-scheduler. Unsubscribes from ready issues and persists config.
-   * If busy, sets pendingStop so the current session finishes before transitioning to Stopped.
+   * Destroy the runner: unsubscribe from ready issues, kill active session if any.
+   * After destroy(), the runner should not be used.
    */
-  async stop(): Promise<void> {
-    // Unsubscribe first
+  async destroy(): Promise<void> {
+    this.destroyed = true;
+
+    // Unsubscribe from ready issues
     if (this.unsubscribeReady) {
       this.unsubscribeReady();
       this.unsubscribeReady = null;
     }
     this.readyIssues = [];
 
-    const convex = getConvexClient();
-    await convex.mutation(api.orchestratorConfig.disable, {
-      projectId: this.projectId,
-    });
-
-    if (this.state === OrchestratorState.Busy) {
-      // Let the current session finish, then transition to stopped
-      this.pendingStop = true;
-    } else {
-      this.state = OrchestratorState.Stopped;
-      this.pendingStop = false;
-
-      // Notify SSE clients of the state transition
-      this.emitLifecycle({ type: "state_change", state: this.state });
+    // Kill active session if busy
+    if (this.state === OrchestratorState.Busy && this.activeSession) {
+      this.clearSessionTimeout();
+      this.clearPidWatchdog();
+      this.activeSession.killed = true;
+      this.activeSession.process.kill();
+      // Don't wait for exit — destroy is fire-and-forget
     }
   }
 
   /**
    * Run a single issue: claim → spawn agent → return immediately.
    * Agent exit is handled in the background via fire-and-forget.
-   * Throws if orchestrator is already busy or claim fails.
+   * Throws if runner is already busy or claim fails.
    */
   async run(
     issueId: Id<"issues">,
   ): Promise<{ sessionId: Id<"sessions">; pid: number }> {
     if (this.state === OrchestratorState.Busy) {
-      throw new Error("Orchestrator is busy. Kill the current session first.");
+      throw new Error("Runner is busy. Kill the current session first.");
     }
 
     // Lock immediately to prevent re-entrant spawns from subscription callbacks.
-    // The onUpdate subscription can fire between any two awaits, and scheduleNext()
-    // checks this guard synchronously. Without this, multiple agents spawn in parallel.
-    const previousState = this.state;
     this.state = OrchestratorState.Busy;
 
     try {
       return await this.executeRun(issueId);
     } catch (err) {
-      // Restore previous state so the scheduler can retry with the next issue
-      this.state = previousState;
+      // Restore Idle state so the scheduler can retry with the next issue
+      this.state = OrchestratorState.Idle;
       throw err;
     }
   }
@@ -311,14 +283,14 @@ class Orchestrator {
     // 0. Validate project path exists on disk before claiming
     if (!this.projectPath) {
       throw new Error(
-        `[Orchestrator] Cannot spawn agent: project ${this.projectId} has no path configured. ` +
+        `[ProjectRunner] Cannot spawn agent: project ${this.projectId} has no path configured. ` +
           "Set a path via PATCH /api/projects/:id.",
       );
     }
     const pathExists = await Bun.file(`${this.projectPath}/.git/HEAD`).exists();
     if (!pathExists) {
       throw new Error(
-        `[Orchestrator] Cannot spawn agent: project path "${this.projectPath}" ` +
+        `[ProjectRunner] Cannot spawn agent: project path "${this.projectPath}" ` +
           "does not exist on disk or is not a git repository. " +
           "Was the project directory moved or deleted?",
       );
@@ -342,14 +314,11 @@ class Orchestrator {
     const startHead = await getCurrentHead(cwd);
 
     // 4. Auto-commit dirty tree before starting work.
-    // Explicit fallback: if this fails, the session proceeds with a dirty tree.
-    // This is acceptable because the auto-commit is a safety net — agents commit
-    // their own changes. A git failure here should not block the session pipeline.
     try {
       await autoCommitDirtyTree(cwd, issue.shortId, "pre-session");
     } catch (err) {
       console.warn(
-        `[Orchestrator] Auto-commit before session failed for ${issue.shortId} — ` +
+        `[ProjectRunner] Auto-commit before session failed for ${issue.shortId} — ` +
           "proceeding with dirty tree:",
         err,
       );
@@ -430,31 +399,17 @@ class Orchestrator {
 
   // ── Session timeout enforcement ───────────────────────────────────
 
-  /**
-   * Start a timeout timer for the active session. On timeout:
-   * 1. SIGTERM (graceful shutdown attempt)
-   * 2. Wait 10 seconds
-   * 3. SIGKILL if still running
-   * 4. handleExit runs with timedOut=true → session failed, disposition "fault"
-   *
-   * @param startedAt - If provided (e.g., re-adopted sessions), calculates
-   *   remaining time from when the session originally started.
-   */
   private startSessionTimeout(startedAt?: number): void {
     const active = this.requireActiveSession("startSessionTimeout");
-
-    // Clear any existing timer (e.g., phase transition)
     this.clearSessionTimeout();
 
-    // Calculate delay: full timeout for new sessions, remaining time for re-adopted
     let delay = this.sessionTimeoutMs;
     if (startedAt !== undefined) {
       const elapsed = Date.now() - startedAt;
       delay = Math.max(0, this.sessionTimeoutMs - elapsed);
       if (delay === 0) {
-        // Already timed out — kill immediately
         console.warn(
-          `[Orchestrator] Re-adopted session for ${active.issue.shortId} already exceeded timeout, killing`,
+          `[ProjectRunner] Re-adopted session for ${active.issue.shortId} already exceeded timeout, killing`,
         );
       }
     }
@@ -463,33 +418,29 @@ class Orchestrator {
       if (!this.activeSession || this.activeSession.killed) return;
 
       console.error(
-        `[Orchestrator] Session timeout (${this.sessionTimeoutMs}ms) for ${active.issue.shortId} phase=${active.phase} — sending SIGTERM`,
+        `[ProjectRunner] Session timeout (${this.sessionTimeoutMs}ms) for ${active.issue.shortId} phase=${active.phase} — sending SIGTERM`,
       );
 
       this.activeSession.timedOut = true;
       this.activeSession.killed = true;
-
-      // SIGTERM first (graceful)
       this.activeSession.process.kill();
 
-      // SIGKILL after 10s if still running
       const pid = this.activeSession.process.pid;
       setTimeout(() => {
         if (isProcessAlive(pid)) {
           console.error(
-            `[Orchestrator] Agent PID ${pid} still alive after 10s grace period — sending SIGKILL`,
+            `[ProjectRunner] Agent PID ${pid} still alive after 10s grace period — sending SIGKILL`,
           );
           try {
-            process.kill(pid, 9); // SIGKILL
+            process.kill(pid, 9);
           } catch {
-            // Already dead — race between natural exit and our kill
+            // Already dead
           }
         }
       }, 10_000);
     }, delay);
   }
 
-  /** Clear the session timeout timer (called on normal exit or manual kill). */
   private clearSessionTimeout(): void {
     if (this.activeSession?.timeoutTimer) {
       clearTimeout(this.activeSession.timeoutTimer);
@@ -499,35 +450,19 @@ class Orchestrator {
 
   // ── Agent session ID extraction ────────────────────────────────────
 
-  /**
-   * Wire up agentSessionId extraction from stream-json output.
-   *
-   * Registers a monitor.onLine() callback that parses JSON lines looking for
-   * the `{ type: "system", session_id: "..." }` message emitted by Claude.
-   * On capture, persists the ID to Convex immediately (survives hot reloads)
-   * and sets a failure flag if the persist call rejects.
-   *
-   * Resets `agentSessionId` and `agentSessionIdPersistFailed` on the active
-   * session before wiring, so callers don't need to clear stale values from
-   * previous phases.
-   */
   private wireAgentSessionIdExtraction(
     active: ActiveSession,
     monitor: SessionMonitor,
   ): void {
-    // Reset from any previous phase (e.g., work → review transition)
     active.agentSessionId = null;
     active.agentSessionIdPersistFailed = false;
 
     monitor.onLine((line) => {
-      if (active.agentSessionId) return; // Already captured
+      if (active.agentSessionId) return;
       try {
         const obj = JSON.parse(line) as Record<string, unknown>;
         if (obj.type === "system" && typeof obj.session_id === "string") {
           active.agentSessionId = obj.session_id;
-          // Persist immediately so it survives hot reloads. Without this,
-          // a module re-evaluation loses the in-memory value and re-adopted
-          // sessions can't resume for retro.
           getConvexClient()
             .mutation(api.sessions.update, {
               sessionId: active.sessionId,
@@ -536,7 +471,7 @@ class Orchestrator {
             .catch((err: unknown) => {
               active.agentSessionIdPersistFailed = true;
               console.error(
-                "[Orchestrator] Failed to persist agentSessionId — " +
+                "[ProjectRunner] Failed to persist agentSessionId — " +
                   "will recover in exit handler:",
                 err,
               );
@@ -550,15 +485,8 @@ class Orchestrator {
 
   // ── PID watchdog ────────────────────────────────────────────────────
 
-  /** Interval between PID liveness checks (15 seconds). */
   private static readonly PID_WATCHDOG_INTERVAL_MS = 15_000;
 
-  /**
-   * Start a periodic PID liveness check. Detects silently-dead agent processes
-   * (e.g. OS killed child during laptop sleep but exit event was never delivered).
-   * Reads activeSession.process.pid each tick, so phase transitions that replace
-   * the process are tracked automatically.
-   */
   private startPidWatchdog(): void {
     this.clearPidWatchdog();
     this.pidWatchdogTimer = setInterval(() => {
@@ -571,14 +499,13 @@ class Orchestrator {
       if (!isProcessAlive(pid)) {
         this.clearPidWatchdog();
         console.warn(
-          `[Orchestrator] PID watchdog: process ${pid} is dead, triggering handleExit(-1)`,
+          `[ProjectRunner] PID watchdog: process ${pid} is dead, triggering handleExit(-1)`,
         );
         this.handleExit(-1);
       }
-    }, Orchestrator.PID_WATCHDOG_INTERVAL_MS);
+    }, ProjectRunner.PID_WATCHDOG_INTERVAL_MS);
   }
 
-  /** Clear the PID watchdog timer. */
   private clearPidWatchdog(): void {
     if (this.pidWatchdogTimer) {
       clearInterval(this.pidWatchdogTimer);
@@ -588,99 +515,37 @@ class Orchestrator {
 
   /**
    * Kill the running agent immediately.
-   * The exit handler will detect the `killed` flag and apply hand-off semantics:
-   * issue stays in_progress, session marked as failed.
+   * The exit handler will detect the `killed` flag and apply hand-off semantics.
    */
   async kill(): Promise<void> {
     if (this.state !== OrchestratorState.Busy || !this.activeSession) {
       throw new Error("No active session to kill.");
     }
 
-    // Clear timeout timer and PID watchdog — manual kill takes precedence
     this.clearSessionTimeout();
     this.clearPidWatchdog();
 
-    // Mark as killed so the exit handler knows this was intentional
     this.activeSession.killed = true;
     this.activeSession.process.kill();
-
-    // Exit handler (handleExit) will run when the process actually terminates
-    // and will apply kill-specific finalization (hand-off semantics).
-  }
-
-  /** Default max time to wait for Stopped state before giving up (30s). */
-  private static readonly WAIT_FOR_STOPPED_TIMEOUT_MS = 30_000;
-
-  /**
-   * Returns a promise that resolves when the orchestrator reaches Stopped state.
-   * Resolves immediately if already stopped.
-   * Rejects after `timeoutMs` (default 30s) if Stopped is never reached —
-   * prevents indefinite hangs when the caller needs to proceed with cleanup.
-   *
-   * @param timeoutMs Override the default 30s timeout (e.g., for graceful shutdown).
-   */
-  waitForStopped(timeoutMs?: number): Promise<void> {
-    const ms = timeoutMs ?? Orchestrator.WAIT_FOR_STOPPED_TIMEOUT_MS;
-    if (this.state === OrchestratorState.Stopped) {
-      return Promise.resolve();
-    }
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        unsub();
-        reject(
-          new Error(
-            `[Orchestrator] waitForStopped timed out after ${ms}ms — ` +
-              `current state: "${this.state}". This indicates a bug in the shutdown path.`,
-          ),
-        );
-      }, ms);
-
-      const unsub = this.onLifecycle((event) => {
-        if (
-          (event.type === "state_change" || event.type === "session_end") &&
-          event.state === OrchestratorState.Stopped
-        ) {
-          clearTimeout(timeout);
-          unsub();
-          resolve();
-        }
-      });
-    });
   }
 
   // ── Exit handling ────────────────────────────────────────────────────
 
-  /**
-   * Handle agent process exit. Routes to the appropriate phase handler.
-   * Called from the fire-and-forget .then() chain on agentProcess.wait().
-   */
   private async handleExit(exitCode: number): Promise<void> {
     if (!this.activeSession) return;
 
-    // Clear session timeout timer — the process has exited
     this.clearSessionTimeout();
-
-    // Clear PID watchdog — no longer needed once exit is being handled
     this.clearPidWatchdog();
 
-    // Wait for monitor to finish draining stdout before finalizing.
-    // Explicit fallback: if the monitor stream errors during drain, we still
-    // proceed with shutdown(). The monitor has already captured output into
-    // its buffer up to the failure point — disposition parsing and session
-    // finalization can work with partial output. Blocking teardown here would
-    // wedge the orchestrator in Busy state permanently.
     try {
       await this.activeSession.monitorDone;
     } catch (err) {
-      console.error("[Orchestrator] Monitor drain error:", err);
+      console.error("[ProjectRunner] Monitor drain error:", err);
     }
     await this.activeSession.monitor.shutdown();
 
-    // Capture monitor ref before phase handlers call finalize() (which nulls activeSession)
     const monitor = this.activeSession.monitor;
 
-    // Kill path: session was terminated externally (manual kill or timeout).
-    // Keep tmp file for debugging.
     if (this.activeSession.killed) {
       const convex = getConvexClient();
       const { sessionId, issueId, timedOut, issue } = this.activeSession;
@@ -690,18 +555,15 @@ class Orchestrator {
         status: SessionStatus.Failed,
         endedAt: Date.now(),
         exitCode,
-        // Timeout kills get an explicit fault disposition for traceability
         disposition: timedOut ? Disposition.Fault : undefined,
         note: timedOut
           ? `Session timed out after ${this.sessionTimeoutMs}ms (phase: ${this.activeSession.phase})`
           : undefined,
       });
 
-      // Timeout: increment failure count so the circuit breaker can trip.
-      // Manual kills leave the issue in_progress for human review.
       if (timedOut) {
         console.error(
-          `[Orchestrator] Session timed out for ${issue.shortId} — incrementing failure count`,
+          `[ProjectRunner] Session timed out for ${issue.shortId} — incrementing failure count`,
         );
         await convex.mutation(api.issues.incrementFailure, {
           issueId,
@@ -713,10 +575,6 @@ class Orchestrator {
       return;
     }
 
-    // Route to phase-specific handler.
-    // CRITICAL: finalize() MUST run regardless of errors, otherwise the orchestrator
-    // wedges in Busy state forever. Any throw in a phase handler that skips finalize()
-    // means the scheduler stops picking up new work.
     try {
       const { phase } = this.activeSession;
       let cleanExit = false;
@@ -727,71 +585,47 @@ class Orchestrator {
       } else if (phase === SessionPhase.Review) {
         cleanExit = await this.handleReviewExit(exitCode);
       }
-      // Only clean up tmp file on success — keep on failure for debugging.
-      // Isolated try-catch: a filesystem error here must NOT propagate to
-      // the outer catch, which calls finalize() — that would orphan an
-      // in-flight retro/review session.
-      // Guard: only clean up if the lifecycle ended (finalize ran). When
-      // work→retro or retro→review transitions occur, activeSession is still
-      // set — the new phase's monitor may share the same tmp path (retro
-      // reuses the work session ID). Cleaning here would delete its active file.
       if (cleanExit && this.activeSession === null) {
         try {
           await monitor.cleanupTmpFile();
         } catch (cleanupErr) {
           console.error(
-            "[Orchestrator] tmp file cleanup failed (non-fatal):",
+            "[ProjectRunner] tmp file cleanup failed (non-fatal):",
             cleanupErr,
           );
         }
       }
     } catch (err) {
-      // Exit handler crashed — keep tmp file for debugging
       console.error(
-        "[Orchestrator] Exit handler crashed — forcing finalize:",
+        "[ProjectRunner] Exit handler crashed — forcing finalize:",
         err,
       );
       this.finalize();
     }
   }
 
-  /**
-   * Handle work session exit. Implements the worker session inference table:
-   *
-   * | Disposition | Commits? | Action                                    |
-   * |-------------|----------|-------------------------------------------|
-   * | malformed   | —        | incrementFailure, reopen (circuit breaker) |
-   * | fault       | —        | incrementFailure, reopen (circuit breaker) |
-   * | noop        | —        | close as noop                              |
-   * | done        | No       | close as noop                              |
-   * | done        | Yes      | auto-commit → retro → review               |
-   */
   private async handleWorkExit(exitCode: number): Promise<boolean> {
     const active = this.requireActiveSession("handleWorkExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
 
-    // Capture endHead — undefined if git fails so session record doesn't
-    // falsely claim endHead === startHead (which hides real commits).
     let endHead: string | undefined;
     try {
       endHead = await getCurrentHead(cwd);
     } catch (err) {
       console.warn(
-        `[Orchestrator] Failed to capture endHead for ${issue.shortId} — session record will omit it:`,
+        `[ProjectRunner] Failed to capture endHead for ${issue.shortId} — session record will omit it:`,
         err,
       );
     }
 
-    // Parse disposition from monitor buffer
     const allLines = active.monitor.buffer.getAll();
     const dispositionResult = parseDisposition(allLines);
 
-    // Update session record (also persists agentSessionId if the early persist failed)
     if (active.agentSessionIdPersistFailed && active.agentSessionId) {
       console.warn(
-        `[Orchestrator] Early agentSessionId persist had failed for ${issue.shortId} — ` +
+        `[ProjectRunner] Early agentSessionId persist had failed for ${issue.shortId} — ` +
           "recovering via handleWorkExit session update.",
       );
     }
@@ -808,10 +642,9 @@ class Orchestrator {
       ...(endHead !== undefined && { endHead }),
     });
 
-    // ── Malformed: no valid disposition parsed ──
     if (!dispositionResult.success) {
       console.error(
-        `[Orchestrator] ${StatusMessages.dispositionParseFailed(issue.shortId)}`,
+        `[ProjectRunner] ${StatusMessages.dispositionParseFailed(issue.shortId)}`,
       );
       await convex.mutation(api.issues.incrementFailure, {
         issueId,
@@ -823,9 +656,10 @@ class Orchestrator {
 
     const { disposition, note } = dispositionResult;
 
-    // ── Fault ──
     if (disposition === Disposition.Fault) {
-      console.error(`[Orchestrator] Agent fault for ${issue.shortId}: ${note}`);
+      console.error(
+        `[ProjectRunner] Agent fault for ${issue.shortId}: ${note}`,
+      );
       await convex.mutation(api.issues.incrementFailure, {
         issueId,
         maxFailures: this.maxFailures,
@@ -834,7 +668,6 @@ class Orchestrator {
       return false;
     }
 
-    // ── Noop ──
     if (disposition === Disposition.Noop) {
       await convex.mutation(api.issues.close, {
         issueId,
@@ -845,13 +678,12 @@ class Orchestrator {
       return true;
     }
 
-    // ── Done: check for commits ──
     let hasCommits: boolean;
     try {
       hasCommits = await hasNewCommits(cwd, startHead);
     } catch (err) {
       console.error(
-        `[Orchestrator] Git error checking commits for ${issue.shortId}:`,
+        `[ProjectRunner] Git error checking commits for ${issue.shortId}:`,
         err,
       );
       await convex.mutation(api.issues.incrementFailure, {
@@ -863,7 +695,6 @@ class Orchestrator {
     }
 
     if (!hasCommits) {
-      // Agent said done but made no commits — treat as noop
       await convex.mutation(api.issues.close, {
         issueId,
         closeType: CloseType.Noop,
@@ -873,10 +704,6 @@ class Orchestrator {
       return true;
     }
 
-    // Done with commits — auto-commit dirty tree, then proceed to retro.
-    // Explicit fallback: if auto-commit fails, uncommitted changes survive in the
-    // working tree and the next phase (retro/review) can still proceed. The agent
-    // is responsible for committing its own work; this is a safety net only.
     try {
       await autoCommitDirtyTree(
         cwd,
@@ -887,24 +714,18 @@ class Orchestrator {
       );
     } catch (err) {
       console.warn(
-        `[Orchestrator] Auto-commit after work failed for ${issue.shortId} — ` +
+        `[ProjectRunner] Auto-commit after work failed for ${issue.shortId} — ` +
           "uncommitted changes remain in working tree:",
         err,
       );
     }
 
-    // Proceed to retro if we can resume, otherwise skip to review
     if (active.agentSessionId) {
       await this.startRetro(note);
     } else {
       console.warn(
-        `[Orchestrator] No agentSessionId captured for ${issue.shortId}, skipping retro`,
+        `[ProjectRunner] No agentSessionId captured for ${issue.shortId}, skipping retro`,
       );
-      // Record the skip as a comment on the issue for traceability.
-      // Explicit fallback: the comment is informational only — it documents
-      // why retro was skipped but doesn't affect the pipeline. If comment
-      // creation fails (e.g., transient Convex error), the session still
-      // proceeds to review. The retro skip is also logged to stdout above.
       try {
         await convex.mutation(api.comments.create, {
           issueId,
@@ -914,35 +735,26 @@ class Orchestrator {
         });
       } catch (err) {
         console.error(
-          "[Orchestrator] Failed to create retro-skip comment:",
+          "[ProjectRunner] Failed to create retro-skip comment:",
           err,
         );
       }
-      // Review creates a new session (different tmp path). Clean up work
-      // tmp file now — it would otherwise be orphaned.
       try {
         await active.monitor.cleanupTmpFile();
       } catch {
-        // Non-fatal: best-effort cleanup
+        // Non-fatal
       }
       await this.startReviewLoop();
     }
     return true;
   }
 
-  /**
-   * Handle retro session exit. Retro is advisory — never blocks the pipeline.
-   * Always proceeds to review regardless of retro outcome.
-   */
   private async handleRetroExit(): Promise<boolean> {
     const active = this.requireActiveSession("handleRetroExit");
     const { sessionId, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
 
-    // Auto-commit any retro changes (e.g., friction fixes).
-    // Explicit fallback: retro commits are best-effort. If this fails, the review
-    // phase still proceeds — uncommitted retro changes persist in the working tree.
     try {
       await autoCommitDirtyTree(
         cwd,
@@ -953,17 +765,12 @@ class Orchestrator {
       );
     } catch (err) {
       console.warn(
-        `[Orchestrator] Auto-commit after retro failed for ${issue.shortId} — ` +
+        `[ProjectRunner] Auto-commit after retro failed for ${issue.shortId} — ` +
           "uncommitted changes remain in working tree:",
         err,
       );
     }
 
-    // Update session endHead after retro.
-    // Explicit fallback: endHead is metadata for traceability (linking session
-    // to its final git state). If this update fails, the session record simply
-    // lacks endHead — disposition parsing, review spawning, and issue lifecycle
-    // are unaffected. The pipeline must proceed to review regardless.
     try {
       const endHead = await getCurrentHead(cwd);
       await convex.mutation(api.sessions.update, {
@@ -971,10 +778,9 @@ class Orchestrator {
         endHead,
       });
     } catch (err) {
-      console.error("[Orchestrator] Post-retro endHead update failed:", err);
+      console.error("[ProjectRunner] Post-retro endHead update failed:", err);
     }
 
-    // Parse retro disposition for logging (but don't act on it)
     const allLines = active.monitor.buffer.getAll();
     const retroResult = parseDisposition(allLines);
     if (retroResult.success) {
@@ -985,54 +791,37 @@ class Orchestrator {
       });
     }
 
-    // Always proceed to review, regardless of retro outcome
-    // Review creates a new session (different tmp path). Clean up the
-    // work/retro tmp file now — it would otherwise be orphaned.
     try {
       await active.monitor.cleanupTmpFile();
     } catch {
-      // Non-fatal: best-effort cleanup
+      // Non-fatal
     }
     await this.startReviewLoop();
     return true;
   }
 
-  /**
-   * Handle review session exit. Implements the review session inference table:
-   *
-   * | Disposition | Commits? | Action                                          |
-   * |-------------|----------|-------------------------------------------------|
-   * | malformed   | —        | incrementFailure                                |
-   * | fault       | —        | incrementFailure                                |
-   * | noop        | —        | incrementReviewIterations, close as completed    |
-   * | done        | No       | incrementReviewIterations, close as completed    |
-   * | done        | Yes      | incrementReviewIterations, loop or mark stuck    |
-   */
   private async handleReviewExit(exitCode: number): Promise<boolean> {
     const active = this.requireActiveSession("handleReviewExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
 
-    // Capture endHead — undefined if git fails (see handleWorkExit comment)
     let endHead: string | undefined;
     try {
       endHead = await getCurrentHead(cwd);
     } catch (err) {
       console.warn(
-        `[Orchestrator] Failed to capture endHead for ${issue.shortId} — session record will omit it:`,
+        `[ProjectRunner] Failed to capture endHead for ${issue.shortId} — session record will omit it:`,
         err,
       );
     }
 
-    // Parse review disposition
     const allLines = active.monitor.buffer.getAll();
     const dispositionResult = parseDisposition(allLines);
 
-    // Update review session record (also persists agentSessionId if the early persist failed)
     if (active.agentSessionIdPersistFailed && active.agentSessionId) {
       console.warn(
-        `[Orchestrator] Early agentSessionId persist had failed for review of ${issue.shortId} — ` +
+        `[ProjectRunner] Early agentSessionId persist had failed for review of ${issue.shortId} — ` +
           "recovering via handleReviewExit session update.",
       );
     }
@@ -1049,12 +838,9 @@ class Orchestrator {
       ...(endHead !== undefined && { endHead }),
     });
 
-    // ── Malformed or Fault: increment failure, leave issue in_progress ──
-    // reopenToOpen: false — review failures should NOT reopen to open,
-    // they leave the issue in_progress (unless circuit breaker trips → stuck)
     if (!dispositionResult.success) {
       console.error(
-        `[Orchestrator] ${StatusMessages.dispositionParseFailed(issue.shortId)}`,
+        `[ProjectRunner] ${StatusMessages.dispositionParseFailed(issue.shortId)}`,
       );
       await convex.mutation(api.issues.incrementFailure, {
         issueId,
@@ -1069,7 +855,7 @@ class Orchestrator {
 
     if (disposition === Disposition.Fault) {
       console.error(
-        `[Orchestrator] Review fault for ${issue.shortId}: ${note}`,
+        `[ProjectRunner] Review fault for ${issue.shortId}: ${note}`,
       );
       await convex.mutation(api.issues.incrementFailure, {
         issueId,
@@ -1080,13 +866,11 @@ class Orchestrator {
       return false;
     }
 
-    // ── Done or Noop: increment review iterations ──
     const newIterations = await convex.mutation(
       api.issues.incrementReviewIterations,
       { issueId },
     );
 
-    // ── Noop: clean pass — close as completed ──
     if (disposition === Disposition.Noop) {
       await convex.mutation(api.issues.close, {
         issueId,
@@ -1097,13 +881,12 @@ class Orchestrator {
       return true;
     }
 
-    // ── Done: check for new commits ──
     let hasCommits: boolean;
     try {
       hasCommits = await hasNewCommits(cwd, startHead);
     } catch (err) {
       console.error(
-        `[Orchestrator] Git error checking commits for ${issue.shortId}:`,
+        `[ProjectRunner] Git error checking commits for ${issue.shortId}:`,
         err,
       );
       await convex.mutation(api.issues.incrementFailure, {
@@ -1116,7 +899,6 @@ class Orchestrator {
     }
 
     if (!hasCommits) {
-      // Review done, no inline fixes — findings became follow-up issues
       await convex.mutation(api.issues.close, {
         issueId,
         closeType: CloseType.Completed,
@@ -1127,10 +909,6 @@ class Orchestrator {
       return true;
     }
 
-    // Review made commits — auto-commit dirty tree.
-    // Explicit fallback: review auto-commit is best-effort. If it fails, the
-    // session closes normally — uncommitted review changes persist in the tree
-    // for the next session or manual intervention.
     try {
       await autoCommitDirtyTree(
         cwd,
@@ -1141,19 +919,15 @@ class Orchestrator {
       );
     } catch (err) {
       console.warn(
-        `[Orchestrator] Auto-commit after review failed for ${issue.shortId} — ` +
+        `[ProjectRunner] Auto-commit after review failed for ${issue.shortId} — ` +
           "uncommitted changes remain in working tree:",
         err,
       );
     }
 
-    // Check iteration limit
     if (newIterations >= this.maxReviewIterations) {
-      // Reviewer said "done" — trust the disposition and close, even though
-      // inline fixes can't be verified with another pass. Marking stuck here
-      // penalises reviews that made trivial last-iteration fixes.
       console.log(
-        `[Orchestrator] Review iteration limit reached for ${issue.shortId} (${newIterations}/${this.maxReviewIterations}), but disposition is "done" — closing.`,
+        `[ProjectRunner] Review iteration limit reached for ${issue.shortId} (${newIterations}/${this.maxReviewIterations}), but disposition is "done" — closing.`,
       );
       await convex.mutation(api.issues.close, {
         issueId,
@@ -1166,13 +940,10 @@ class Orchestrator {
       return true;
     }
 
-    // Loop: start another review
-    // Review loop creates a new session (different tmp path). Clean up the
-    // current review's tmp file now — it would otherwise be orphaned.
     try {
       await active.monitor.cleanupTmpFile();
     } catch {
-      // Non-fatal: best-effort cleanup
+      // Non-fatal
     }
     await this.startReviewLoop();
     return true;
@@ -1180,10 +951,6 @@ class Orchestrator {
 
   // ── Retro & review lifecycle ─────────────────────────────────────────
 
-  /**
-   * Start the retro phase by resuming the agent session.
-   * Retro is advisory — the agent reflects and may create follow-up issues.
-   */
   private async startRetro(workNote: string): Promise<void> {
     const active = this.requireActiveSession("startRetro");
     const cwd = this.projectPath;
@@ -1196,20 +963,17 @@ class Orchestrator {
 
     if (!active.agentSessionId) {
       throw new Error(
-        `[Orchestrator] startRetro: agentSessionId is null for ${active.issue.shortId} — ` +
+        `[ProjectRunner] startRetro: agentSessionId is null for ${active.issue.shortId} — ` +
           "cannot resume agent session without a session ID.",
       );
     }
 
-    // Resume the same agent session for retro
     const retroProcess = this.provider.resume({
       cwd,
       prompt: retroPrompt,
       sessionId: active.agentSessionId,
     });
 
-    // Create a new monitor for the retro output, continuing sequence from work monitor
-    // Note: We reuse the same session record — retro is part of the work session
     const retroMonitor = new SessionMonitor(
       active.sessionId,
       active.monitor.currentSequence,
@@ -1217,48 +981,38 @@ class Orchestrator {
     retroMonitor.recordInput(retroPrompt);
     const retroMonitorDone = retroMonitor.consume(retroProcess.stdout);
 
-    // Update active session for retro phase
     active.process = retroProcess;
     active.monitor = retroMonitor;
     active.monitorDone = retroMonitorDone;
     active.phase = SessionPhase.Retro;
 
-    // Notify SSE clients about the new monitor
     this.emitLifecycle({ type: "monitor_changed", monitor: retroMonitor });
 
-    // Persist phase transition so re-adoption can route correctly
     await getConvexClient().mutation(api.sessions.update, {
       sessionId: active.sessionId,
       phase: SessionPhase.Retro,
     });
 
-    // Fire-and-forget: handle retro exit
     retroProcess.wait().then(
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
     );
 
-    // Restart timeout and PID watchdog for the new phase
     this.startSessionTimeout();
     this.startPidWatchdog();
   }
 
-  /**
-   * Start a review loop iteration. Spawns a fresh stateless review session
-   * with diff and related issues context.
-   */
   private async startReviewLoop(): Promise<void> {
     const active = this.requireActiveSession("startReviewLoop");
     const { issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
 
-    // Check iteration limit before starting
     const currentIssue = await convex.query(api.issues.get, { issueId });
     const currentIterations = currentIssue?.reviewIterations ?? 0;
     if (currentIterations >= this.maxReviewIterations) {
       console.warn(
-        `[Orchestrator] Review iteration limit reached for ${issue.shortId}`,
+        `[ProjectRunner] Review iteration limit reached for ${issue.shortId}`,
       );
       await convex.mutation(api.issues.update, {
         issueId,
@@ -1268,13 +1022,11 @@ class Orchestrator {
       return;
     }
 
-    // Build review context
     let diff: string;
     let commitLog: string;
     try {
       diff = await getDiff(cwd, startHead);
       if (!diff) {
-        // No diff means no changes to review — close as completed
         await convex.mutation(api.issues.close, {
           issueId,
           closeType: CloseType.Completed,
@@ -1286,7 +1038,7 @@ class Orchestrator {
       commitLog = await getCommitLog(cwd, startHead);
     } catch (err) {
       console.error(
-        `[Orchestrator] Git error building review context for ${issue.shortId}:`,
+        `[ProjectRunner] Git error building review context for ${issue.shortId}:`,
         err,
       );
       await convex.mutation(api.issues.update, {
@@ -1297,8 +1049,6 @@ class Orchestrator {
       return;
     }
 
-    // Build related issues summary (issues created during retro/reviews)
-    // TODO: Add issues.listBySource query when sourceIssueId filtering is available
     const relatedIssues: Array<{
       shortId: string;
       title: string;
@@ -1316,10 +1066,8 @@ class Orchestrator {
       maxReviewIterations: this.maxReviewIterations,
     });
 
-    // Spawn a fresh (stateless) review session
     const reviewProcess = this.provider.spawn({ cwd, prompt: reviewPrompt });
 
-    // Create a new session record for the review
     const reviewSession = await convex.mutation(api.sessions.create, {
       projectId: this.projectId,
       issueId,
@@ -1332,72 +1080,57 @@ class Orchestrator {
     if (!reviewSession) {
       reviewProcess.kill();
       console.error(
-        `[Orchestrator] Failed to create review session for ${issue.shortId}`,
+        `[ProjectRunner] Failed to create review session for ${issue.shortId}`,
       );
       this.finalize();
       return;
     }
 
-    // Monitor review output
     const reviewMonitor = new SessionMonitor(reviewSession._id);
     reviewMonitor.recordInput(reviewPrompt);
     const reviewMonitorDone = reviewMonitor.consume(reviewProcess.stdout);
 
-    // Update active session to track the review
     active.sessionId = reviewSession._id;
     active.process = reviewProcess;
     active.monitor = reviewMonitor;
     active.monitorDone = reviewMonitorDone;
     active.phase = SessionPhase.Review;
 
-    // Wire up agentSessionId extraction (resets stale values from previous phase)
     this.wireAgentSessionIdExtraction(active, reviewMonitor);
-
-    // Notify SSE clients about the new monitor
     this.emitLifecycle({ type: "monitor_changed", monitor: reviewMonitor });
 
-    // No phase persistence needed here — sessions.create above already
-    // set phase: SessionPhase.Review on the new record.
-
-    // Fire-and-forget: handle review exit
     reviewProcess.wait().then(
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
     );
 
-    // Restart timeout and PID watchdog for the new phase
     this.startSessionTimeout();
     this.startPidWatchdog();
   }
 
   // ── Scheduling ───────────────────────────────────────────────────────
 
-  /**
-   * Try to pick up the next ready issue. No-op if not idle or queue is empty.
-   * Iterates through ready issues until one claim succeeds (others may be race-lost).
-   */
   private scheduleNext(): void {
     if (this.state !== OrchestratorState.Idle) return;
+    if (this.destroyed) return;
     if (this.readyIssues.length === 0) return;
 
-    // Try each ready issue until one claim succeeds (others may race)
     const issues = [...this.readyIssues];
     const tryNext = async () => {
       for (const issue of issues) {
         try {
           await this.run(issue._id);
-          return; // Successfully started
+          return;
         } catch (err) {
           const isClaim =
             err instanceof Error && err.message.startsWith("Failed to claim");
           if (!isClaim) {
             console.error(
-              `[Orchestrator] Unexpected error running issue ${issue._id}:`,
+              `[ProjectRunner] Unexpected error running issue ${issue._id}:`,
               err,
             );
-            return; // Stop trying — something is broken
+            return;
           }
-          // Claim race lost — try the next issue
         }
       }
     };
@@ -1405,36 +1138,20 @@ class Orchestrator {
   }
 
   /**
-   * Finalize the current issue lifecycle. Clears active session and transitions
-   * state based on pendingStop and subscription status.
+   * Finalize the current issue lifecycle. Clears active session and
+   * transitions to Idle, then schedules next work.
    */
   private finalize(): void {
-    // Clear PID watchdog before nulling the session
     this.clearPidWatchdog();
-
     this.activeSession = null;
+    this.state = OrchestratorState.Idle;
 
-    if (this.pendingStop || !this.unsubscribeReady) {
-      this.state = OrchestratorState.Stopped;
-      this.pendingStop = false;
-    } else {
-      this.state = OrchestratorState.Idle;
-    }
-
-    // Capture state before scheduleNext() — run() synchronously transitions to
-    // Busy before its first await, so this.state would be "busy" by the time
-    // emitLifecycle fires if we called scheduleNext() first.
-    const endState = this.state as Exclude<OrchestratorState, "busy">;
-
-    // Notify SSE clients the session ended (after state transition so they see the new state)
     this.emitLifecycle({
       type: "session_end",
-      state: endState,
+      state: OrchestratorState.Idle,
     });
 
-    // Schedule next work after notifying SSE clients — run() sets state to Busy
-    // synchronously, which would corrupt the session_end event state.
-    if (this.state === OrchestratorState.Idle) {
+    if (!this.destroyed) {
       this.scheduleNext();
     }
   }
@@ -1442,15 +1159,6 @@ class Orchestrator {
   /**
    * Recover orphaned sessions — running sessions whose PID is no longer alive,
    * or re-adopt live sessions that were orphaned by a hot reload.
-   *
-   * Dead PIDs: mark session failed, reopen issue.
-   * Live PIDs (no activeSession): re-adopt the first one found so the
-   * orchestrator regains lifecycle control (exit handling, retro, review).
-   *
-   * FLUX-269: Also detects in_progress issues with no Running session.
-   * This handles the case where a session's exit handler updated the session
-   * record but failed to reset the issue status — leaving the issue stuck
-   * as in_progress with no session working on it.
    */
   private async recoverOrphanedSessions(): Promise<OrphanRecoveryStats> {
     const convex = getConvexClient();
@@ -1465,9 +1173,6 @@ class Orchestrator {
       orphanedIssues: 0,
     };
 
-    // Pre-pass: identify which issues have live Running sessions.
-    // Must be computed before the recovery loop because the loop may `break`
-    // early after adopting a session, which would leave the set incomplete.
     const issuesWithLiveSessions = new Set<string>();
     for (const session of sessions) {
       const pid = session.pid;
@@ -1488,10 +1193,6 @@ class Orchestrator {
           endedAt: Date.now(),
           exitCode: -1,
         });
-        // FLUX-25: Only reopen if the issue isn't already closed.
-        // A session can be orphaned after it completed work but before its
-        // status was updated to "completed" — reopening a closed issue
-        // would undo finished work.
         const issue = await convex.query(api.issues.get, {
           issueId: session.issueId,
         });
@@ -1505,12 +1206,10 @@ class Orchestrator {
         continue;
       }
 
-      // Live PID with no in-memory handle — re-adopt it.
-      // Only re-adopt one; others will be picked up on the next cycle.
       if (this.activeSession === null) {
         if (!pid) {
           console.error(
-            `[Orchestrator] Cannot re-adopt session ${session._id}: PID is null despite being alive`,
+            `[ProjectRunner] Cannot re-adopt session ${session._id}: PID is null despite being alive`,
           );
           continue;
         }
@@ -1522,9 +1221,6 @@ class Orchestrator {
       }
     }
 
-    // FLUX-269: Detect in_progress issues with no active session.
-    // This catches the case where the session was cleaned up but the issue
-    // status was never reset (e.g., transient error in exit handler).
     stats.orphanedIssues = await this.recoverOrphanedIssues(
       convex,
       issuesWithLiveSessions,
@@ -1533,13 +1229,6 @@ class Orchestrator {
     return stats;
   }
 
-  /**
-   * FLUX-269: Reopen in_progress issues that have no Running session.
-   *
-   * When a session's exit handler fails to reset the issue status, the issue
-   * gets stuck as in_progress — invisible to the scheduler (which only queries
-   * open issues). This recovers those orphans by resetting them to open.
-   */
   private async recoverOrphanedIssues(
     convex: ReturnType<typeof getConvexClient>,
     issuesWithLiveSessions: Set<string>,
@@ -1554,7 +1243,7 @@ class Orchestrator {
       if (issuesWithLiveSessions.has(issue._id)) continue;
 
       console.warn(
-        `[Orchestrator] FLUX-269: Orphaned issue ${issue.shortId} is in_progress with no active session — reopening`,
+        `[ProjectRunner] Orphaned issue ${issue.shortId} is in_progress with no active session — reopening`,
       );
       await convex.mutation(api.issues.update, {
         issueId: issue._id,
@@ -1567,11 +1256,6 @@ class Orchestrator {
     return count;
   }
 
-  /**
-   * Re-adopt a live orphaned session after a hot reload.
-   * Creates a lightweight ActiveSession (no stdout stream) and polls PID
-   * liveness until the process exits, then runs the normal exit handler path.
-   */
   private async adoptOrphanedSession(
     session: {
       _id: Id<"sessions">;
@@ -1586,19 +1270,16 @@ class Orchestrator {
   ): Promise<boolean> {
     const convex = getConvexClient();
 
-    // Fetch the issue for WorkPromptContext
     const issue = await convex.query(api.issues.get, {
       issueId: session.issueId,
     });
     if (!issue) {
       console.error(
-        `[Orchestrator] Cannot re-adopt session ${session._id}: issue ${session.issueId} not found`,
+        `[ProjectRunner] Cannot re-adopt session ${session._id}: issue ${session.issueId} not found`,
       );
       return false;
     }
 
-    // Determine phase from the persisted record. Falls back to type-based
-    // inference for sessions created before the phase field existed.
     let phase: SessionPhaseValue;
     if (
       session.phase === SessionPhase.Work ||
@@ -1607,7 +1288,6 @@ class Orchestrator {
     ) {
       phase = session.phase;
     } else {
-      // Legacy fallback: infer from session type
       phase =
         session.type === SessionType.Review
           ? SessionPhase.Review
@@ -1615,22 +1295,13 @@ class Orchestrator {
     }
 
     console.log(
-      `[Orchestrator] Re-adopting orphaned session ${session._id} (PID ${pid}, phase: ${phase}) for ${issue.shortId}`,
+      `[ProjectRunner] Re-adopting orphaned session ${session._id} (PID ${pid}, phase: ${phase}) for ${issue.shortId}`,
     );
 
-    // Lock orchestrator as busy
     this.state = OrchestratorState.Busy;
 
-    // Create a lightweight ActiveSession — no real process handle or monitor,
-    // just enough metadata for the exit handlers to function.
-    const tmpPath = `/tmp/flux-session-${session._id}.log`;
-
-    // Create a no-op monitor stub for the exit handler. The real monitor
-    // was lost in the hot reload, but the tmp log file has the output.
     const stubMonitor = new SessionMonitor(session._id);
 
-    // Build a no-op AgentProcess that only provides pid and a wait()
-    // that resolves when we detect the PID has died.
     const { promise: exitPromise, resolve: resolveExit } =
       Promise.withResolvers<{ exitCode: number }>();
 
@@ -1639,7 +1310,7 @@ class Orchestrator {
       stdout: new ReadableStream<Uint8Array>(),
       kill: () => {
         try {
-          process.kill(pid); // SIGTERM (default)
+          process.kill(pid);
         } catch {
           // Already dead
         }
@@ -1652,7 +1323,7 @@ class Orchestrator {
       issueId: session.issueId,
       process: stubProcess,
       monitor: stubMonitor,
-      monitorDone: Promise.resolve(), // No stream to drain
+      monitorDone: Promise.resolve(),
       killed: false,
       timedOut: false,
       startHead: session.startHead ?? "",
@@ -1667,9 +1338,6 @@ class Orchestrator {
       timeoutTimer: null,
     };
 
-    // Notify SSE clients of the re-adopted session so the UI reflects it
-    // immediately. The stub monitor has no stdout to pipe, but clients need
-    // the session_start event to know a session is active.
     this.emitLifecycle({
       type: "session_start",
       sessionId: session._id,
@@ -1678,28 +1346,23 @@ class Orchestrator {
       monitor: stubMonitor,
     });
 
-    // Poll PID liveness and trigger exit handler when it dies
-    this.pollPidAndHandleExit(pid, tmpPath, stubMonitor, resolveExit);
+    this.pollPidAndHandleExit(
+      pid,
+      `/tmp/flux-session-${session._id}.log`,
+      stubMonitor,
+      resolveExit,
+    );
 
-    // Fire-and-forget: handle exit when the PID dies (mirrors executeRun pattern)
     stubProcess.wait().then(
       ({ exitCode }) => this.handleExit(exitCode),
       () => this.handleExit(1),
     );
 
-    // Start timeout enforcement for re-adopted sessions.
-    // Uses remaining time based on session.startedAt, not the full timeout,
-    // since the process has already been running.
     this.startSessionTimeout(session.startedAt);
 
     return true;
   }
 
-  /**
-   * Poll a PID's liveness at 2s intervals. When the PID dies:
-   * 1. Load output from the tmp log file into the monitor buffer
-   * 2. Resolve the exit promise (which triggers handleExit via the wait() chain)
-   */
   private pollPidAndHandleExit(
     pid: number,
     tmpPath: string,
@@ -1707,11 +1370,10 @@ class Orchestrator {
     resolveExit: (value: { exitCode: number }) => void,
   ): void {
     const interval = setInterval(async () => {
-      if (isProcessAlive(pid)) return; // Still running, keep polling
+      if (isProcessAlive(pid)) return;
 
       clearInterval(interval);
 
-      // PID died — load tmp log into the monitor buffer for disposition parsing
       try {
         const logFile = Bun.file(tmpPath);
         if (await logFile.exists()) {
@@ -1734,99 +1396,21 @@ class Orchestrator {
           }
         } else {
           console.warn(
-            `[Orchestrator] No tmp log file at ${tmpPath} for re-adopted session`,
+            `[ProjectRunner] No tmp log file at ${tmpPath} for re-adopted session`,
           );
         }
       } catch (err) {
-        // Explicit fallback: proceeding with an empty/partial buffer is
-        // acceptable here. Disposition parsing will produce a 'malformed'
-        // result, which triggers incrementFailure — the correct degradation
-        // path for a re-adopted session whose tmp log output was lost.
         console.error(
-          `[Orchestrator] Failed to read tmp log for re-adopted session:`,
+          `[ProjectRunner] Failed to read tmp log for re-adopted session:`,
           err,
         );
       }
 
-      // Resolve with exit code -1 (unknown — process was not our child)
       resolveExit({ exitCode: -1 });
     }, 2_000);
   }
 }
 
-// Survive hot reloads: globalThis persists across Bun HMR re-evaluations,
-// preventing ghost orchestrator instances with dangling Convex subscriptions.
-const _global = globalThis as unknown as {
-  __fluxOrchestrators?: Map<string, Orchestrator>;
-};
-
-function getOrchestratorMap(): Map<string, Orchestrator> {
-  if (!_global.__fluxOrchestrators) {
-    _global.__fluxOrchestrators = new Map();
-  }
-  return _global.__fluxOrchestrators;
-}
-
-export function getOrchestrator(
-  projectId: Id<"projects">,
-  projectPath?: string,
-): Orchestrator {
-  const map = getOrchestratorMap();
-  const existing = map.get(projectId);
-  if (existing) {
-    // Detect stale projectPath: if the caller passes an updated path that
-    // differs from the cached instance, push the change through.  This
-    // covers the PATCH /api/projects/:id flow where the database path is
-    // updated but the in-memory orchestrator still holds the old value.
-    if (projectPath && projectPath !== existing.getProjectPath()) {
-      const { state } = existing.getStatus();
-      if (state === OrchestratorState.Stopped) {
-        existing.updateProjectPath(projectPath);
-      } else {
-        console.warn(
-          `[Orchestrator] projectPath for ${projectId} changed ` +
-            `("${existing.getProjectPath()}" → "${projectPath}") ` +
-            `but orchestrator is "${state}" — skipping update. ` +
-            "Path will sync on next stop/start cycle.",
-        );
-      }
-    }
-    return existing;
-  }
-
-  if (!projectPath) {
-    throw new Error(
-      `[Orchestrator] Cannot create orchestrator for project ${projectId}: ` +
-        "projectPath is required on first access. This is a bug — the caller " +
-        "should pass the project's filesystem path.",
-    );
-  }
-
-  const instance = new Orchestrator(projectId, projectPath);
-  map.set(projectId, instance);
-  return instance;
-}
-
-/** Remove an orchestrator instance for a project (e.g. when stopping a project).
- *  Throws if the orchestrator is not stopped — caller must call stop() first. */
-export function removeOrchestrator(projectId: Id<"projects">): boolean {
-  const map = getOrchestratorMap();
-  const instance = map.get(projectId);
-  if (!instance) return false;
-
-  const { state } = instance.getStatus();
-  if (state !== OrchestratorState.Stopped) {
-    throw new Error(
-      `Cannot remove orchestrator for project ${projectId}: state is "${state}", expected "stopped". Call stop() first.`,
-    );
-  }
-  return map.delete(projectId);
-}
-
-/** Return a read-only view of orchestrator instances, keyed by projectId. */
-export function getAllOrchestrators(): ReadonlyMap<string, Orchestrator> {
-  return getOrchestratorMap();
-}
-
-export { Orchestrator };
+export { ProjectRunner };
+export type { OrchestratorLifecycleEvent as ProjectRunnerLifecycleEvent };
 export { OrchestratorState } from "@/shared/orchestrator";

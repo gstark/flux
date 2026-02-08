@@ -47,7 +47,7 @@ export function useOrchestratorStatus(projectId: string) {
     // Session started → refetch for full status (includes activeSession, phase)
     unsubs.push(subscribe("session_start", () => fetchStatus()));
 
-    // State change (session_end, enable, stop) → refetch for full status
+    // State change (session_end, kill) → refetch for full status
     unsubs.push(subscribe("status", () => fetchStatus()));
 
     return () => {

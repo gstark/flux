@@ -1,15 +1,13 @@
 import type { SessionPhaseValue } from "$convex/schema";
 
 /**
- * Orchestrator states — runtime state of the Flux daemon.
+ * Orchestrator states — runtime state of a ProjectRunner.
  * Shared between server (orchestrator) and client (UI components).
  *
- * STOPPED: scheduler disabled, no auto-scheduling.
- * IDLE: scheduler enabled, waiting for work.
+ * IDLE: waiting for work.
  * BUSY: active session in progress.
  */
 export const OrchestratorState = {
-  Stopped: "stopped",
   Idle: "idle",
   Busy: "busy",
 } as const;
@@ -28,7 +26,6 @@ export interface OrchestratorActiveSession {
 export interface OrchestratorStatusData {
   status: {
     state: OrchestratorState;
-    schedulerEnabled: boolean;
     readyCount: number;
     activeSession: OrchestratorActiveSession | null;
   };

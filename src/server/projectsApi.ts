@@ -1,7 +1,6 @@
 import type { ConvexClient } from "convex/browser";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import { ProjectState, type ProjectStateValue } from "$convex/schema";
 import { inferProjectSlug, validateProjectPath } from "./git";
 import { sanitizeConvexError } from "./sanitizeError";
 
@@ -71,7 +70,7 @@ async function handleList(convex: ConvexClient): Promise<Response> {
           slug: project.slug,
           name: project.name,
           path: project.path ?? null,
-          state: project.state ?? null,
+          enabled: project.enabled ?? false,
           issueCounts: counts,
         };
       }),
@@ -104,7 +103,7 @@ async function handleGet(convex: ConvexClient, id: string): Promise<Response> {
       slug: project.slug,
       name: project.name,
       path: project.path ?? null,
-      state: project.state ?? null,
+      enabled: project.enabled ?? false,
       issueCounts: counts,
     });
   } catch (err) {
@@ -162,7 +161,7 @@ async function handleCreate(
         slug: project.slug,
         name: project.name,
         path: project.path ?? null,
-        state: project.state ?? null,
+        enabled: project.enabled ?? false,
       },
       { status: 201 },
     );
@@ -202,7 +201,7 @@ async function handleUpdate(
     name?: string;
     slug?: string;
     path?: string;
-    state?: ProjectStateValue;
+    enabled?: boolean;
   } = { projectId: id as Id<"projects"> };
 
   if (typeof body.name === "string") updates.name = body.name;
@@ -214,21 +213,16 @@ async function handleUpdate(
     }
     updates.path = body.path;
   }
-  if (typeof body.state === "string") {
-    const validStates = Object.values(ProjectState);
-    if (!validStates.includes(body.state as (typeof validStates)[number])) {
-      return Response.json(
-        { error: `Invalid state. Expected one of: ${validStates.join(", ")}` },
-        { status: 400 },
-      );
-    }
-    updates.state = body.state as (typeof validStates)[number];
+  if (typeof body.enabled === "boolean") {
+    updates.enabled = body.enabled;
   }
 
   // Check that at least one field is being updated (beyond projectId)
   if (Object.keys(updates).length <= 1) {
     return Response.json(
-      { error: "No valid fields to update. Accepted: name, slug, path, state" },
+      {
+        error: "No valid fields to update. Accepted: name, slug, path, enabled",
+      },
       { status: 400 },
     );
   }
@@ -249,7 +243,7 @@ async function handleUpdate(
       slug: project.slug,
       name: project.name,
       path: project.path ?? null,
-      state: project.state ?? null,
+      enabled: project.enabled ?? false,
     });
   } catch (err) {
     const message = sanitizeConvexError(

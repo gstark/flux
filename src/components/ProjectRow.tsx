@@ -2,19 +2,12 @@ import { useMutation } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Doc } from "$convex/_generated/dataModel";
-import { ProjectState, type ProjectStateValue } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faPen, faTrash } from "./Icon";
 import { ProjectStateBadge } from "./ProjectStateBadge";
 
 type Project = Doc<"projects">;
-
-const STATE_OPTIONS: { value: ProjectStateValue; label: string }[] = [
-  { value: ProjectState.Running, label: "Running" },
-  { value: ProjectState.Paused, label: "Paused" },
-  { value: ProjectState.Stopped, label: "Stopped" },
-];
 
 export function ProjectRow({ project }: { project: Project }) {
   const updateProject = useMutation(api.projects.update);
@@ -124,12 +117,12 @@ export function ProjectRow({ project }: { project: Project }) {
     }
   }
 
-  async function handleStateChange(newState: ProjectStateValue) {
+  async function handleEnabledToggle() {
     clearError();
     try {
       await updateProject({
         projectId: project._id,
-        state: newState,
+        enabled: !(project.enabled ?? false),
       });
     } catch (err) {
       showError(err);
@@ -144,8 +137,6 @@ export function ProjectRow({ project }: { project: Project }) {
       setConfirmDelete(false);
     }
   }
-
-  const currentState = project.state ?? ProjectState.Stopped;
 
   if (editing) {
     return (
@@ -182,7 +173,7 @@ export function ProjectRow({ project }: { project: Project }) {
           />
         </td>
         <td>
-          <ProjectStateBadge state={project.state} />
+          <ProjectStateBadge enabled={project.enabled} />
         </td>
         <td className="text-right">
           <div className="flex items-center justify-end gap-1">
@@ -228,20 +219,13 @@ export function ProjectRow({ project }: { project: Project }) {
         </code>
       </td>
       <td>
-        <select
-          className="select select-ghost select-xs"
-          aria-label="Project state"
-          value={currentState}
-          onChange={(e) =>
-            handleStateChange(e.target.value as ProjectStateValue)
-          }
-        >
-          {STATE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <input
+          type="checkbox"
+          className="toggle toggle-success toggle-sm"
+          checked={project.enabled ?? false}
+          onChange={handleEnabledToggle}
+          aria-label="Toggle project enabled"
+        />
       </td>
       <td className="text-right">
         <div className="flex items-center justify-end gap-1">

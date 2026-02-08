@@ -114,18 +114,6 @@ export const closeTypeValidator = v.union(
   v.literal(CloseType.Wontfix),
 );
 
-export const ProjectState = {
-  Running: "running",
-  Paused: "paused",
-  Stopped: "stopped",
-} as const;
-
-export const projectStateValidator = v.union(
-  v.literal(ProjectState.Running),
-  v.literal(ProjectState.Paused),
-  v.literal(ProjectState.Stopped),
-);
-
 export const Disposition = {
   Done: "done",
   Noop: "noop",
@@ -153,8 +141,6 @@ export type EpicStatusValue = (typeof EpicStatus)[keyof typeof EpicStatus];
 export type CommentAuthorValue =
   (typeof CommentAuthor)[keyof typeof CommentAuthor];
 export type DispositionValue = (typeof Disposition)[keyof typeof Disposition];
-export type ProjectStateValue =
-  (typeof ProjectState)[keyof typeof ProjectState];
 
 export default defineSchema({
   projects: defineTable({
@@ -162,7 +148,10 @@ export default defineSchema({
     name: v.string(),
     issueCounter: v.number(),
     path: v.optional(v.string()),
-    state: v.optional(projectStateValidator),
+    enabled: v.optional(v.boolean()),
+    // TEMP: legacy field kept for migration compat — remove after running
+    // migrations:stripLegacyFields then redeploy.
+    state: v.optional(v.string()),
   }).index("by_slug", ["slug"]),
 
   issues: defineTable({
@@ -270,12 +259,14 @@ export default defineSchema({
 
   orchestratorConfig: defineTable({
     projectId: v.id("projects"),
-    enabled: v.boolean(),
     agent: v.string(),
     focusEpicId: v.optional(v.id("epics")),
     sessionTimeoutMs: v.number(),
     maxFailures: v.number(),
     maxReviewIterations: v.number(),
+    // TEMP: legacy field kept for migration compat — remove after running
+    // migrations:stripLegacyFields then redeploy.
+    enabled: v.optional(v.boolean()),
   }).index("by_project", ["projectId"]),
 
   dependencies: defineTable({

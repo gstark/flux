@@ -2,12 +2,8 @@ import type { ConvexClient } from "convex/browser";
 import type { z } from "zod";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import {
-  ProjectState,
-  SessionEventDirection,
-  SessionStatus,
-} from "$convex/schema";
-import type { Orchestrator } from "../orchestrator";
+import { SessionEventDirection, SessionStatus } from "$convex/schema";
+import type { ProjectRunner } from "../orchestrator";
 import {
   CommentsCreateSchema,
   CommentsListSchema,
@@ -43,7 +39,7 @@ export type ToolContext = {
   convex: ConvexClient;
   projectId: Id<"projects">;
   projectSlug: string;
-  getOrchestrator: () => Orchestrator;
+  getRunner: () => ProjectRunner;
 };
 
 export type ToolResult = {
@@ -96,14 +92,13 @@ function safeHandler(
 }
 
 function buildMeta(ctx: ToolContext) {
-  const orchestrator = ctx.getOrchestrator();
-  const status = orchestrator.getStatus();
+  const runner = ctx.getRunner();
+  const status = runner.getStatus();
   return {
     project: ctx.projectSlug,
     timestamp: Date.now(),
     orchestrator_status: status.state,
     active_session: status.activeSession?.sessionId ?? null,
-    scheduler_enabled: status.schedulerEnabled,
   };
 }
 
@@ -213,7 +208,7 @@ const issues_ready = typedHandler(IssuesReadySchema, async ({ limit }, ctx) => {
 const orchestrator_run = typedHandler(
   OrchestratorRunSchema,
   async ({ issueId }, ctx) => {
-    const orchestrator = ctx.getOrchestrator();
+    const orchestrator = ctx.getRunner();
     const result = await orchestrator.run(issueId as Id<"issues">);
     return ok(ctx, {
       session: { sessionId: result.sessionId, pid: result.pid },
@@ -222,39 +217,15 @@ const orchestrator_run = typedHandler(
 );
 
 const orchestrator_kill: ToolHandler = safeHandler(async (_args, ctx) => {
-  const orchestrator = ctx.getOrchestrator();
+  const orchestrator = ctx.getRunner();
   await orchestrator.kill();
   return ok(ctx, { message: "Session killed." });
 });
 
 const orchestrator_status: ToolHandler = safeHandler(async (_args, ctx) => {
-  const orchestrator = ctx.getOrchestrator();
+  const orchestrator = ctx.getRunner();
   const status = orchestrator.getStatus();
   return ok(ctx, { status });
-});
-
-const orchestrator_enable: ToolHandler = safeHandler(async (_args, ctx) => {
-  // Route through Convex project state — the project state watcher
-  // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
-  await ctx.convex.mutation(api.projects.update, {
-    projectId: ctx.projectId,
-    state: ProjectState.Running,
-  });
-  // State change is async (watcher hasn't fired yet) — return the requested
-  // state rather than a stale getStatus() snapshot.
-  return ok(ctx, { state: ProjectState.Running });
-});
-
-const orchestrator_stop: ToolHandler = safeHandler(async (_args, ctx) => {
-  // Route through Convex project state — the project state watcher
-  // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
-  // Uses Paused (graceful: finish current session, then idle) not Stopped
-  // (aggressive: kill active session + remove orchestrator instance).
-  await ctx.convex.mutation(api.projects.update, {
-    projectId: ctx.projectId,
-    state: ProjectState.Paused,
-  });
-  return ok(ctx, { state: ProjectState.Paused });
 });
 
 const sessions_list = typedHandler(
@@ -290,7 +261,7 @@ const sessions_show = typedHandler(
     }> = [];
 
     // For the active running session, read from in-memory buffer
-    const orchestrator = ctx.getOrchestrator();
+    const orchestrator = ctx.getRunner();
     const status = orchestrator.getStatus();
     if (
       session.status === SessionStatus.Running &&
@@ -628,8 +599,6 @@ export const handlers: Record<string, ToolHandler> = {
   orchestrator_run,
   orchestrator_kill,
   orchestrator_status,
-  orchestrator_enable,
-  orchestrator_stop,
   sessions_list,
   sessions_show,
 };

@@ -1,15 +1,9 @@
-import type { ConvexClient } from "convex/browser";
-import { api } from "$convex/_generated/api";
-import type { Id } from "$convex/_generated/dataModel";
-import { ProjectState } from "$convex/schema";
-import type { Orchestrator } from "./orchestrator";
+import type { ProjectRunner } from "./orchestrator";
 import { sanitizeConvexError } from "./sanitizeError";
 
-type OrchestratorAction = "enable" | "stop" | "kill" | "status";
+type OrchestratorAction = "kill" | "status";
 
 const VALID_ACTIONS: ReadonlySet<string> = new Set<OrchestratorAction>([
-  "enable",
-  "stop",
   "kill",
   "status",
 ]);
@@ -21,24 +15,13 @@ function isValidAction(value: string): value is OrchestratorAction {
 /**
  * Dedicated API handler for orchestrator actions.
  *
- * Accepts POST requests with JSON body `{ action: "enable" | "stop" | "kill" | "status" }`.
+ * Accepts POST requests with JSON body `{ action: "kill" | "status" }`.
  * This bypasses the generic MCP tool dispatch layer (`/api/projects/:id/tools`), giving the UI
  * a direct, purpose-built endpoint for orchestrator control.
  *
- * `enable` and `stop` are routed through Convex project state updates so the
- * project state watcher handles the actual orchestrator lifecycle. This prevents
- * desync between Convex project state and runtime orchestrator state (FLUX-307).
- *
- * `kill` and `status` remain direct orchestrator actions — they don't affect
- * lifecycle state that the watcher manages.
- *
- * The MCP tool handlers remain available for agent consumption via `/mcp/projects/:projectId`.
+ * `kill` and `status` are direct runner actions — they don't affect lifecycle state.
  */
-export function createOrchestratorApiHandler(
-  getOrchestrator: () => Orchestrator,
-  convex: ConvexClient,
-  projectId: Id<"projects">,
-) {
+export function createOrchestratorApiHandler(getRunner: () => ProjectRunner) {
   return async function handleOrchestratorApi(req: Request): Promise<Response> {
     if (req.method !== "POST") {
       return Response.json(
@@ -61,36 +44,14 @@ export function createOrchestratorApiHandler(
 
     try {
       switch (action) {
-        case "enable":
-          // Route through Convex project state — the project state watcher
-          // will observe the transition and call orchestrator.enable().
-          await convex.mutation(api.projects.update, {
-            projectId,
-            state: ProjectState.Running,
-          });
-          // State change is async (watcher hasn't fired yet), so return
-          // the requested state — not a stale getStatus() snapshot.
-          return Response.json({ state: ProjectState.Running });
-
-        case "stop":
-          // Route through Convex project state — the project state watcher
-          // will observe the transition and call orchestrator.stop() (graceful).
-          // Uses Paused, not Stopped: Paused = finish current session then idle,
-          // Stopped = kill active session + remove orchestrator instance.
-          await convex.mutation(api.projects.update, {
-            projectId,
-            state: ProjectState.Paused,
-          });
-          return Response.json({ state: ProjectState.Paused });
-
         case "kill": {
-          const orchestrator = getOrchestrator();
-          await orchestrator.kill();
+          const runner = getRunner();
+          await runner.kill();
           return Response.json({ message: "Session killed." });
         }
 
         case "status":
-          return Response.json({ status: getOrchestrator().getStatus() });
+          return Response.json({ status: getRunner().getStatus() });
 
         default: {
           const _exhaustive: never = action;

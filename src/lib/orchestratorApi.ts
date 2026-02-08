@@ -8,9 +8,8 @@ type OrchestratorAction = "kill" | "status";
  * Routes to `/api/projects/:projectId/orchestrator` — a purpose-built route
  * that skips the generic MCP tool dispatch layer used by agents.
  *
- * Note: `enable` and `stop` are handled via Convex project state mutations
- * (see OrchestratorStatus component), not this endpoint. Only `kill` and
- * `status` remain as direct orchestrator actions (FLUX-307).
+ * Only `kill` and `status` are exposed — the orchestrator is always on
+ * and auto-schedules based on project.enabled.
  */
 async function callOrchestratorApi<T = unknown>(
   projectId: string,

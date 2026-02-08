@@ -238,7 +238,6 @@ Agent Output → Monitor
 | Field | Type | Notes |
 |-------|------|-------|
 | projectId | id("projects") | One per project |
-| enabled | boolean | |
 | agent | string | Default "claude". Agent provider to use. |
 | focusEpicId | id("epics")? | If set, only work issues from this epic (critical/high standalone still interrupt). |
 | sessionTimeoutMs | number | Default 1800000 (30 min). Kill session if exceeded. |
@@ -521,9 +520,7 @@ Note: Session lifecycle (start/stop) is internal to the orchestrator, not expose
 ### Orchestrator Tools
 | Tool | Description |
 |------|-------------|
-| `orchestrator_status` | Current orchestrator state |
-| `orchestrator_enable` | Start the scheduler — begins picking up ready issues |
-| `orchestrator_stop` | Stop queuing new work, let current session finish gracefully |
+| `orchestrator_status` | Current orchestrator state (idle/busy, active session, ready count) |
 | `orchestrator_kill` | Kill the running agent immediately, leave uncommitted work for human to handle |
 
 ### Response Metadata
@@ -541,9 +538,8 @@ Every tool response includes `_meta`:
 {
   "project": "arcloop",
   "timestamp": 1234567890,
-  "orchestrator_status": "running",
-  "active_session": "session-id-or-null",
-  "scheduler_enabled": true
+  "orchestrator_status": "idle",
+  "active_session": "session-id-or-null"
 }
 ```
 
@@ -611,99 +607,40 @@ Essential keyboard shortcuts for power users. Establishes the pattern; more shor
 
 ## Orchestrator Control
 
-Three control actions manage the scheduler lifecycle:
+The orchestrator is **always on**. A single `Orchestrator` instance watches all projects via `api.projects.list` and auto-manages a `ProjectRunner` per enabled project. No manual enable/stop ceremony — if a project is enabled and has ready issues, they get picked up.
+
+**Architecture:**
+- `Orchestrator` (singleton) — watches projects, creates/destroys runners
+- `ProjectRunner` (per project) — subscribes to `issues.ready`, manages session lifecycle
+- Project `enabled` boolean controls whether a runner exists for that project
+
+**Control actions:**
 
 | Action | Effect |
 |--------|--------|
-| `enable` | Start the scheduler. Subscribes to `issues.ready`, picks up work when available. |
-| `stop` | Stop picking up new work. Current session (if any) continues to completion. Scheduler goes idle after. |
-| `kill` | Immediately kill the running agent process. Issue stays `in_progress`. Uncommitted work left in working tree for human to handle. |
+| `kill` | Immediately kill the running agent process for a project. Issue stays `in_progress`. Uncommitted work left in working tree for human to handle. |
 
-**State Machine Diagram:**
-
-```mermaid
-stateDiagram-v2
-    [*] --> IDLE : startup / recovery complete
-    
-     IDLE --> BUSY : enable
-     BUSY --> IDLE : stop (session completes)
-     BUSY --> IDLE : kill (immediate)
-     
-     state BUSY {
-         [*] --> CLAIMING : issue ready
-         CLAIMING --> WORKING : claim success
-         CLAIMING --> IDLE : claim failed
-         
-         WORKING --> REVIEWING : work done (has commits)
-         WORKING --> IDLE : work noop / fault
-         
-         REVIEWING --> WORKING : review found issues (fixes made)
-         REVIEWING --> IDLE : review clean
-         REVIEWING --> [*] : stuck (max iterations)
-         
-         WORKING --> [*] : timeout
-         WORKING --> [*] : kill
-         REVIEWING --> [*] : timeout
-         REVIEWING --> [*] : kill
-     }
-    
-    note right of CLAIMING
-        Phase: Atomic mutation
-        status open → in_progress
-    end note
-    
-    note right of WORKING
-        Phase: Active work session
-        Session timeout: 30min
-        Circuit breaker: 3 failures
-    end note
-    
-    note right of REVIEWING
-        Phase: Code review session
-        Max iterations: 5
-    end note
-```
-
-**Note on Diagram**: The diagram above shows **internal phases** within the `BUSY` state (claiming, working, reviewing), not separate orchestrator states. These phases are derived from reactive queries (session type, status, endHead presence), not stored state. The orchestrator itself only tracks the four states below.
-
-**Orchestrator States** (runtime state of the Flux daemon):
+**Orchestrator States** (runtime state of each ProjectRunner):
 
 | State | Description | Transitions |
 |-------|-------------|-------------|
-| `IDLE` | Not processing work. Either no ready issues exist, scheduler explicitly stopped, or waiting between issues. | `enable` → BUSY |
-| `BUSY` | Active session in progress (claiming, working, reviewing). | `stop` → IDLE (after session completes), `kill` → IDLE (immediate) |
-| `STOPPED` | Scheduler disabled via `orchestrator_stop`. Current session (if any) continues, then goes IDLE. | `enable` → BUSY |
-| `FAULT` | Fatal error in orchestrator (e.g., Convex connection lost). Requires restart. | Manual restart → IDLE |
+| `IDLE` | Waiting for work. Subscribed to ready issues, none available or between sessions. | ready issue → BUSY |
+| `BUSY` | Active session in progress (claiming, working, reviewing). | session complete → IDLE, `kill` → IDLE (immediate) |
 
-**Important distinction**: These are orchestrator states. Issue statuses (`open`, `in_progress`, `closed`, `deferred`, `stuck`) are separate. An orchestrator in `BUSY` state works on an issue with `in_progress` status.
+**Important distinction**: These are per-runner states. Issue statuses (`open`, `in_progress`, `closed`, `deferred`, `stuck`) are separate. A runner in `BUSY` state works on an issue with `in_progress` status.
 
-**UI Display**: The UI derives substates (claiming, working, reviewing) from reactive Convex queries using session and issue fields:
-- `BUSY [claiming] ARCL-123` — No session record yet, attempting atomic claim
-- `BUSY [working] ARCL-123` — Session exists, `type: "work"`, `status: "running"`, no `endHead`
-- `BUSY [reviewing] ARCL-123` — Session exists, `type: "review"`, `status: "running"`
-
-Use `ts-pattern` for clean conditional matching throughout:
-```typescript
-match({ orchestratorState, session, issue })
-  .with({ orchestratorState: 'BUSY', session: null }, () => 'claiming')
-  .with({ orchestratorState: 'BUSY', session: { type: 'work' } }, () => 'working')
-  .with({ orchestratorState: 'BUSY', session: { type: 'review' } }, () => 'reviewing')
-  .otherwise(() => orchestratorState);
-```
-
-Apply `ts-pattern` to:
-- State machine transitions (orchestrator)
-- Disposition parsing and routing
-- Status change validation
-- UI phase derivation
+**Internal phases** within `BUSY` (derived from session/issue fields, not stored state):
+- `BUSY [claiming]` — Attempting atomic claim mutation
+- `BUSY [working]` — Session exists, `type: "work"`, `status: "running"`
+- `BUSY [reviewing]` — Session exists, `type: "review"`, `status: "running"`
 
 **After `kill`:**
 - Issue remains `in_progress` (not reset to `open`)
 - Assignee remains unchanged (for context/history)
-- Orchestrator transitions to `IDLE` state ("hand-off" mode)
+- Runner transitions to `IDLE`
 - Human reviews uncommitted changes in working tree
 - Human can: commit + close, discard + reopen, or resume manually
-- Scheduler (in `IDLE` state) won't pick up `in_progress` issues — human must resolve
+- Scheduler won't pick up `in_progress` issues — human must resolve
 - **Hand-off semantics**: System stops and relinquishes control to human. No automatic cleanup, no state changes — everything preserved exactly as-is for inspection and debugging.
 
 ## Work Selection Algorithm

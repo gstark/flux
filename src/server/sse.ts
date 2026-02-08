@@ -1,4 +1,7 @@
-import type { Orchestrator, OrchestratorLifecycleEvent } from "./orchestrator";
+import type {
+  ProjectRunner,
+  ProjectRunnerLifecycleEvent,
+} from "./orchestrator";
 import type { SessionMonitor } from "./orchestrator/monitor";
 
 /** How often to send a keepalive comment to prevent proxy timeouts. */
@@ -9,13 +12,13 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
  * Keeps connections open persistently — pushes session start/end events
  * and live agent output without requiring client reconnection.
  */
-export function createSSEHandler(getOrchestrator: () => Orchestrator) {
+export function createSSEHandler(getRunner: () => ProjectRunner) {
   return (req: Request): Response => {
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
       start(controller) {
-        const orch = getOrchestrator();
+        const orch = getRunner();
         const status = orch.getStatus();
 
         // ── Helper: safely enqueue (no-op if controller is closed) ──
@@ -76,7 +79,7 @@ export function createSSEHandler(getOrchestrator: () => Orchestrator) {
 
         // ── Subscribe to orchestrator lifecycle events ──
         const unsubLifecycle = orch.onLifecycle(
-          (event: OrchestratorLifecycleEvent) => {
+          (event: ProjectRunnerLifecycleEvent) => {
             if (event.type === "session_start") {
               send(
                 formatSSE("session_start", {

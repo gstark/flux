@@ -274,10 +274,6 @@ export const OrchestratorKillSchema = z.object({});
 
 export const OrchestratorStatusSchema = z.object({});
 
-export const OrchestratorEnableSchema = z.object({});
-
-export const OrchestratorStopSchema = z.object({});
-
 // ── ToolDef instances (derive .schema from Zod object .shape) ────────
 
 const issues_create: ToolDef = {
@@ -487,20 +483,6 @@ const orchestrator_status: ToolDef = {
   schema: OrchestratorStatusSchema.shape,
 };
 
-const orchestrator_enable: ToolDef = {
-  name: "orchestrator_enable",
-  description:
-    "Start the scheduler — begins picking up ready issues automatically.",
-  schema: OrchestratorEnableSchema.shape,
-};
-
-const orchestrator_stop: ToolDef = {
-  name: "orchestrator_stop",
-  description:
-    "Stop queuing new work. Current session (if any) continues to completion.",
-  schema: OrchestratorStopSchema.shape,
-};
-
 // ── All tools ─────────────────────────────────────────────────────────
 
 export const allTools: ToolDef[] = [
@@ -550,8 +532,6 @@ export const allTools: ToolDef[] = [
   orchestrator_run,
   orchestrator_kill,
   orchestrator_status,
-  orchestrator_enable,
-  orchestrator_stop,
 ];
 
 /** Lookup map for O(1) access by name. */

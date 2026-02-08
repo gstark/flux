@@ -2,12 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import {
-  IssueStatus,
-  ProjectState,
-  projectStateValidator,
-  SessionStatus,
-} from "./schema";
+import { IssueStatus, SessionStatus } from "./schema";
 
 export const create = mutation({
   args: {
@@ -30,7 +25,7 @@ export const create = mutation({
       name: args.name,
       issueCounter: 0,
       path: args.path ?? "",
-      state: ProjectState.Stopped,
+      enabled: true,
     });
 
     await ctx.scheduler.runAfter(0, internal.seeds.runAll, { projectId });
@@ -45,7 +40,7 @@ export const update = mutation({
     name: v.optional(v.string()),
     slug: v.optional(v.string()),
     path: v.optional(v.string()),
-    state: v.optional(projectStateValidator),
+    enabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -56,7 +51,7 @@ export const update = mutation({
     const updates: Partial<Doc<"projects">> = {};
     if (args.name !== undefined) updates.name = args.name;
     if (args.path !== undefined) updates.path = args.path;
-    if (args.state !== undefined) updates.state = args.state;
+    if (args.enabled !== undefined) updates.enabled = args.enabled;
 
     if (args.slug !== undefined) {
       const newSlug = args.slug;
