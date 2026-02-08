@@ -14,7 +14,12 @@ export type ParsedLine =
       toolId: string;
       toolInput: Record<string, unknown> | null;
     }
-  | { kind: "tool_result"; toolName: string | null; content: string }
+  | {
+      kind: "tool_result";
+      toolUseId: string | null;
+      toolName: string | null;
+      content: string;
+    }
   | { kind: "skip" };
 
 /**
@@ -210,7 +215,7 @@ export function parseStreamLine(line: string): ParsedLine[] {
       const blocks = message.content as Array<Record<string, unknown>>;
       const toolResults = blocks.filter((b) => b.type === "tool_result");
       if (toolResults.length > 0) {
-        const parts: string[] = [];
+        const results: ParsedLine[] = [];
         for (const toolResult of toolResults) {
           let content = "";
           if (typeof toolResult.content === "string") {
@@ -223,22 +228,23 @@ export function parseStreamLine(line: string): ParsedLine[] {
               .map((b) => b.text as string);
             content = textParts.join("");
           }
-          parts.push(content);
-        }
-        const joined = parts.filter(Boolean).join("\n---\n");
-        // Truncate long tool results for the activity stream
-        const maxLen = 500;
-        const truncated =
-          joined.length > maxLen
-            ? `${joined.slice(0, maxLen)}… (${joined.length} chars)`
-            : joined;
-        return [
-          {
+          // Truncate long tool results for the activity stream
+          const maxLen = 500;
+          const truncated =
+            content.length > maxLen
+              ? `${content.slice(0, maxLen)}… (${content.length} chars)`
+              : content;
+          results.push({
             kind: "tool_result",
-            toolName: null, // tool name is in the preceding tool_use
+            toolUseId:
+              typeof toolResult.tool_use_id === "string"
+                ? toolResult.tool_use_id
+                : null,
+            toolName: null,
             content: truncated,
-          },
-        ];
+          });
+        }
+        return results;
       }
     }
     return [{ kind: "skip" }];

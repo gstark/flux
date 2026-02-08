@@ -14,11 +14,222 @@ import {
   phaseLabel,
   typeLabel,
 } from "../lib/format";
-import { parsedLineKey, parseStreamLine } from "../lib/parseStreamLine";
-import { FontAwesomeIcon, faArrowLeft, Icon } from "./Icon";
+import {
+  type ParsedLine,
+  parseStreamLine,
+  summarizeToolInput,
+} from "../lib/parseStreamLine";
+import {
+  FontAwesomeIcon,
+  faArrowLeft,
+  faCircleCheck,
+  faScrewdriverWrench,
+  Icon,
+} from "./Icon";
 import { Markdown } from "./Markdown";
 import { SessionStatusBadge } from "./SessionStatusBadge";
 import { StreamContent } from "./StreamContent";
+
+// -- Transcript grouping types ------------------------------------------------
+
+/** A tool_use paired with its optional tool_result. */
+type ToolCallPair = {
+  toolUse: Extract<ParsedLine, { kind: "tool_use" }>;
+  toolResult: Extract<ParsedLine, { kind: "tool_result" }> | null;
+};
+
+/**
+ * A node in the grouped transcript.
+ * - "input": user message rendered as markdown
+ * - "text": assistant text content
+ * - "tool_call": a tool_use header + collapsible result body
+ */
+type TranscriptNode =
+  | { type: "input"; key: string; content: string }
+  | { type: "text"; key: string; parsed: Extract<ParsedLine, { kind: "text" }> }
+  | { type: "tool_call"; key: string; pair: ToolCallPair };
+
+// -- Grouping logic -----------------------------------------------------------
+
+/**
+ * Walk the flat list of session events and group consecutive
+ * tool_use → tool_result pairs into single TranscriptNode entries.
+ *
+ * Algorithm: parse each event, collect pending tool_use items from output
+ * events. When the next input event arrives with tool_result items, match
+ * them by toolUseId (falling back to positional matching). Non-tool items
+ * (text, input messages) emit immediately.
+ */
+function groupTranscriptEvents(
+  events: Array<{
+    _id: string;
+    direction: string;
+    content: string;
+    sequence: number;
+  }>,
+): TranscriptNode[] {
+  const nodes: TranscriptNode[] = [];
+  // Pending tool_use items awaiting their results
+  let pendingToolUses: Array<Extract<ParsedLine, { kind: "tool_use" }>> = [];
+
+  for (const event of events) {
+    if (event.direction === SessionEventDirection.Input) {
+      const items = parseStreamLine(event.content).filter(
+        (p) => p.kind !== "skip",
+      );
+
+      // Check if this input event has tool_result items that match pending tool_uses
+      const toolResults = items.filter(
+        (p): p is Extract<ParsedLine, { kind: "tool_result" }> =>
+          p.kind === "tool_result",
+      );
+
+      if (toolResults.length > 0 && pendingToolUses.length > 0) {
+        // Match tool_results to pending tool_uses
+        const resultById = new Map<
+          string,
+          Extract<ParsedLine, { kind: "tool_result" }>
+        >();
+        const unmatchedResults: Array<
+          Extract<ParsedLine, { kind: "tool_result" }>
+        > = [];
+
+        for (const result of toolResults) {
+          if (result.toolUseId) {
+            resultById.set(result.toolUseId, result);
+          } else {
+            unmatchedResults.push(result);
+          }
+        }
+
+        // Pair each pending tool_use with its result
+        let unmatchedIdx = 0;
+        for (const toolUse of pendingToolUses) {
+          const matched =
+            resultById.get(toolUse.toolId) ??
+            unmatchedResults[unmatchedIdx++] ??
+            null;
+          nodes.push({
+            type: "tool_call",
+            key: `tool_call:${toolUse.toolId}`,
+            pair: { toolUse, toolResult: matched },
+          });
+        }
+        pendingToolUses = [];
+      } else {
+        // Flush any unmatched pending tool_uses before the input
+        flushPending(nodes, pendingToolUses);
+        pendingToolUses = [];
+
+        // Non-tool input event — render as markdown (skip tool_result-only inputs that had no pending)
+        if (toolResults.length > 0) {
+          // Orphaned tool_results with no preceding tool_use — show them inline
+          for (const result of toolResults) {
+            nodes.push({
+              type: "tool_call",
+              key: `orphan_result:${event._id}:${result.toolUseId ?? nodes.length}`,
+              pair: {
+                toolUse: {
+                  kind: "tool_use",
+                  toolName: result.toolName ?? "unknown",
+                  toolId: result.toolUseId ?? "",
+                  toolInput: null,
+                },
+                toolResult: result,
+              },
+            });
+          }
+        } else {
+          nodes.push({
+            type: "input",
+            key: `input:${event._id}`,
+            content: event.content,
+          });
+        }
+      }
+    } else {
+      // Output event
+      const items = parseStreamLine(event.content).filter(
+        (p) => p.kind !== "skip",
+      );
+
+      // Flush any pending tool_uses from a previous output before processing this one
+      flushPending(nodes, pendingToolUses);
+      pendingToolUses = [];
+
+      for (const item of items) {
+        if (item.kind === "tool_use") {
+          pendingToolUses.push(item);
+        } else if (item.kind === "text") {
+          nodes.push({
+            type: "text",
+            key: `text:${event._id}:${nodes.length}`,
+            parsed: item,
+          });
+        }
+      }
+    }
+  }
+
+  // Flush any remaining pending tool_uses at the end (session may still be running)
+  flushPending(nodes, pendingToolUses);
+
+  return nodes;
+}
+
+/** Emit pending tool_use items as tool_call nodes without results. */
+function flushPending(
+  nodes: TranscriptNode[],
+  pending: Array<Extract<ParsedLine, { kind: "tool_use" }>>,
+) {
+  for (const toolUse of pending) {
+    nodes.push({
+      type: "tool_call",
+      key: `tool_call:${toolUse.toolId}`,
+      pair: { toolUse, toolResult: null },
+    });
+  }
+}
+
+// -- ToolCallCard component ---------------------------------------------------
+
+/** A single collapsible card showing tool name + input summary, with result body. */
+function ToolCallCard({ pair }: { pair: ToolCallPair }) {
+  const { toolUse, toolResult } = pair;
+  const summary = summarizeToolInput(toolUse.toolName, toolUse.toolInput);
+
+  return (
+    <details className="group rounded-lg bg-neutral font-mono text-neutral-content text-sm">
+      <summary className="flex cursor-pointer select-none items-center gap-2 p-3">
+        <FontAwesomeIcon
+          icon={faScrewdriverWrench}
+          aria-hidden="true"
+          className="shrink-0 text-info"
+        />
+        <span className="font-semibold text-info">{toolUse.toolName}</span>
+        {summary && (
+          <span className="truncate text-base-content/50 text-xs">
+            {summary}
+          </span>
+        )}
+        {toolResult && (
+          <FontAwesomeIcon
+            icon={faCircleCheck}
+            aria-hidden="true"
+            className="ml-auto shrink-0 text-success"
+          />
+        )}
+      </summary>
+      {toolResult && (
+        <div className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words border-neutral-content/10 border-t px-3 pt-2 pb-3 text-xs">
+          {toolResult.content}
+        </div>
+      )}
+    </details>
+  );
+}
+
+// -- Existing helpers ---------------------------------------------------------
 
 type DispositionValue = (typeof Disposition)[keyof typeof Disposition];
 
@@ -53,30 +264,6 @@ function dispositionLabel(disposition: DispositionValue): {
   }
 }
 
-/** Render transcript event content: parse output JSON, render input as markdown. */
-function TranscriptEventContent({
-  direction,
-  content,
-}: {
-  direction: string;
-  content: string;
-}) {
-  if (direction === SessionEventDirection.Input) {
-    return <Markdown content={content} />;
-  }
-
-  // Output events are NDJSON lines from Claude's stream-json — parse and render
-  const items = parseStreamLine(content).filter((p) => p.kind !== "skip");
-  if (items.length === 0) return null;
-  return (
-    <>
-      {items.map((parsed, i) => (
-        <StreamContent key={parsedLineKey(parsed, i)} parsed={parsed} />
-      ))}
-    </>
-  );
-}
-
 /** Check if an output event should be displayed (non-skip after parsing). */
 function isDisplayableEvent(direction: string, content: string): boolean {
   if (direction === SessionEventDirection.Input) return true;
@@ -93,6 +280,11 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
         isDisplayableEvent(event.direction, event.content),
       ) ?? [],
     [events],
+  );
+
+  const transcriptNodes = useMemo(
+    () => groupTranscriptEvents(displayableEvents),
+    [displayableEvents],
   );
 
   if (session === undefined) {
@@ -301,35 +493,42 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
           <div className="flex justify-center p-8">
             <span className="loading loading-spinner loading-md" />
           </div>
-        ) : displayableEvents.length === 0 ? (
+        ) : transcriptNodes.length === 0 ? (
           <p className="py-8 text-center text-base-content/60">
             No transcript events recorded.
           </p>
         ) : (
           <div className="flex flex-col gap-2">
-            {displayableEvents.map((event) => (
-              <div
-                key={event._id}
-                className={
-                  event.direction === SessionEventDirection.Output
-                    ? "overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-neutral p-3 font-mono text-neutral-content text-sm"
-                    : "whitespace-pre-wrap break-words rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"
+            {transcriptNodes.map((node) => {
+              switch (node.type) {
+                case "input":
+                  return (
+                    <div
+                      key={node.key}
+                      className="whitespace-pre-wrap break-words rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"
+                    >
+                      <Markdown content={node.content} />
+                    </div>
+                  );
+                case "text":
+                  return (
+                    <div
+                      key={node.key}
+                      className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-neutral p-3 font-mono text-neutral-content text-sm"
+                    >
+                      <StreamContent parsed={node.parsed} />
+                    </div>
+                  );
+                case "tool_call":
+                  return <ToolCallCard key={node.key} pair={node.pair} />;
+                default: {
+                  const _exhaustive: never = node;
+                  throw new Error(
+                    `Unhandled node type: ${(_exhaustive as TranscriptNode).type}`,
+                  );
                 }
-              >
-                <div className="mb-1 flex items-center gap-2 text-xs opacity-60">
-                  <span className="font-medium">
-                    {event.direction === SessionEventDirection.Input
-                      ? "Input"
-                      : "Output"}
-                  </span>
-                  <span>#{event.sequence}</span>
-                </div>
-                <TranscriptEventContent
-                  direction={event.direction}
-                  content={event.content}
-                />
-              </div>
-            ))}
+              }
+            })}
           </div>
         )}
       </div>
