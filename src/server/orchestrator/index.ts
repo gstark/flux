@@ -1,6 +1,6 @@
 import {
-  type OrchestratorActiveSession,
   OrchestratorState,
+  type OrchestratorStatusData,
 } from "@/shared/orchestrator";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
@@ -112,12 +112,7 @@ class Orchestrator {
     return this.activeSession;
   }
 
-  getStatus(): {
-    state: OrchestratorState;
-    schedulerEnabled: boolean;
-    readyCount: number;
-    activeSession: OrchestratorActiveSession | null;
-  } {
+  getStatus(): OrchestratorStatusData["status"] {
     return {
       state: this.state,
       schedulerEnabled: this.unsubscribeReady !== null,
