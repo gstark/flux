@@ -2,7 +2,7 @@ import { paginationOptsValidator } from "convex/server";
 import { type Validator, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import {
   closeTypeValidator,
   IssuePriority,
@@ -583,21 +583,5 @@ export const counts = query({
       statuses.map((status, i) => [status, buckets[i]?.length ?? 0]),
     );
     return counts;
-  },
-});
-
-/** One-shot migration: populate priorityOrder for issues created before FLUX-204. */
-export const backfillPriorityOrder = internalMutation({
-  handler: async (ctx) => {
-    const issues = await ctx.db.query("issues").collect();
-    let patched = 0;
-    for (const issue of issues) {
-      if (issue.priorityOrder !== undefined) continue;
-      await ctx.db.patch(issue._id, {
-        priorityOrder: toPriorityOrder(issue.priority),
-      });
-      patched++;
-    }
-    return { patched, total: issues.length };
   },
 });
