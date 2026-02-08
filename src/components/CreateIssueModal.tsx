@@ -44,7 +44,9 @@ export function CreateIssueModal({
   const [isOpen, setIsOpen] = useState(false);
 
   const open = useCallback(() => {
-    dialogRef.current?.showModal();
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) return;
+    dialog.showModal();
     setIsOpen(true);
   }, []);
 
