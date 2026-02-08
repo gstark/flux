@@ -2,11 +2,7 @@ import type { ConvexClient } from "convex/browser";
 import type { z } from "zod";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import {
-  CommentAuthor,
-  SessionEventDirection,
-  SessionStatus,
-} from "$convex/schema";
+import { SessionEventDirection, SessionStatus } from "$convex/schema";
 import type { Orchestrator } from "../orchestrator";
 import {
   CommentsCreateSchema,
@@ -344,11 +340,6 @@ const issues_defer = typedHandler(
         issueId: issueId as Id<"issues">,
         note,
       });
-      await ctx.convex.mutation(api.comments.create, {
-        issueId: issueId as Id<"issues">,
-        content: `Deferred: ${note}`,
-        author: CommentAuthor.Flux,
-      });
       return ok(ctx, { issue: updated });
     } catch (err) {
       return error(ctx, String(err instanceof Error ? err.message : err));
@@ -362,11 +353,7 @@ const issues_undefer = typedHandler(
     try {
       const updated = await ctx.convex.mutation(api.issues.undefer, {
         issueId: issueId as Id<"issues">,
-      });
-      await ctx.convex.mutation(api.comments.create, {
-        issueId: issueId as Id<"issues">,
-        content: `Undeferred: ${note}`,
-        author: CommentAuthor.Flux,
+        note,
       });
       return ok(ctx, { issue: updated });
     } catch (err) {

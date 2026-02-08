@@ -7,7 +7,6 @@ import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useTrackedAction } from "../hooks/useTrackedAction";
-import { callTool } from "../lib/api";
 import { PRIORITY_OPTIONS } from "../lib/format";
 import { CommentsThread } from "./CommentsThread";
 import { DependencySection } from "./DependencySection";
@@ -30,6 +29,8 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const updateIssue = useMutation(api.issues.update);
   const retryIssue = useMutation(api.issues.retry);
   const closeIssue = useMutation(api.issues.close);
+  const deferIssue = useMutation(api.issues.defer);
+  const undeferIssue = useMutation(api.issues.undefer);
 
   const { error: mutationError, showError, clearError } = useDismissableError();
 
@@ -75,17 +76,14 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
 
   const [handleDefer, deferring] = useTrackedAction(
     async (note: string) => {
-      await callTool("issues_defer", { issueId, note });
+      await deferIssue({ issueId, note });
     },
     showError,
     { rethrow: true },
   );
 
   const [handleUndefer, undeferring] = useTrackedAction(async () => {
-    await callTool("issues_undefer", {
-      issueId,
-      note: "Undeferred from UI",
-    });
+    await undeferIssue({ issueId });
   }, showError);
 
   const [handleResetToOpen, resetting] = useTrackedAction(async () => {
@@ -125,7 +123,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const isInProgress = currentIssue.status === IssueStatus.InProgress;
   const isStuck = currentIssue.status === IssueStatus.Stuck;
 
-  // Read defer reason directly from the issue field (set by issues_defer handler)
+  // Read defer reason directly from the issue field (set by defer mutation)
   const deferReason = isDeferred ? currentIssue.deferNote : undefined;
 
   // Any mutation in flight — disables interactive controls

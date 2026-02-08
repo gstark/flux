@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import {
+  CommentAuthor,
   closeTypeValidator,
   IssuePriority,
   type IssuePriorityValue,
@@ -401,11 +402,18 @@ export const defer = mutation({
       throw new Error(`Cannot defer issue ${issueId}: already closed`);
     }
 
+    const now = Date.now();
     await ctx.db.patch(issueId, {
       status: IssueStatus.Deferred,
       deferNote: note,
       assignee: undefined,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("comments", {
+      issueId,
+      content: `Deferred: ${note}`,
+      author: CommentAuthor.Flux,
+      createdAt: now,
     });
     const updated = await ctx.db.get(issueId);
     if (!updated)
@@ -417,8 +425,9 @@ export const defer = mutation({
 export const undefer = mutation({
   args: {
     issueId: v.id("issues"),
+    note: v.optional(v.string()),
   },
-  handler: async (ctx, { issueId }) => {
+  handler: async (ctx, { issueId, note }) => {
     const issue = await getActiveIssue(ctx, issueId);
     if (issue.status === IssueStatus.Open) return issue;
     if (issue.status !== IssueStatus.Deferred) {
@@ -427,11 +436,18 @@ export const undefer = mutation({
       );
     }
 
+    const now = Date.now();
     await ctx.db.patch(issueId, {
       status: IssueStatus.Open,
       deferNote: undefined,
       assignee: undefined,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("comments", {
+      issueId,
+      content: note ? `Undeferred: ${note}` : "Undeferred",
+      author: CommentAuthor.Flux,
+      createdAt: now,
     });
     const updated = await ctx.db.get(issueId);
     if (!updated)

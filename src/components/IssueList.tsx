@@ -1,12 +1,11 @@
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import { usePaginatedQuery, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { IssueStatusValue } from "$convex/schema";
 import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
-import { callTool } from "../lib/api";
 import { CreateIssueModal } from "./CreateIssueModal";
 import { DeferModal, type DeferModalHandle } from "./DeferModal";
 import { ErrorBanner } from "./ErrorBanner";
@@ -34,6 +33,7 @@ export function IssueList() {
     IssueStatus.Open,
   );
 
+  const undeferIssue = useMutation(api.issues.undefer);
   const deferRef = useRef<DeferModalHandle>(null);
   const {
     error: actionError,
@@ -46,10 +46,7 @@ export function IssueList() {
   async function handleUndefer(issueId: Id<"issues">) {
     setUndeferringId(issueId);
     try {
-      await callTool("issues_undefer", {
-        issueId,
-        note: "Undeferred from UI",
-      });
+      await undeferIssue({ issueId });
     } catch (err) {
       showActionError(err);
     } finally {

@@ -1,7 +1,8 @@
+import { useMutation } from "convex/react";
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { useDismissableError } from "../hooks/useDismissableError";
-import { callTool } from "../lib/api";
 import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faCirclePause } from "./Icon";
 
@@ -30,6 +31,7 @@ export function DeferModal({
   ref,
   onDeferred,
 }: DeferModalProps & { ref: React.Ref<DeferModalHandle> }) {
+  const deferIssue = useMutation(api.issues.defer);
   const [targetId, setTargetId] = useState<Id<"issues"> | null>(null);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +62,7 @@ export function DeferModal({
     setSubmitting(true);
     clearError();
     try {
-      await callTool("issues_defer", {
+      await deferIssue({
         issueId: targetId,
         note: note.trim() || "Deferred from UI",
       });
