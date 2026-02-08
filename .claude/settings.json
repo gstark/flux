@@ -10,6 +10,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/auto-mkdir.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/verify-edit-pre.sh"
           }
         ]
       }
@@ -21,6 +25,15 @@
           {
             "type": "command",
             "command": ".claude/hooks/lint.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__morph-mcp__edit_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/verify-edit.sh"
           }
         ]
       }
