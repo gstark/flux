@@ -929,6 +929,377 @@ Phase 4: Consider Option D (WASM) for untrusted tools
 
 ---
 
+## 3.5 The Flux-Native Agent: Deep Integration Vision (Hypothetical)
+
+**Status:** Brainstorming / Exploration  
+**Purpose:** Documenting what a custom-built Flux agent could achieve beyond generic agents  
+
+### The "Pixie-Dust" Question
+
+If we build a custom agent from scratch, what capabilities could it have that would make it demonstrably better than Claude Code or Opencode when working with Flux?
+
+The answer: **Deep ambient context integration** — the agent doesn't just use Flux, it becomes part of Flux's orchestration intelligence.
+
+### Core Differentiators
+
+#### 1. Native Ambient Context (Not Text, But State)
+
+**Generic agents** receive context as text to read:
+```
+Build: success
+Tests: 3 failing
+Available tools: issues.list, issues.create...
+```
+
+**Flux-native agent** receives context as **typed, queryable state**:
+```typescript
+interface AgentState {
+  projectStatus: {
+    build: { status: 'success', lastRun: Date, duration: 12000 };
+    tests: { failing: 3, passing: 44, details: TestFailure[] };
+    lint: { errors: 0, warnings: 2 };
+  };
+  
+  availableTools: Map<string, ToolCapability>;
+  // Can query: state.availableTools.filter(t => t.triggers.includes('auth'))
+  
+  currentFocus: Issue | null;
+  relevantIssues: Issue[];
+  recentCommits: Commit[];
+  
+  // Tool affinity: which tools are often used together
+  toolChains: Map<string, string[]>;
+}
+```
+
+The agent **programmatically queries** its context instead of parsing text:
+```typescript
+const authTools = state.availableTools.filter(t => 
+  t.triggers.includes('auth') || t.name.includes('auth')
+);
+// Auto-suggests to itself: "I see 3 auth-related tools"
+```
+
+#### 2. Push-Based Context Subscription (Not Poll)
+
+**Generic agents**: Must call tools to get fresh context
+
+**Flux-native agent**: Subscribes to context changes:
+```typescript
+// WebSocket/SSE connection to Flux daemon
+const eventSource = new EventSource('/api/agent/stream');
+
+eventSource.onmessage = (event) => {
+  const update = JSON.parse(event.data);
+  
+  switch (update.type) {
+    case 'context:tool_added':
+      // New tool appeared in .anvil/tools/!
+      state.availableTools.set(update.tool.name, update.tool);
+      if (update.tool.type === 'query') {
+        preloadTool(update.tool); // Pre-warm for use
+      }
+      break;
+      
+    case 'context:status_changed':
+      // Build just failed!
+      if (update.status.build === 'failed') {
+        agent.interrupt(`Build failed: ${update.error}`);
+        // Pivot to fixing immediately
+      }
+      break;
+      
+    case 'context:issue_updated':
+      // Current issue changed status (someone else modified?)
+      if (update.issue.id === state.currentFocus?.id) {
+        agent.adaptToIssueChange(update.issue);
+      }
+      break;
+  }
+};
+```
+
+**The agent reacts to state changes as they happen, not when prompted.**
+
+#### 3. Self-Extending Tool Registry
+
+Tools appear in context **automatically** when added to `.anvil/tools/`:
+
+```typescript
+// File watcher in Flux daemon
+watcher.on('add', async (filePath) => {
+  if (filePath.startsWith('.anvil/tools/')) {
+    const tool = await parseTool(filePath);
+    
+    // Update ALL connected agents' context
+    broadcastToAgents({
+      type: 'context:tool_added',
+      tool: tool
+    });
+  }
+});
+```
+
+**Agent experience:**
+```
+Turn 10: Working on auth bug...
+Turn 11: [System notification] New tool available: rails.models
+Turn 12: Agent sees rails.models in availableTools, uses it immediately
+```
+
+No restart, no reconnection, no discovery ceremony.
+
+#### 4. Intent Prediction & Pre-Call
+
+The agent monitors its **own thought stream** and pre-calls likely tools:
+
+```typescript
+agent.onThought((thought) => {
+  const predictedIntent = parseIntent(thought);
+  
+  if (predictedIntent.confidence > 0.8) {
+    // Fire off queries in background while still "thinking"
+    const toolsToPreload = state.toolChains.get(predictedIntent.tool);
+    
+    Promise.all(toolsToPreload.map(t => 
+      flux.query(t, predictedIntent.params)
+    )).then(results => {
+      // Cache results, ready when agent asks
+      state.preloadedResults = results;
+    });
+  }
+});
+
+// When agent actually asks 500ms later:
+Agent: "Show me the auth issues"
+System: Results already cached, immediate response
+```
+
+#### 5. Query vs Mutate Safety
+
+All tools annotated with safety levels:
+
+```typescript
+const tools = {
+  // Queries: Safe to auto-call based on keywords
+  "issues.list": { type: "query", auto_call: true },
+  "git.status": { type: "query", auto_call: true },
+  "test.status": { type: "query", auto_call: true },
+  
+  // Mutations: NEVER auto-call
+  "issues.create": { type: "mutate", auto_call: false },
+  "git.commit": { type: "mutate", auto_call: false },
+  
+  // Destructive: Special handling
+  "database.drop": { 
+    type: "destructive", 
+    require_explicit: true,
+    dry_run_default: true 
+  }
+};
+```
+
+**Keyword-triggered pre-calls only for query tools:**
+```typescript
+Agent: "The auth tests are failing"
+Keywords: ["auth", "tests", "failing"]
+
+System auto-calls (safe, read-only):
+- test.status (failing: 3)
+- issues.search("auth") → AUTH-42
+- git.log --files="*auth*"
+
+Injects results into context, agent sees fresh state immediately.
+```
+
+#### 6. Continuous Evaluation Loop (Not Turn-Based)
+
+**Generic agent:**
+```
+User: Work on FLUX-42
+Agent: [does some work]
+User: Check tests
+Agent: [runs tests]
+User: Fix failures
+Agent: [fixes]
+```
+
+**Flux-native agent:**
+```typescript
+// Autonomous work loop
+while (issue.status !== 'closed') {
+  // 1. Check ambient context
+  const status = await flux.getProjectStatus();
+  
+  // 2. Detect problems automatically
+  if (status.tests.failing > 0) {
+    // Don't wait to be told - just fix it
+    await fixTestFailures();
+    continue; // Re-evaluate
+  }
+  
+  // 3. Check if current approach working
+  if (attempts > 3 && success_rate < 0.5) {
+    // Pivot strategy automatically
+    await openSubIssue("Alternative approach needed");
+    await deferCurrentIssue("Pending sub-issue");
+    break;
+  }
+  
+  // 4. Surface blockers immediately
+  if (hasUnresolvedDependencies()) {
+    await escalateBlockers();
+    break;
+  }
+  
+  // 5. Make progress
+  await makeProgressOnIssue();
+}
+```
+
+**The agent evaluates state continuously and adapts without prompting.**
+
+#### 7. Learned Historical Patterns
+
+The agent builds knowledge from previous Flux tasks:
+
+```typescript
+class AgentMemory {
+  // Learned from 100+ Flux completions
+  patterns: {
+    // "When I see this error, do this"
+    errorFixes: Map<ErrorSignature, FixPattern>;
+    
+    // "Auth bugs usually need these 5 files"
+    filePatterns: Map<IssueType, string[]>;
+    
+    // "Tests fail in this order when auth breaks"
+    testSequences: Map<IssueType, TestOrder>;
+    
+    // "This approach worked 90% of the time"
+    strategySuccess: Map<Approach, SuccessRate>;
+  };
+}
+
+// When assigned AUTH-42 (auth bug):
+const historicalFixes = memory.patterns.errorFixes.get('JWT validation');
+const likelyFiles = memory.patterns.filePatterns.get('auth');
+
+// Pre-loads knowledge:
+"This auth bug is similar to AUTH-7, AUTH-15, AUTH-23.
+Those were fixed by:
+1. Updating src/auth/jwt.ts (100% of cases)
+2. Modifying src/middleware/auth.ts (80% of cases)
+3. Adding test in tests/auth/jwt.test.ts (90% of cases)
+
+I'll start with this pattern."
+```
+
+#### 8. Deep Project Embedding (Not File-by-File)
+
+**Generic agent:**
+- Reads files A, B, C
+- Builds mental model piece by piece
+- Makes change
+
+**Flux-native agent:**
+```typescript
+// Persistent project model built once, continuously updated
+class ProjectModel {
+  architecture: {
+    layers: ['api', 'services', 'models', 'db'];
+    dependencies: DependencyGraph;
+    entryPoints: string[];
+    dataFlow: DataFlowGraph;
+  };
+  
+  semantics: {
+    functions: Map<string, FunctionSignature>;
+    types: Map<string, TypeDefinition>;
+    patterns: CodePatterns;
+  };
+  
+  coverage: {
+    hotPaths: string[];      // Most tested code
+    coldPaths: string[];     // Rarely tested  
+    riskyPaths: string[];    // Complex, poorly tested
+  };
+}
+
+// When assigned a task:
+const impact = projectModel.assessImpact({
+  filesToChange: ['src/auth.ts'],
+  changeType: 'modify-validation'
+});
+
+// Knows automatically:
+"Changing src/auth.ts affects:
+- 12 downstream callers
+- 3 API endpoints  
+- Risk level: MEDIUM (well tested)
+- Must update: tests/auth.test.ts
+- Must verify: integration tests"
+```
+
+### Performance Comparison
+
+Given same PRD + Roadmap:
+
+| Metric | Claude Code | Opencode | Flux-Native |
+|--------|-------------|----------|-------------|
+| **Setup time** | 10 min discovery | 10 min | 0 min (pre-warmed) |
+| **Planning** | Needs prompting | Needs prompting | Auto-expands roadmap |
+| **Sub-tasks** | Manual creation | Manual | Auto-creates dependencies |
+| **Verification** | When asked | When asked | Continuous |
+| **Error recovery** | Human intervention | Human intervention | Self-corrects 80% |
+| **Learning** | None | None | Improves per task |
+| **Avg completion** | 2 hours | 2 hours | 45 min (Task 50+) |
+| **Human touches** | 5-10 per task | 5-10 per task | 0-2 per task |
+
+### The "Pixie-Dust" Formula
+
+```
+Flux-Native Agent = 
+  Ambient Context Understanding
+  + Proactive State Evaluation  
+  + Learned Historical Patterns
+  + Deep Project Embedding
+  + Autonomous Decision Loops
+  + Meta-Cognitive Self-Improvement
+  -----------------------------------
+  = An agent that doesn't just USE Flux
+    but EXTENDS and IMPROVES the system
+```
+
+### Universal vs. Native
+
+**Important clarification:** The ambient context system works with **ANY** agent (Claude, Opencode, custom). But a Flux-native agent can go deeper:
+
+| Capability | Any Agent | Flux-Native |
+|------------|-----------|-------------|
+| Receive ambient context | ✅ | ✅ |
+| Parse context as typed state | ❌ (text only) | ✅ |
+| Subscribe to push updates | ❌ (poll only) | ✅ |
+| Self-directed work loops | ❌ (turn-based) | ✅ |
+| Learn from history | ❌ | ✅ |
+| Predict intent & pre-call | ❌ | ✅ |
+
+### Phase C Possibility
+
+This represents a **potential Phase C direction** — not a commitment. The core Flux system (Anvil tools, ambient context, CLI-native design) works with any agent. A custom-built agent would be an optimization, not a requirement.
+
+**When to consider building:**
+- After 100+ tasks with generic agents
+- Clear patterns emerge that could be automated
+- Performance gains justify the investment
+
+**When NOT to build:**
+- Generic agents are "good enough"
+- Complexity outweighs benefits
+- Maintenance burden too high
+
+---
+
 ## 4. Multi-Project Daemon: Always-On Orchestration
 
 ### Current State
@@ -1218,6 +1589,8 @@ $ flux daemon start    # Managed by OS
 | 2026-02-07 | All Decisions | Awaiting selection | ⏳ Pending |
 | 2026-02-08 | CLI-Native Anvil | Agents use bash universally, not MCP | ✅ Insight |
 | 2026-02-08 | Deep Engine Vision | Anvil enables runtime introspection, not just CLI | ✅ Insight |
+| 2026-02-08 | Ambient Context | Pre-called queries, keyword triggers, live dashboard | ✅ Insight |
+| 2026-02-08 | Native Agent Vision | Deep integration, push updates, learned patterns | 📝 Brainstorming |
 
 ---
 
