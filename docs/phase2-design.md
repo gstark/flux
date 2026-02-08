@@ -60,6 +60,89 @@ $ flux anvil run issues.create --json '{"title": "foo"}'
 - Stateless (no persistent connections to manage)
 - Composable (actions can call other actions internally)
 
+### The Deep Engine Integration Vision
+
+Anvil Tools expose a **simple CLI interface** to Flux and agents. What's underneath that CLI can be anything—from simple functions to complex integrations:
+
+**CLI as the abstraction layer:**
+```bash
+# To the agent, it's always just:
+$ flux anvil run <tool> --json '{...}'
+```
+
+**Implementation details are tool-specific:**
+- `fontawesome.search` → Simple HTTP call to API
+- `godot.scene_tree` → WebSocket to EditorPlugin running in Godot
+- `rails.query` → HTTP to mounted Rails engine
+- `issues.create` → Convex mutation
+
+The CLI contract is simple and universal. The **implementation** handles the bespoke mechanisms required for deep integration.
+
+**For a Godot game** (`~/Projects/forge`):
+```gdscript
+# anvil/anvil.gd - EditorPlugin loaded in Godot
+# Internally connects to Bellows via WebSocket
+# But to Flux, it's just CLI commands:
+
+# Agent calls via Anvil CLI:
+$ flux anvil run godot.scene_tree
+{"root": {"name": "Main", "children": [{"name": "Player", "type": "CharacterBody2D"}]}}
+
+$ flux anvil run godot.inspect_node --path "/root/Player"
+{"scripts": ["player.gd"], "properties": {"health": 100, "speed": 300}}
+
+$ flux anvil run godot.set_property --path "/root/Player" --property "speed" --value 400
+{"previous": 300, "current": 400}
+```
+The CLI tool `godot.set_property` wraps the WebSocket communication with the EditorPlugin. The agent just sees a CLI command.
+
+**For a Rails app:**
+```ruby
+# anvil/rails_engine.rb - Mountable engine
+# Loads into Rails environment via HTTP
+# But exposed as simple CLI:
+
+$ flux anvil run rails.models
+["User", "Post", "Comment"]
+
+$ flux anvil run rails.model --name "User" --inspect
+{"attributes": ["id", "email", "created_at"], "associations": ["has_many: posts"]}
+
+$ flux anvil run rails.query --model "User" --where "created_at > ?" --args "2024-01-01"
+[{"id": 1, "email": "foo@example.com"}]
+```
+The CLI commands wrap HTTP calls to the Rails engine. Simple interface, powerful implementation.
+
+**For any language/framework:**
+The agent writes Anvil tools that:
+1. **Parse source code** to extract up-to-date API documentation
+2. **Connect to runtimes** (WebSocket, HTTP, IPC) to introspect live state
+3. **Execute and verify** behavior automatically
+4. **Report results** as clean JSON via CLI
+
+**The Verification Loop:**
+The Flux agent never says *"okay done, try running X command to test it"*. The Flux agent:
+1. **Already ran X** via CLI and verified it works
+2. **If it doesn't work** → fixes it immediately
+3. **If missing tools needed** → adds them (self-extending)
+4. **If deeper integration required** → opens an issue to build that plugin
+
+The agent **self-prioritizes** based on what it discovers it needs:
+```
+Working on feature X...
+→ Needs to check database state
+→ No `rails.query` tool available
+→ Opens issue: "Add Rails query introspection to Anvil"
+→ Either implements it or defers and finds workaround
+```
+
+This creates a **virtuous cycle:**
+- Agent does work
+- Discovers gaps in tooling
+- Extends Anvil to fill gaps
+- Future work becomes easier
+- Agent becomes more capable over time
+
 ### Tool Schema Declaration (TBD)
 
 **[DECISION REQUIRED]** How do Anvil tools declare their schema/interface for model understanding?
@@ -1133,6 +1216,8 @@ $ flux daemon start    # Managed by OS
 | 2026-02-07 | Native Agent | Brainstorm options A-D | 📝 TBD |
 | 2026-02-07 | Multi-Project UI | Brainstorm options 1-4 | 📝 TBD |
 | 2026-02-07 | All Decisions | Awaiting selection | ⏳ Pending |
+| 2026-02-08 | CLI-Native Anvil | Agents use bash universally, not MCP | ✅ Insight |
+| 2026-02-08 | Deep Engine Vision | Anvil enables runtime introspection, not just CLI | ✅ Insight |
 
 ---
 
