@@ -25,7 +25,7 @@ const STATUS_CONFIG = {
   },
   [IssueStatus.Deferred]: {
     label: "Deferred",
-    className: "badge-soft badge-ghost",
+    className: "badge-ghost",
     icon: "fa-circle-pause",
   },
 } as const;
