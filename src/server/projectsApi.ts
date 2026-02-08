@@ -2,6 +2,7 @@ import { $ } from "bun";
 import type { ConvexClient } from "convex/browser";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { ProjectState, type ProjectStateValue } from "$convex/schema";
 
 /**
  * Infer a project slug from a git repository path.
@@ -41,6 +42,7 @@ function extractProjectId(url: URL): string | null {
  * REST API handler for project CRUD.
  *
  * - GET    /api/projects        — list all projects with issue counts
+ * - GET    /api/projects/:id    — get a single project with issue counts
  * - POST   /api/projects        — create a project (body: { path })
  * - PATCH  /api/projects/:id    — update project fields
  * - DELETE /api/projects/:id    — remove a project
@@ -52,7 +54,7 @@ export function createProjectsApiHandler(convex: ConvexClient) {
 
     switch (req.method) {
       case "GET":
-        return handleList(convex);
+        return id ? handleGet(convex, id) : handleList(convex);
       case "POST":
         return handleCreate(convex, req);
       case "PATCH":
@@ -88,6 +90,34 @@ async function handleList(convex: ConvexClient): Promise<Response> {
       }),
     );
     return Response.json(results);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+async function handleGet(convex: ConvexClient, id: string): Promise<Response> {
+  try {
+    const project = await convex.query(api.projects.getById, {
+      projectId: id as Id<"projects">,
+    });
+    if (!project) {
+      return Response.json(
+        { error: `Project ${id} not found.` },
+        { status: 404 },
+      );
+    }
+    const counts = await convex.query(api.issues.counts, {
+      projectId: project._id,
+    });
+    return Response.json({
+      id: project._id,
+      slug: project.slug,
+      name: project.name,
+      path: project.path ?? null,
+      state: project.state ?? null,
+      issueCounts: counts,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: message }, { status: 500 });
@@ -173,21 +203,21 @@ async function handleUpdate(
     name?: string;
     slug?: string;
     path?: string;
-    state?: "running" | "paused" | "stopped";
+    state?: ProjectStateValue;
   } = { projectId: id as Id<"projects"> };
 
   if (typeof body.name === "string") updates.name = body.name;
   if (typeof body.slug === "string") updates.slug = body.slug;
   if (typeof body.path === "string") updates.path = body.path;
   if (typeof body.state === "string") {
-    const validStates = ["running", "paused", "stopped"];
-    if (!validStates.includes(body.state)) {
+    const validStates = Object.values(ProjectState);
+    if (!validStates.includes(body.state as (typeof validStates)[number])) {
       return Response.json(
         { error: `Invalid state. Expected one of: ${validStates.join(", ")}` },
         { status: 400 },
       );
     }
-    updates.state = body.state as "running" | "paused" | "stopped";
+    updates.state = body.state as (typeof validStates)[number];
   }
 
   // Check that at least one field is being updated (beyond projectId)
