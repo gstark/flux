@@ -149,9 +149,6 @@ export default defineSchema({
     issueCounter: v.number(),
     path: v.optional(v.string()),
     enabled: v.optional(v.boolean()),
-    // TEMP: legacy field kept for migration compat — remove after running
-    // migrations:stripLegacyFields then redeploy.
-    state: v.optional(v.string()),
   }).index("by_slug", ["slug"]),
 
   issues: defineTable({
@@ -264,9 +261,6 @@ export default defineSchema({
     sessionTimeoutMs: v.number(),
     maxFailures: v.number(),
     maxReviewIterations: v.number(),
-    // TEMP: legacy field kept for migration compat — remove after running
-    // migrations:stripLegacyFields then redeploy.
-    enabled: v.optional(v.boolean()),
   }).index("by_project", ["projectId"]),
 
   dependencies: defineTable({
