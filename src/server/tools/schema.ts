@@ -9,6 +9,15 @@ import {
   SessionStatus,
 } from "$convex/schema";
 
+export type {
+  CloseTypeValue,
+  CommentAuthorValue,
+  EpicStatusValue,
+  IssuePriorityValue,
+  IssueStatusValue,
+  SessionStatusValue,
+} from "$convex/schema";
+
 // ── Derived Zod enums (single source of truth from Convex schema) ────
 const issueStatusEnum = z.enum(
   Object.values(IssueStatus) as [string, ...string[]],
@@ -26,17 +35,6 @@ const closeTypeEnum = z.enum(Object.values(CloseType) as [string, ...string[]]);
 const sessionStatusEnum = z.enum(
   Object.values(SessionStatus) as [string, ...string[]],
 );
-
-// ── Derived TypeScript types for handler type assertions ─────────────
-export type IssueStatusValue = (typeof IssueStatus)[keyof typeof IssueStatus];
-export type IssuePriorityValue =
-  (typeof IssuePriority)[keyof typeof IssuePriority];
-export type EpicStatusValue = (typeof EpicStatus)[keyof typeof EpicStatus];
-export type CommentAuthorValue =
-  (typeof CommentAuthor)[keyof typeof CommentAuthor];
-export type CloseTypeValue = (typeof CloseType)[keyof typeof CloseType];
-export type SessionStatusValue =
-  (typeof SessionStatus)[keyof typeof SessionStatus];
 
 export interface ToolDef {
   name: string;

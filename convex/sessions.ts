@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
+import type { SessionStatusValue } from "./schema";
 import {
   dispositionValidator,
   SessionStatus,
@@ -9,8 +10,6 @@ import {
   sessionStatusValidator,
   sessionTypeValidator,
 } from "./schema";
-
-type SessionStatusValue = (typeof SessionStatus)[keyof typeof SessionStatus];
 
 async function querySessions(
   ctx: QueryCtx,

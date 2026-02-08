@@ -3,6 +3,7 @@ import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { IssueStatusValue } from "$convex/schema";
 import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { callTool } from "../lib/api";
@@ -13,7 +14,7 @@ import { LabelBadge } from "./LabelBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { StatusBadge } from "./StatusBadge";
 
-type StatusFilter = (typeof IssueStatus)[keyof typeof IssueStatus] | null;
+type StatusFilter = IssueStatusValue | null;
 
 const TABS: { label: string; value: StatusFilter }[] = [
   { label: "All", value: null },

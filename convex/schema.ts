@@ -126,6 +126,22 @@ export const dispositionValidator = v.union(
   v.literal(Disposition.Fault),
 );
 
+// ── Derived value types (single source of truth) ─────────────────────
+// SessionPhaseValue is defined inline above (near SessionPhase).
+export type IssueStatusValue = (typeof IssueStatus)[keyof typeof IssueStatus];
+export type IssuePriorityValue =
+  (typeof IssuePriority)[keyof typeof IssuePriority];
+export type SessionStatusValue =
+  (typeof SessionStatus)[keyof typeof SessionStatus];
+export type SessionTypeValue = (typeof SessionType)[keyof typeof SessionType];
+export type SessionEventDirectionValue =
+  (typeof SessionEventDirection)[keyof typeof SessionEventDirection];
+export type CloseTypeValue = (typeof CloseType)[keyof typeof CloseType];
+export type EpicStatusValue = (typeof EpicStatus)[keyof typeof EpicStatus];
+export type CommentAuthorValue =
+  (typeof CommentAuthor)[keyof typeof CommentAuthor];
+export type DispositionValue = (typeof Disposition)[keyof typeof Disposition];
+
 export default defineSchema({
   projects: defineTable({
     slug: v.string(),

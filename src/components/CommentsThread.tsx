@@ -2,12 +2,11 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { CommentAuthorValue } from "$convex/schema";
 import { CommentAuthor } from "$convex/schema";
 import { formatRelativeTime } from "../lib/format";
 import { FontAwesomeIcon, faPaperPlane, Icon } from "./Icon";
 import { Markdown } from "./Markdown";
-
-type CommentAuthorValue = (typeof CommentAuthor)[keyof typeof CommentAuthor];
 
 const AUTHOR_BADGE: Record<
   CommentAuthorValue,

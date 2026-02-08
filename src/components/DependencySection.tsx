@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import type { IssueStatus } from "$convex/schema";
+import type { IssueStatusValue } from "$convex/schema";
 import { FontAwesomeIcon, faPlus, faXmark } from "./Icon";
 import { StatusBadge } from "./StatusBadge";
 
@@ -116,14 +116,12 @@ export function DependencySection({
   );
 }
 
-type Status = (typeof IssueStatus)[keyof typeof IssueStatus];
-
 type DepItem = {
   depId: Id<"dependencies">;
   issueId: Id<"issues">;
   shortId?: string;
   title?: string;
-  status?: Status;
+  status?: IssueStatusValue;
 };
 
 function DepList({

@@ -2,12 +2,11 @@ import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
+import type { IssuePriorityValue } from "$convex/schema";
 import { IssuePriority } from "$convex/schema";
 import { FontAwesomeIcon, faPlus } from "./Icon";
 
-type PriorityValue = (typeof IssuePriority)[keyof typeof IssuePriority];
-
-const PRIORITY_OPTIONS: { value: PriorityValue; label: string }[] = [
+const PRIORITY_OPTIONS: { value: IssuePriorityValue; label: string }[] = [
   { value: IssuePriority.Critical, label: "Critical" },
   { value: IssuePriority.High, label: "High" },
   { value: IssuePriority.Medium, label: "Medium" },
@@ -23,7 +22,9 @@ export function CreateIssueModal() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<PriorityValue>(IssuePriority.Medium);
+  const [priority, setPriority] = useState<IssuePriorityValue>(
+    IssuePriority.Medium,
+  );
   const [titleError, setTitleError] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -136,7 +137,9 @@ export function CreateIssueModal() {
               <select
                 className="select w-full"
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as PriorityValue)}
+                onChange={(e) =>
+                  setPriority(e.target.value as IssuePriorityValue)
+                }
               >
                 {PRIORITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>

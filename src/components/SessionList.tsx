@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
+import type { SessionStatusValue } from "$convex/schema";
 import { SessionStatus } from "$convex/schema";
 import {
   formatDuration,
@@ -11,7 +12,7 @@ import {
 } from "../lib/format";
 import { SessionStatusBadge } from "./SessionStatusBadge";
 
-type StatusFilter = (typeof SessionStatus)[keyof typeof SessionStatus] | null;
+type StatusFilter = SessionStatusValue | null;
 
 const TABS: { label: string; value: StatusFilter }[] = [
   { label: "All", value: null },

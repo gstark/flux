@@ -1,12 +1,10 @@
 import fs from "node:fs/promises";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { SessionEventDirectionValue } from "$convex/schema";
 import { SessionEventDirection } from "$convex/schema";
 import { getConvexClient } from "../convex";
 import { ActivityBuffer } from "./activity-buffer";
-
-type SessionEventDirectionValue =
-  (typeof SessionEventDirection)[keyof typeof SessionEventDirection];
 
 /** Pending event awaiting batch insert to Convex. */
 interface PendingEvent {

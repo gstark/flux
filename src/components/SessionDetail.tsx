@@ -3,6 +3,7 @@ import { useQuery } from "convex/react";
 import { useMemo } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { DispositionValue } from "$convex/schema";
 import {
   Disposition,
   SessionEventDirection,
@@ -291,8 +292,6 @@ function ToolCallCard({ pair }: { pair: ToolCallPair }) {
 }
 
 // -- Existing helpers ---------------------------------------------------------
-
-type DispositionValue = (typeof Disposition)[keyof typeof Disposition];
 
 function dispositionLabel(disposition: DispositionValue): {
   label: string;

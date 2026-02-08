@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import type { CloseTypeValue, IssuePriorityValue } from "$convex/schema";
 import { CloseType, IssuePriority, IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { callTool } from "../lib/api";
@@ -23,9 +24,6 @@ import { LabelPicker } from "./LabelPicker";
 import { Markdown } from "./Markdown";
 import { StatusBadge } from "./StatusBadge";
 
-type CloseTypeValue = (typeof CloseType)[keyof typeof CloseType];
-type PriorityValue = (typeof IssuePriority)[keyof typeof IssuePriority];
-
 const CLOSE_TYPE_LABELS: Record<CloseTypeValue, string> = {
   [CloseType.Completed]: "Completed",
   [CloseType.Wontfix]: "Won't Fix",
@@ -33,7 +31,7 @@ const CLOSE_TYPE_LABELS: Record<CloseTypeValue, string> = {
   [CloseType.Noop]: "No-op",
 };
 
-const PRIORITY_OPTIONS: { value: PriorityValue; label: string }[] = [
+const PRIORITY_OPTIONS: { value: IssuePriorityValue; label: string }[] = [
   { value: IssuePriority.Critical, label: "Critical" },
   { value: IssuePriority.High, label: "High" },
   { value: IssuePriority.Medium, label: "Medium" },
@@ -184,7 +182,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   async function handlePriorityChange(value: string) {
     setSaving(true);
     try {
-      await updateIssue({ issueId, priority: value as PriorityValue });
+      await updateIssue({ issueId, priority: value as IssuePriorityValue });
     } catch (err) {
       showError(err);
     } finally {

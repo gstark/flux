@@ -1,3 +1,4 @@
+import type { IssuePriorityValue } from "$convex/schema";
 import { IssuePriority } from "$convex/schema";
 import { Icon } from "./Icon";
 
@@ -24,9 +25,7 @@ const PRIORITY_CONFIG = {
   },
 } as const;
 
-type Priority = (typeof IssuePriority)[keyof typeof IssuePriority];
-
-export function PriorityBadge({ priority }: { priority: Priority }) {
+export function PriorityBadge({ priority }: { priority: IssuePriorityValue }) {
   const config = PRIORITY_CONFIG[priority];
   return (
     <span className={`badge badge-sm badge-outline gap-1 ${config.className}`}>

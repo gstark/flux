@@ -1,9 +1,10 @@
 // ── Disposition ──────────────────────────────────────────────────────
 // Single source of truth lives in convex/schema.ts — re-export here for convenience.
 
+import type { DispositionValue } from "$convex/schema";
 import { Disposition as _Disposition } from "$convex/schema";
 export { _Disposition as Disposition };
-export type Disposition = (typeof _Disposition)[keyof typeof _Disposition];
+export type Disposition = DispositionValue;
 
 export type DispositionResult =
   | { success: true; disposition: Disposition; note: string }
