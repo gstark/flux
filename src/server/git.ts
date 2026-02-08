@@ -47,7 +47,7 @@ export async function inferProjectSlug(cwd?: string): Promise<string> {
     return segments[segments.length - 1] || "unknown";
   }
   const repoRoot = await resolveRepoRoot();
-  return repoRoot.split("/").pop() || "flux";
+  return repoRoot.split("/").pop() || "unknown";
 }
 
 /**
