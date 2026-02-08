@@ -1648,13 +1648,35 @@ class Orchestrator {
 
 // Survive hot reloads: globalThis persists across Bun HMR re-evaluations,
 // preventing ghost orchestrator instances with dangling Convex subscriptions.
-const _global = globalThis as unknown as { __fluxOrchestrator?: Orchestrator };
+const _global = globalThis as unknown as {
+  __fluxOrchestrators?: Map<string, Orchestrator>;
+};
+
+function getOrchestratorMap(): Map<string, Orchestrator> {
+  if (!_global.__fluxOrchestrators) {
+    _global.__fluxOrchestrators = new Map();
+  }
+  return _global.__fluxOrchestrators;
+}
 
 export function getOrchestrator(projectId: Id<"projects">): Orchestrator {
-  if (!_global.__fluxOrchestrator) {
-    _global.__fluxOrchestrator = new Orchestrator(projectId);
-  }
-  return _global.__fluxOrchestrator;
+  const map = getOrchestratorMap();
+  const existing = map.get(projectId);
+  if (existing) return existing;
+
+  const instance = new Orchestrator(projectId);
+  map.set(projectId, instance);
+  return instance;
+}
+
+/** Remove an orchestrator instance for a project (e.g. when stopping a project). */
+export function removeOrchestrator(projectId: Id<"projects">): boolean {
+  return getOrchestratorMap().delete(projectId);
+}
+
+/** Return all active orchestrator instances, keyed by projectId. */
+export function getAllOrchestrators(): Map<string, Orchestrator> {
+  return getOrchestratorMap();
 }
 
 export { Orchestrator };
