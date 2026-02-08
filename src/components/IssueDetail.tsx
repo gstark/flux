@@ -1,4 +1,4 @@
-import { Link, useRouteContext } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
@@ -6,6 +6,7 @@ import type { CloseTypeValue, IssuePriorityValue } from "$convex/schema";
 import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { useTrackedAction } from "../hooks/useTrackedAction";
 import { PRIORITY_OPTIONS } from "../lib/format";
 import { CommentsThread } from "./CommentsThread";
@@ -23,7 +24,8 @@ import { Markdown } from "./Markdown";
 import { StatusBadge } from "./StatusBadge";
 
 export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
+  const projectSlug = useProjectSlug();
   const issue = useQuery(api.issues.get, { issueId });
   const allLabels = useQuery(api.labels.list, { projectId });
   const updateIssue = useMutation(api.issues.update);
@@ -109,7 +111,11 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
     return (
       <div className="flex flex-col items-center gap-4 p-8">
         <p className="text-base-content/60">Issue not found.</p>
-        <Link to="/issues" className="btn btn-sm">
+        <Link
+          to="/p/$projectSlug/issues"
+          params={{ projectSlug }}
+          className="btn btn-sm"
+        >
           Back to Issues
         </Link>
       </div>
@@ -148,7 +154,11 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
 
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Link to="/issues" className="btn btn-ghost btn-sm">
+        <Link
+          to="/p/$projectSlug/issues"
+          params={{ projectSlug }}
+          className="btn btn-ghost btn-sm"
+        >
           <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
           Back
         </Link>

@@ -8,6 +8,7 @@ import type { SessionPhaseValue } from "$convex/schema";
 import { SessionPhase } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useOrchestratorStatus } from "../hooks/useOrchestratorStatus";
+import { useProjectSlug } from "../hooks/useProjectId";
 import {
   enableOrchestrator,
   killOrchestrator,
@@ -72,6 +73,7 @@ export function OrchestratorStatus({
 }: {
   projectId: Id<"projects">;
 }) {
+  const projectSlug = useProjectSlug();
   const {
     status,
     error: statusError,
@@ -219,8 +221,8 @@ export function OrchestratorStatus({
       {/* State label: link to active session when busy, plain text otherwise */}
       {activeSessionId && !isTransitioning ? (
         <Link
-          to="/sessions/$sessionId"
-          params={{ sessionId: activeSessionId }}
+          to="/p/$projectSlug/sessions/$sessionId"
+          params={{ projectSlug, sessionId: activeSessionId }}
           className="hover:underline"
         >
           {statusLabel}

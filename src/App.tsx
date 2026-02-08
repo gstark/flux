@@ -1,19 +1,15 @@
 import { RouterProvider } from "@tanstack/react-router";
 import { useMemo } from "react";
-import type { Id } from "$convex/_generated/dataModel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { createAppRouter } from "./lib/router";
 import "./index.css";
 
 interface AppProps {
-  projectId: string;
+  defaultSlug: string;
 }
 
-export function App({ projectId }: AppProps) {
-  const router = useMemo(
-    () => createAppRouter({ projectId: projectId as Id<"projects"> }),
-    [projectId],
-  );
+export function App({ defaultSlug }: AppProps) {
+  const router = useMemo(() => createAppRouter({ defaultSlug }), [defaultSlug]);
 
   return (
     <ErrorBoundary>

@@ -1,9 +1,9 @@
-import { useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useCallback, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { useDismiss } from "../hooks/useDismiss";
+import { useProjectId } from "../hooks/useProjectId";
 import { FontAwesomeIcon, faTag } from "./Icon";
 import { LabelBadge } from "./LabelBadge";
 
@@ -16,7 +16,7 @@ export function LabelPicker({
   onChange: (ids: Id<"labels">[]) => void;
   disabled?: boolean;
 }) {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
   const allLabels = useQuery(api.labels.list, { projectId });
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

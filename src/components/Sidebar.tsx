@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useProjectSlug } from "../hooks/useProjectId";
 import {
   FontAwesomeIcon,
   faCircleDot,
@@ -9,11 +10,15 @@ import {
 } from "./Icon";
 
 export function Sidebar() {
+  const projectSlug = useProjectSlug();
+  const params = { projectSlug };
+
   return (
     <ul className="menu min-h-full w-64 bg-base-200 p-4">
       <li>
         <Link
-          to="/issues"
+          to="/p/$projectSlug/issues"
+          params={params}
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
@@ -23,7 +28,8 @@ export function Sidebar() {
       </li>
       <li>
         <Link
-          to="/labels"
+          to="/p/$projectSlug/labels"
+          params={params}
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
@@ -33,7 +39,8 @@ export function Sidebar() {
       </li>
       <li>
         <Link
-          to="/activity"
+          to="/p/$projectSlug/activity"
+          params={params}
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
@@ -43,7 +50,8 @@ export function Sidebar() {
       </li>
       <li>
         <Link
-          to="/sessions"
+          to="/p/$projectSlug/sessions"
+          params={params}
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >
@@ -53,7 +61,8 @@ export function Sidebar() {
       </li>
       <li>
         <Link
-          to="/settings"
+          to="/p/$projectSlug/settings"
+          params={params}
           activeProps={{ className: "menu-active" }}
           inactiveProps={{ className: "" }}
         >

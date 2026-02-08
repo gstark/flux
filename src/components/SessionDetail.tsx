@@ -6,6 +6,7 @@ import type { Id } from "$convex/_generated/dataModel";
 import type { DispositionValue } from "$convex/schema";
 import { SessionStatus } from "$convex/schema";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { useProjectSlug } from "../hooks/useProjectId";
 import { typeLabel } from "../lib/format";
 import {
   groupTranscriptEvents,
@@ -18,6 +19,7 @@ import { SessionStatusBadge } from "./SessionStatusBadge";
 import { SessionTranscript } from "./SessionTranscript";
 
 export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
+  const projectSlug = useProjectSlug();
   const session = useQuery(api.sessions.getWithIssue, { sessionId });
   const {
     results: events,
@@ -64,7 +66,11 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
     return (
       <div className="flex flex-col items-center gap-4 p-8">
         <p className="text-base-content/60">Session not found.</p>
-        <Link to="/sessions" className="btn btn-sm">
+        <Link
+          to="/p/$projectSlug/sessions"
+          params={{ projectSlug }}
+          className="btn btn-sm"
+        >
           Back to Sessions
         </Link>
       </div>
@@ -77,7 +83,11 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <Link to="/sessions" className="btn btn-ghost btn-sm">
+        <Link
+          to="/p/$projectSlug/sessions"
+          params={{ projectSlug }}
+          className="btn btn-ghost btn-sm"
+        >
           <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
           Sessions
         </Link>

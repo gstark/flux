@@ -35,7 +35,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
         >
           Try Again
         </button>
-        <Link to="/issues" className="btn btn-ghost btn-sm">
+        <Link to="/" className="btn btn-ghost btn-sm">
           Back to Issues
         </Link>
       </div>

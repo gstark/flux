@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useProjectSlug } from "../hooks/useProjectId";
 import { FontAwesomeIcon, faMagnifyingGlass } from "./Icon";
 import { IssueSearchResults, useIssueSearch } from "./IssueSearchResults";
 import { PriorityBadge } from "./PriorityBadge";
@@ -21,6 +22,7 @@ export function SearchModal({
   ref: React.RefObject<SearchModalHandle | null>;
 }) {
   const navigate = useNavigate();
+  const projectSlug = useProjectSlug();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,7 +58,10 @@ export function SearchModal({
 
   function navigateToIssue(issueId: string) {
     close();
-    navigate({ to: "/issues/$issueId", params: { issueId } });
+    navigate({
+      to: "/p/$projectSlug/issues/$issueId",
+      params: { projectSlug, issueId },
+    });
   }
 
   const items = results ?? [];

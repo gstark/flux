@@ -14,10 +14,15 @@ async function start() {
   if (!res.ok) {
     throw new Error(`Failed to fetch /api/config: ${res.status}`);
   }
-  const { convexUrl, projectId } = (await res.json()) as {
+  const { convexUrl, projects } = (await res.json()) as {
     convexUrl: string;
-    projectId: string;
+    projects: Array<{ slug: string }>;
   };
+
+  const defaultSlug = projects[0]?.slug;
+  if (!defaultSlug) {
+    throw new Error("No projects configured. Create a project first.");
+  }
 
   const convex = new ConvexReactClient(convexUrl);
   const rootEl = document.getElementById("root");
@@ -25,7 +30,7 @@ async function start() {
   const root = createRoot(rootEl);
   root.render(
     <ConvexProvider client={convex}>
-      <App projectId={projectId} />
+      <App defaultSlug={defaultSlug} />
     </ConvexProvider>,
   );
 }

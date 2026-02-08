@@ -5,6 +5,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { IssueStatusValue } from "$convex/schema";
 import { useDismiss } from "../hooks/useDismiss";
+import { useProjectSlug } from "../hooks/useProjectId";
 import { FontAwesomeIcon, faPlus, faXmark } from "./Icon";
 import { IssueSearchResults, useIssueSearch } from "./IssueSearchResults";
 import { StatusBadge } from "./StatusBadge";
@@ -143,6 +144,7 @@ function DepList({
   onRemove: (blockerId: Id<"issues">, blockedId: Id<"issues">) => void;
   onStartAdd: () => void;
 }) {
+  const projectSlug = useProjectSlug();
   return (
     <div>
       <div className="flex items-center gap-2">
@@ -166,8 +168,8 @@ function DepList({
             return (
               <li key={item.depId} className="flex items-center gap-2 text-sm">
                 <Link
-                  to="/issues/$issueId"
-                  params={{ issueId: item.issueId }}
+                  to="/p/$projectSlug/issues/$issueId"
+                  params={{ projectSlug, issueId: item.issueId }}
                   className="link link-hover font-mono text-sm"
                 >
                   {item.shortId ?? item.issueId}

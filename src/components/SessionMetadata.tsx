@@ -5,6 +5,7 @@ import type {
   SessionStatusValue,
   SessionTypeValue,
 } from "$convex/schema";
+import { useProjectSlug } from "../hooks/useProjectId";
 import {
   formatDuration,
   formatTime,
@@ -52,6 +53,7 @@ export function SessionMetadata({
   startHead,
   endHead,
 }: SessionMetadataProps) {
+  const projectSlug = useProjectSlug();
   return (
     <div className="rounded-lg bg-base-200 p-4">
       <h3 className="mb-3 font-medium text-base-content/60 text-sm">
@@ -80,8 +82,8 @@ export function SessionMetadata({
         <dd>
           {issueShortId ? (
             <Link
-              to="/issues/$issueId"
-              params={{ issueId }}
+              to="/p/$projectSlug/issues/$issueId"
+              params={{ projectSlug, issueId }}
               className="link link-hover font-mono"
             >
               {issueShortId}

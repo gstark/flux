@@ -4,9 +4,9 @@ import {
   createRouter,
   redirect,
 } from "@tanstack/react-router";
-import type { Id } from "$convex/_generated/dataModel";
-import { AppShell } from "../components/AppShell";
 import { NotFound } from "../components/NotFound";
+import { ProjectLayout } from "../components/ProjectLayout";
+import { RootLayout } from "../components/RootLayout";
 import { RouteError } from "../components/RouteError";
 import { ActivityPage } from "../pages/ActivityPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
@@ -17,24 +17,36 @@ import { SessionsPage } from "../pages/SessionsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 
 export interface RouterContext {
-  projectId: Id<"projects">;
+  /** Default project slug used for the root `/` redirect. */
+  defaultSlug: string;
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: AppShell,
+  component: RootLayout,
   notFoundComponent: NotFound,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: () => {
-    throw redirect({ to: "/issues" });
+  beforeLoad: ({ context }) => {
+    throw redirect({
+      to: "/p/$projectSlug/issues",
+      params: { projectSlug: context.defaultSlug },
+    });
   },
 });
 
-const issuesRoute = createRoute({
+/** Layout route: resolves projectSlug → projectId via Convex query. */
+const projectLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
+  path: "/p/$projectSlug",
+  component: ProjectLayout,
+  errorComponent: RouteError,
+});
+
+const issuesRoute = createRoute({
+  getParentRoute: () => projectLayoutRoute,
   path: "/issues",
   component: IssuesPage,
   errorComponent: RouteError,
@@ -48,14 +60,14 @@ const issueDetailRoute = createRoute({
 });
 
 const activityRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => projectLayoutRoute,
   path: "/activity",
   component: ActivityPage,
   errorComponent: RouteError,
 });
 
 const sessionsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => projectLayoutRoute,
   path: "/sessions",
   component: SessionsPage,
   errorComponent: RouteError,
@@ -69,14 +81,14 @@ const sessionDetailRoute = createRoute({
 });
 
 const labelsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => projectLayoutRoute,
   path: "/labels",
   component: LabelsPage,
   errorComponent: RouteError,
 });
 
 const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => projectLayoutRoute,
   path: "/settings",
   component: SettingsPage,
   errorComponent: RouteError,
@@ -84,11 +96,13 @@ const settingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  issuesRoute.addChildren([issueDetailRoute]),
-  activityRoute,
-  sessionsRoute.addChildren([sessionDetailRoute]),
-  labelsRoute,
-  settingsRoute,
+  projectLayoutRoute.addChildren([
+    issuesRoute.addChildren([issueDetailRoute]),
+    activityRoute,
+    sessionsRoute.addChildren([sessionDetailRoute]),
+    labelsRoute,
+    settingsRoute,
+  ]),
 ]);
 
 export function createAppRouter(context: RouterContext) {

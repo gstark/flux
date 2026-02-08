@@ -4,7 +4,7 @@ import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 export function IssuesPage() {
   const isDetailView = useMatch({
-    from: "/issues/$issueId",
+    from: "/p/$projectSlug/issues/$issueId",
     shouldThrow: false,
   });
 

@@ -1,4 +1,4 @@
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
   useCallback,
@@ -11,6 +11,7 @@ import { api } from "$convex/_generated/api";
 import type { IssuePriorityValue } from "$convex/schema";
 import { IssuePriority } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
+import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { PRIORITY_OPTIONS } from "../lib/format";
 import { ErrorBanner } from "./ErrorBanner";
 
@@ -23,7 +24,8 @@ export function CreateIssueModal({
 }: {
   ref?: React.RefObject<CreateIssueModalHandle | null>;
 }) {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
+  const projectSlug = useProjectSlug();
   const navigate = useNavigate();
   const createIssue = useMutation(api.issues.create);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -94,7 +96,10 @@ export function CreateIssueModal({
     }
 
     close();
-    navigate({ to: "/issues/$issueId", params: { issueId } });
+    navigate({
+      to: "/p/$projectSlug/issues/$issueId",
+      params: { projectSlug, issueId },
+    });
   }
 
   return (

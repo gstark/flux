@@ -1,4 +1,4 @@
-import { Link, useRouteContext } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
@@ -6,6 +6,7 @@ import type { Id } from "$convex/_generated/dataModel";
 import type { IssueStatusValue } from "$convex/schema";
 import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
+import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { DeferModal, type DeferModalHandle } from "./DeferModal";
 import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faCirclePause, faCirclePlay } from "./Icon";
@@ -27,7 +28,8 @@ const TABS: { label: string; value: StatusFilter }[] = [
 const PAGE_SIZE = 50;
 
 export function IssueList() {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
+  const projectSlug = useProjectSlug();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
     IssueStatus.Open,
   );
@@ -132,8 +134,8 @@ export function IssueList() {
                 <tr key={issue._id} className="hover:bg-base-200">
                   <td className="p-0">
                     <Link
-                      to="/issues/$issueId"
-                      params={{ issueId: issue._id }}
+                      to="/p/$projectSlug/issues/$issueId"
+                      params={{ projectSlug, issueId: issue._id }}
                       className="block px-4 py-3"
                     >
                       <span className="font-mono text-sm">{issue.shortId}</span>
@@ -141,8 +143,8 @@ export function IssueList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/issues/$issueId"
-                      params={{ issueId: issue._id }}
+                      to="/p/$projectSlug/issues/$issueId"
+                      params={{ projectSlug, issueId: issue._id }}
                       className="block px-4 py-3"
                     >
                       {issue.title}
@@ -150,8 +152,8 @@ export function IssueList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/issues/$issueId"
-                      params={{ issueId: issue._id }}
+                      to="/p/$projectSlug/issues/$issueId"
+                      params={{ projectSlug, issueId: issue._id }}
                       className="block px-4 py-3"
                     >
                       <div className="flex flex-wrap gap-1">
@@ -171,8 +173,8 @@ export function IssueList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/issues/$issueId"
-                      params={{ issueId: issue._id }}
+                      to="/p/$projectSlug/issues/$issueId"
+                      params={{ projectSlug, issueId: issue._id }}
                       className="block px-4 py-3"
                     >
                       <StatusBadge status={issue.status} />
@@ -180,8 +182,8 @@ export function IssueList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/issues/$issueId"
-                      params={{ issueId: issue._id }}
+                      to="/p/$projectSlug/issues/$issueId"
+                      params={{ projectSlug, issueId: issue._id }}
                       className="block px-4 py-3"
                     >
                       <PriorityBadge priority={issue.priority} />

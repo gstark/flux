@@ -3,7 +3,7 @@ import type { Id } from "$convex/_generated/dataModel";
 import { IssueDetail } from "../components/IssueDetail";
 
 export function IssueDetailPage() {
-  const { issueId } = useParams({ from: "/issues/$issueId" });
+  const { issueId } = useParams({ from: "/p/$projectSlug/issues/$issueId" });
 
   return <IssueDetail issueId={issueId as Id<"issues">} />;
 }

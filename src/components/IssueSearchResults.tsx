@@ -1,9 +1,9 @@
-import { useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import type React from "react";
 import { useDeferredValue, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Doc } from "$convex/_generated/dataModel";
+import { useProjectId } from "../hooks/useProjectId";
 
 /** Return type of useIssueSearch — everything consumers need. */
 export interface IssueSearchState {
@@ -24,7 +24,7 @@ export interface IssueSearchState {
  * @param enabled  When false the query is skipped entirely (e.g. dialog not open).
  */
 export function useIssueSearch({ enabled = true } = {}): IssueSearchState {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
 

@@ -1,14 +1,14 @@
-import { useRouteContext } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { useDismissableError } from "../hooks/useDismissableError";
+import { useProjectId } from "../hooks/useProjectId";
 import { useTrackedAction } from "../hooks/useTrackedAction";
 import { ErrorBanner } from "./ErrorBanner";
 
 export function SettingsForm() {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
   const project = useQuery(api.projects.getById, { projectId });
   const config = useQuery(api.orchestratorConfig.get, { projectId });
   const epics = useQuery(api.epics.list, { projectId });

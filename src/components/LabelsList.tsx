@@ -1,13 +1,13 @@
-import { useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
+import { useProjectId } from "../hooks/useProjectId";
 import { CreateLabelForm } from "./CreateLabelForm";
 import { FontAwesomeIcon, faPlus } from "./Icon";
 import { LabelRow } from "./LabelRow";
 
 export function LabelsList() {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
   const labels = useQuery(api.labels.list, { projectId });
   const [showCreate, setShowCreate] = useState(false);
 

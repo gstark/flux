@@ -1,9 +1,10 @@
-import { Link, useRouteContext } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { SessionStatusValue } from "$convex/schema";
 import { SessionStatus } from "$convex/schema";
+import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import {
   formatDuration,
   formatRelativeTime,
@@ -24,7 +25,8 @@ const TABS: { label: string; value: StatusFilter }[] = [
 const PAGE_SIZE = 50;
 
 export function SessionList() {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
+  const projectSlug = useProjectSlug();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
 
   const {
@@ -103,8 +105,8 @@ export function SessionList() {
                 <tr key={session._id} className="hover:bg-base-200">
                   <td className="p-0">
                     <Link
-                      to="/sessions/$sessionId"
-                      params={{ sessionId: session._id }}
+                      to="/p/$projectSlug/sessions/$sessionId"
+                      params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3"
                     >
                       {typeLabel(session.type)}
@@ -112,8 +114,8 @@ export function SessionList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/sessions/$sessionId"
-                      params={{ sessionId: session._id }}
+                      to="/p/$projectSlug/sessions/$sessionId"
+                      params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3 text-sm"
                     >
                       {session.phase ? phaseLabel(session.phase) : "—"}
@@ -121,8 +123,8 @@ export function SessionList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/sessions/$sessionId"
-                      params={{ sessionId: session._id }}
+                      to="/p/$projectSlug/sessions/$sessionId"
+                      params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3"
                     >
                       <SessionStatusBadge status={session.status} />
@@ -131,8 +133,8 @@ export function SessionList() {
                   <td>
                     {session.issueShortId ? (
                       <Link
-                        to="/issues/$issueId"
-                        params={{ issueId: session.issueId }}
+                        to="/p/$projectSlug/issues/$issueId"
+                        params={{ projectSlug, issueId: session.issueId }}
                         className="link link-hover font-mono text-sm"
                       >
                         {session.issueShortId}
@@ -143,8 +145,8 @@ export function SessionList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/sessions/$sessionId"
-                      params={{ sessionId: session._id }}
+                      to="/p/$projectSlug/sessions/$sessionId"
+                      params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3 text-sm"
                     >
                       {session.agent}
@@ -152,8 +154,8 @@ export function SessionList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/sessions/$sessionId"
-                      params={{ sessionId: session._id }}
+                      to="/p/$projectSlug/sessions/$sessionId"
+                      params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3 text-sm"
                     >
                       {formatRelativeTime(session.startedAt)}
@@ -161,8 +163,8 @@ export function SessionList() {
                   </td>
                   <td className="p-0">
                     <Link
-                      to="/sessions/$sessionId"
-                      params={{ sessionId: session._id }}
+                      to="/p/$projectSlug/sessions/$sessionId"
+                      params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3 text-sm"
                     >
                       {formatDuration(session.startedAt, session.endedAt)}

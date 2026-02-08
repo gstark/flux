@@ -1,5 +1,5 @@
-import { useRouteContext } from "@tanstack/react-router";
 import { useNotifications } from "../hooks/useNotifications";
+import { useProjectId } from "../hooks/useProjectId";
 import { modKey, shiftKey } from "../lib/platform";
 import {
   FontAwesomeIcon,
@@ -18,7 +18,7 @@ export function Navbar({
   onSearchClick?: () => void;
   onCreateClick?: () => void;
 }) {
-  const { projectId } = useRouteContext({ from: "__root__" });
+  const projectId = useProjectId();
   const { enabled, supported, toggle } = useNotifications();
 
   return (
