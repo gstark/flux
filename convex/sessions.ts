@@ -1,9 +1,6 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import type { QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
-import type { SessionStatusValue } from "./schema";
 import {
   dispositionValidator,
   SessionStatus,
@@ -11,28 +8,6 @@ import {
   sessionStatusValidator,
   sessionTypeValidator,
 } from "./schema";
-
-async function querySessions(
-  ctx: QueryCtx,
-  args: { projectId: Id<"projects">; status?: SessionStatusValue },
-) {
-  // Compound index narrows by status when provided, avoiding in-memory filter
-  const { status } = args;
-  const sessions = status
-    ? await ctx.db
-        .query("sessions")
-        .withIndex("by_project_status", (q) =>
-          q.eq("projectId", args.projectId).eq("status", status),
-        )
-        .collect()
-    : await ctx.db
-        .query("sessions")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-
-  sessions.sort((a, b) => b.startedAt - a.startedAt);
-  return sessions;
-}
 
 export const create = mutation({
   args: {
@@ -114,7 +89,22 @@ export const list = query({
     status: v.optional(sessionStatusValidator),
   },
   handler: async (ctx, args) => {
-    return await querySessions(ctx, args);
+    const { status } = args;
+    return status
+      ? await ctx.db
+          .query("sessions")
+          .withIndex("by_project_status_startedAt", (q) =>
+            q.eq("projectId", args.projectId).eq("status", status),
+          )
+          .order("desc")
+          .collect()
+      : await ctx.db
+          .query("sessions")
+          .withIndex("by_project_startedAt", (q) =>
+            q.eq("projectId", args.projectId),
+          )
+          .order("desc")
+          .collect();
   },
 });
 
@@ -137,28 +127,6 @@ export const getWithIssue = query({
       issueShortId: issue?.shortId ?? null,
       issueTitle: issue?.title ?? null,
     };
-  },
-});
-
-export const listWithIssues = query({
-  args: {
-    projectId: v.id("projects"),
-    status: v.optional(sessionStatusValidator),
-  },
-  handler: async (ctx, args) => {
-    const sessions = await querySessions(ctx, args);
-
-    const enriched = await Promise.all(
-      sessions.map(async (session) => {
-        const issue = await ctx.db.get(session.issueId);
-        return {
-          ...session,
-          issueShortId: issue?.shortId ?? null,
-        };
-      }),
-    );
-
-    return enriched;
   },
 });
 

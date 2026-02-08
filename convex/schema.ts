@@ -240,7 +240,6 @@ export default defineSchema({
     toolCalls: v.optional(v.number()),
     model: v.optional(v.string()),
   })
-    .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"])
     .index("by_project_startedAt", ["projectId", "startedAt"])
     .index("by_project_status_startedAt", ["projectId", "status", "startedAt"])
