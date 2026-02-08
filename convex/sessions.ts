@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -158,6 +159,48 @@ export const listWithIssues = query({
     );
 
     return enriched;
+  },
+});
+
+export const listPaginatedWithIssues = query({
+  args: {
+    projectId: v.id("projects"),
+    status: v.optional(sessionStatusValidator),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const { status } = args;
+    const page = status
+      ? await ctx.db
+          .query("sessions")
+          .withIndex("by_project_status_startedAt", (q) =>
+            q.eq("projectId", args.projectId).eq("status", status),
+          )
+          .order("desc")
+          .paginate(args.paginationOpts)
+      : await ctx.db
+          .query("sessions")
+          .withIndex("by_project_startedAt", (q) =>
+            q.eq("projectId", args.projectId),
+          )
+          .order("desc")
+          .paginate(args.paginationOpts);
+
+    // Enrich each session with issue shortId
+    const enrichedPage = await Promise.all(
+      page.page.map(async (session) => {
+        const issue = await ctx.db.get(session.issueId);
+        return {
+          ...session,
+          issueShortId: issue?.shortId ?? null,
+        };
+      }),
+    );
+
+    return {
+      ...page,
+      page: enrichedPage,
+    };
   },
 });
 

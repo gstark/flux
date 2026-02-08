@@ -240,6 +240,8 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"])
+    .index("by_project_startedAt", ["projectId", "startedAt"])
+    .index("by_project_status_startedAt", ["projectId", "status", "startedAt"])
     .index("by_issue", ["issueId"]),
 
   sessionEvents: defineTable({

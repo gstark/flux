@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -161,6 +162,33 @@ export const list = query({
           .take(cap);
 
     return issues;
+  },
+});
+
+export const listPaginated = query({
+  args: {
+    projectId: v.id("projects"),
+    status: v.optional(issueStatusValidator),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const { status } = args;
+    return status
+      ? await ctx.db
+          .query("issues")
+          .withIndex("by_project_status_priority", (q) =>
+            q
+              .eq("projectId", args.projectId)
+              .eq("deletedAt", undefined)
+              .eq("status", status),
+          )
+          .paginate(args.paginationOpts)
+      : await ctx.db
+          .query("issues")
+          .withIndex("by_project_priority", (q) =>
+            q.eq("projectId", args.projectId).eq("deletedAt", undefined),
+          )
+          .paginate(args.paginationOpts);
   },
 });
 

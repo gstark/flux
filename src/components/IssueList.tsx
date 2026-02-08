@@ -1,5 +1,5 @@
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
@@ -24,6 +24,8 @@ const TABS: { label: string; value: StatusFilter }[] = [
   { label: "Stuck", value: IssueStatus.Stuck },
   { label: "Deferred", value: IssueStatus.Deferred },
 ];
+
+const PAGE_SIZE = 50;
 
 export function IssueList() {
   const { projectId } = useRouteContext({ from: "__root__" });
@@ -97,10 +99,18 @@ export function IssueList() {
     }
   }
 
-  const issues = useQuery(api.issues.list, {
-    projectId,
-    status: statusFilter ?? undefined,
-  });
+  const {
+    results: issues,
+    status: paginationStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.issues.listPaginated,
+    {
+      projectId,
+      status: statusFilter ?? undefined,
+    },
+    { initialNumItems: PAGE_SIZE },
+  );
 
   const issueCounts = useQuery(api.issues.counts, { projectId });
 
@@ -124,13 +134,14 @@ export function IssueList() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-xl">Issues</h2>
-          {issues && totalForStatus !== undefined && (
-            <span className="text-base-content/60 text-sm">
-              {issues.length < totalForStatus
-                ? `showing ${issues.length} of ${totalForStatus}`
-                : `${totalForStatus} ${totalForStatus === 1 ? "issue" : "issues"}`}
-            </span>
-          )}
+          {paginationStatus !== "LoadingFirstPage" &&
+            totalForStatus !== undefined && (
+              <span className="text-base-content/60 text-sm">
+                {paginationStatus !== "Exhausted"
+                  ? `showing ${issues.length} of ${totalForStatus}`
+                  : `${totalForStatus} ${totalForStatus === 1 ? "issue" : "issues"}`}
+              </span>
+            )}
         </div>
         <CreateIssueModal />
       </div>
@@ -162,7 +173,7 @@ export function IssueList() {
 
       <ErrorBanner error={actionError} onDismiss={clearActionError} />
 
-      {issues === undefined ? (
+      {paginationStatus === "LoadingFirstPage" ? (
         <div className="flex justify-center p-8">
           <span className="loading loading-spinner loading-md" />
         </div>
@@ -262,6 +273,22 @@ export function IssueList() {
               ))}
             </tbody>
           </table>
+          {paginationStatus === "CanLoadMore" && (
+            <div className="flex justify-center py-4">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => loadMore(PAGE_SIZE)}
+              >
+                Load more issues
+              </button>
+            </div>
+          )}
+          {paginationStatus === "LoadingMore" && (
+            <div className="flex justify-center py-4">
+              <span className="loading loading-spinner loading-sm" />
+            </div>
+          )}
         </div>
       )}
 
