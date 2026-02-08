@@ -8,7 +8,6 @@ import { allTools, handlers, type ToolContext } from "./tools";
 type Session = {
   transport: WebStandardStreamableHTTPServerTransport;
   server: McpServer;
-  projectId: string;
 };
 
 /** Sessions keyed by `${projectId}:${mcpSessionId}` to prevent cross-project collisions. */
@@ -119,11 +118,7 @@ export async function handleMcpRequest(
   // Store session for subsequent requests, keyed by project
   if (transport.sessionId) {
     const key = sessionKey(project.projectId, transport.sessionId);
-    sessions.set(key, {
-      transport,
-      server: mcp,
-      projectId: project.projectId,
-    });
+    sessions.set(key, { transport, server: mcp });
     transport.onclose = () => {
       if (transport.sessionId) {
         sessions.delete(sessionKey(project.projectId, transport.sessionId));
