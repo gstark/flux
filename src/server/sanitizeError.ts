@@ -21,8 +21,10 @@ export function sanitizeConvexError(message: string): string {
   // Strip stack trace: everything from "\n    at " onward
   const withoutStack = message.replace(/\n\s+at .*/g, "");
 
-  // Remove the [CONVEX ...] prefix(es) and [Request ID: ...] blocks
-  const withoutBrackets = withoutStack.replace(/\[.*?\]\s*/g, "");
+  // Remove leading [CONVEX ...] and [Request ID: ...] blocks.
+  // Only strip brackets anchored at the start to avoid mangling messages
+  // that legitimately contain brackets (e.g., 'Field [name] is required').
+  const withoutBrackets = withoutStack.replace(/^(?:\[.*?\]\s*)+/, "");
 
   // The remainder looks like: "Server Error\nUncaught Error: Human message"
   // Split on newlines and take the last non-empty line — that's the actual error.
