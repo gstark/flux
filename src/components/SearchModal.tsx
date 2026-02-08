@@ -77,13 +77,14 @@ export function SearchModal({
   }, [items.length, selectedIndex]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    if (items.length === 0) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.min(prev + 1, items.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === "Enter" && items.length > 0) {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       const selected = items[selectedIndex];
       if (selected) navigateToIssue(selected._id);
