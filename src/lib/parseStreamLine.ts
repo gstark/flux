@@ -308,6 +308,11 @@ export function extractTextFromLine(line: string): string | null {
   return texts.length > 0 ? texts.join("") : null;
 }
 
+/** Whether a parsed line represents displayable content (not internal bookkeeping). */
+export function isDisplayableParsedLine(p: ParsedLine): boolean {
+  return p.kind !== "skip" && p.kind !== "tool_input_delta";
+}
+
 /** Safely extract tool input, returning null if not a valid object. */
 function extractToolInput(input: unknown): Record<string, unknown> | null {
   if (input && typeof input === "object" && !Array.isArray(input)) {

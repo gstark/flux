@@ -5,7 +5,11 @@ import {
   type KeyedStreamEvent,
   useActivityStream,
 } from "../hooks/useActivityStream";
-import { type ParsedLine, parseStreamLine } from "../lib/parseStreamLine";
+import {
+  isDisplayableParsedLine,
+  type ParsedLine,
+  parseStreamLine,
+} from "../lib/parseStreamLine";
 
 /**
  * Accumulator state for streaming tool input.
@@ -177,7 +181,7 @@ function groupActivityNodes(
 
     // Activity event — parse and group
     const items = parseStreamLine(event.content).filter(
-      (p) => p.kind !== "skip" && p.kind !== "tool_input_delta",
+      isDisplayableParsedLine,
     );
 
     for (const item of items) {
