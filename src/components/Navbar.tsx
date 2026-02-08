@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useNotifications } from "../hooks/useNotifications";
 import { useProjectId } from "../hooks/useProjectId";
 import { modKey, shiftKey } from "../lib/platform";
@@ -36,7 +37,9 @@ export function Navbar({
           />
         </label>
       </div>
-      <div className="flex-1 px-4 font-bold text-lg">Flux</div>
+      <Link to="/" className="flex-1 px-4 font-bold text-lg">
+        Flux
+      </Link>
       <div className="navbar-end flex items-center gap-2 pr-4">
         {onCreateClick && (
           <button
