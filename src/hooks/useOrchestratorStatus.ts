@@ -43,6 +43,8 @@ export function useOrchestratorStatus() {
 
       es.addEventListener("open", () => {
         retryDelay.current = 1000;
+        // Refetch on reconnect — state may have changed while disconnected
+        fetchStatus();
       });
 
       // Session started → refetch for full status (includes activeSession, phase)
