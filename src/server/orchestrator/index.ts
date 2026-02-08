@@ -1235,7 +1235,7 @@ class Orchestrator {
     // Capture state before scheduleNext() — run() synchronously transitions to
     // Busy before its first await, so this.state would be "busy" by the time
     // emitLifecycle fires if we called scheduleNext() first.
-    const endState = this.state as "stopped" | "idle";
+    const endState = this.state as Exclude<OrchestratorState, "busy">;
 
     // Notify SSE clients the session ended (after state transition so they see the new state)
     this.emitLifecycle({

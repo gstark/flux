@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { OrchestratorState } from "@/shared/orchestrator";
 
 /** Event types from the SSE endpoint */
 export interface SessionStartEvent {
@@ -15,7 +16,7 @@ export interface ActivityEvent {
 
 export interface StatusEvent {
   type: "status";
-  state: "stopped" | "idle" | "busy";
+  state: OrchestratorState;
   message: string;
 }
 
@@ -163,7 +164,7 @@ export function useActivityStream(): ActivityStreamState & {
 
       es.addEventListener("status", (e: MessageEvent) => {
         const data = parseSSE<{
-          state: "stopped" | "idle" | "busy";
+          state: OrchestratorState;
           message: string;
         }>(e, "status", bufferRef.current);
         if (!data) {
