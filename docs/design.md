@@ -169,7 +169,7 @@ Note: "discovered-from" provenance is now tracked via `sourceIssueId` on the iss
 |-------|------|-------|
 | projectId | id("projects") | |
 | issueId | id("issues") | |
-| type | "work" \| "review" | Work = main task + retro (resumed). Review = code review session. |
+| type | "work" \| "review" | Work = main task execution + retro (resumed). Review = code review session. |
 | agentSessionId | string | Claude session UUID (used for --resume) |
 | agent | string | Agent provider name (e.g., "claude"). Extensible for future providers. |
 | status | "running" \| "completed" \| "failed" | |
@@ -941,7 +941,7 @@ All tool schemas are registered upfront in `src/server/tools/schema.ts`. Unimple
     "flux": {
       "type": "stdio",
       "command": "bun",
-      "args": ["run", "/Users/jason/Projects/flux/bin/flux-mcp-stdio.ts"]
+      "args": ["run", "/Users/jason/Projects/flux/src/server/index.ts"]
     }
   }
 }
@@ -1124,14 +1124,14 @@ When spawning an agent, the orchestrator:
 5. The agent works in the repo naturally, same as a human-started session
 
 ### Git State
-- Orchestrator checks for clean working tree before starting a session
-- If dirty: auto-commit with system message (see below), then proceed
+- Orchestrator checks for clean working tree before starting a session (pre-session auto-commit)
+- **Between phases**: auto-commit runs after work→retro, retro→review, and review→next iteration
 - Each session records `startHead` (commit SHA at start)
 - `endHead` updated after each session/review completes (for posterity, diffing, metrics)
 - Commits made during session are tracked via `git log {startHead}..HEAD`
 - No branch management by Flux — agent works on whatever branch is checked out
 - After `kill`: uncommitted changes stay in working tree for human review
-- Between sessions: if agent left dirty state, auto-commit before next issue
+- PID guard prevents race conditions with agent child processes during auto-commit
 
 **Auto-commit Failure Handling:**
 
@@ -1253,7 +1253,7 @@ The `sessionTimeoutMs` timer restarts independently for each phase transition wi
 
 ### Retry / Backoff Strategy
 
-The scheduler implements intelligent retry with exponential backoff:
+The scheduler implements intelligent retry with failure tracking:
 
 **Failure Counting:**
 - `failureCount` increments on: `fault` disposition, malformed response, timeout, orphaned session
@@ -1262,32 +1262,19 @@ The scheduler implements intelligent retry with exponential backoff:
   - **Never reset on success** — failure history is preserved for investigation even after successful completion
   - Note: Review session failures don't increment failureCount (separate concern)
 
-**Backoff Calculation:**
+**Circuit Breaker:**
 ```typescript
-// Plain class implementation (no globalThis)
-class RetryBackoff {
-  private baseDelayMs = 60000;     // 1 minute
-  private maxDelayMs = 3600000;    // 1 hour
-  private backoffMultiplier = 2;
-  private jitterRange = 0.2;       // ±20% jitter
-
-  getDelay(failureCount: number): number {
-    const exponential = this.baseDelayMs * Math.pow(this.backoffMultiplier, failureCount - 1);
-    const capped = Math.min(exponential, this.maxDelayMs);
-    const jitter = capped * this.jitterRange * (Math.random() * 2 - 1);
-    return Math.floor(capped + jitter);
-  }
-}
+// Ready query filters out issues that have exceeded maxFailures
+const candidates = openIssues.filter((i) => i.failureCount < maxFailures);
 ```
 
 **Scheduler Behavior:**
-- First failure: retry immediately (next scheduling cycle)
-- 2nd failure: wait ~2 minutes before picking up again
-- 3rd failure: circuit breaker trips, issue excluded from `issues.ready`
+- First failure: retry on next scheduling cycle (immediate)
+- After `maxFailures` (default 3): circuit breaker trips, issue excluded from `issues.ready`
 - Human must use `issues_retry` to reset and re-queue
 
-**Review Iteration Backoff:**
-- No backoff within review loop — iterations happen immediately
+**Review Iteration Behavior:**
+- No delay within review loop — iterations happen immediately
 - If review fixes were made, next review starts right away
 - This ensures rapid iteration on code quality
 - Only `maxReviewIterations` limits the loop
@@ -1347,7 +1334,7 @@ Features and improvements intentionally deferred to after MVP:
 - **Custom agent tenets**: Per-project tenet configuration
 - **E2E test automation**: Playwright-based automated testing
 
-### Nice-to-Haves (Future Exploration)
+### Nice to-Haves (Future Exploration)
 Features to consider Post-MVP, pending user feedback:
 - **Issue relations**: Non-blocking relationships (`relates_to`, `duplicates`) for better issue linking and discovery
 - **Webhook support**: Session lifecycle events for external integrations
