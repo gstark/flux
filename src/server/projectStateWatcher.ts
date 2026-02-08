@@ -55,14 +55,8 @@ export function startProjectStateWatcher(): () => void {
       // Skip if state hasn't changed (or first observation with no state set)
       if (prev === next) continue;
 
-      // First observation: if state is already set, apply it
-      // (handles server restart — re-sync orchestrators with DB state)
-      if (prev === undefined && next !== undefined) {
-        handleTransition(project, next);
-        continue;
-      }
-
-      // Normal transition
+      // Apply transition: covers both first observation (server restart re-sync)
+      // and normal state changes.
       if (next !== undefined) {
         handleTransition(project, next);
       }

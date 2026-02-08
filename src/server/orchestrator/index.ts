@@ -581,29 +581,36 @@ class Orchestrator {
     // and will apply kill-specific finalization (hand-off semantics).
   }
 
+  /** Max time to wait for Stopped state before giving up (30s). */
+  private static readonly WAIT_FOR_STOPPED_TIMEOUT_MS = 30_000;
+
   /**
    * Returns a promise that resolves when the orchestrator reaches Stopped state.
    * Resolves immediately if already stopped.
-   * Used by the project state watcher to wait for kill() → finalize() to complete
-   * before removing the orchestrator instance from the Map.
+   * Rejects after 30s if Stopped is never reached — prevents indefinite hangs
+   * when the caller (e.g., project state watcher) needs to proceed with cleanup.
    */
   waitForStopped(): Promise<void> {
     if (this.state === OrchestratorState.Stopped) {
       return Promise.resolve();
     }
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        unsub();
+        reject(
+          new Error(
+            `[Orchestrator] waitForStopped timed out after ${Orchestrator.WAIT_FOR_STOPPED_TIMEOUT_MS}ms — ` +
+              `current state: "${this.state}". This indicates a bug in the shutdown path.`,
+          ),
+        );
+      }, Orchestrator.WAIT_FOR_STOPPED_TIMEOUT_MS);
+
       const unsub = this.onLifecycle((event) => {
         if (
-          event.type === "state_change" &&
+          (event.type === "state_change" || event.type === "session_end") &&
           event.state === OrchestratorState.Stopped
         ) {
-          unsub();
-          resolve();
-        }
-        if (
-          event.type === "session_end" &&
-          event.state === OrchestratorState.Stopped
-        ) {
+          clearTimeout(timeout);
           unsub();
           resolve();
         }
