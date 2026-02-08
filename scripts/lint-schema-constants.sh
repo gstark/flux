@@ -41,8 +41,13 @@ run_check() {
   local constant="$2"
   local pattern="$3"
 
-  local results
-  results=$(rg "${RG_BASE[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>/dev/null || true)
+  local results rc=0
+  results=$(rg "${RG_BASE[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>&1) || rc=$?
+  # rg exit codes: 0=matches, 1=no matches, 2=error (bad pattern, I/O, etc.)
+  if [[ $rc -eq 2 ]]; then
+    echo "FATAL: rg failed for check '$label': $results" >&2
+    exit 2
+  fi
 
   if [[ -n "$results" ]]; then
     echo ""
@@ -59,8 +64,13 @@ run_check_pcre() {
   local constant="$2"
   local pattern="$3"
 
-  local results
-  results=$(rg -P "${RG_BASE[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>/dev/null || true)
+  local results rc=0
+  results=$(rg -P "${RG_BASE[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>&1) || rc=$?
+  # rg exit codes: 0=matches, 1=no matches, 2=error (bad pattern, I/O, etc.)
+  if [[ $rc -eq 2 ]]; then
+    echo "FATAL: rg failed for check '$label': $results" >&2
+    exit 2
+  fi
 
   if [[ -n "$results" ]]; then
     echo ""
