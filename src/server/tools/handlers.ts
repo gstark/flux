@@ -70,7 +70,15 @@ function typedHandler<S extends z.ZodType>(
 }
 
 function buildMeta(ctx: ToolContext) {
-  return { project: ctx.projectSlug, timestamp: Date.now() };
+  const orchestrator = ctx.getOrchestrator();
+  const status = orchestrator.getStatus();
+  return {
+    project: ctx.projectSlug,
+    timestamp: Date.now(),
+    orchestrator_status: status.state,
+    active_session: status.activeSession?.sessionId ?? null,
+    scheduler_enabled: status.schedulerEnabled,
+  };
 }
 
 function ok(ctx: ToolContext, data: Record<string, unknown>): ToolResult {
