@@ -1,5 +1,6 @@
 import { useRouteContext } from "@tanstack/react-router";
 import { useNotifications } from "../hooks/useNotifications";
+import { modKey } from "../lib/platform";
 import {
   FontAwesomeIcon,
   faBars,
@@ -8,8 +9,6 @@ import {
   faMagnifyingGlass,
 } from "./Icon";
 import { OrchestratorStatus } from "./OrchestratorStatus";
-
-const modKey = navigator.platform?.startsWith("Mac") ? "⌘" : "Ctrl+";
 
 export function Navbar({ onSearchClick }: { onSearchClick?: () => void }) {
   const { projectId } = useRouteContext({ from: "__root__" });

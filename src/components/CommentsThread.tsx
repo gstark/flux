@@ -6,6 +6,7 @@ import type { CommentAuthorValue } from "$convex/schema";
 import { CommentAuthor } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { formatRelativeTime } from "../lib/format";
+import { modKey } from "../lib/platform";
 import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faPaperPlane, Icon } from "./Icon";
 import { Markdown } from "./Markdown";
@@ -118,7 +119,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
         />
         <div className="flex items-center justify-between">
           <span className="text-base-content/40 text-xs">
-            Ctrl+Enter to submit
+            {modKey}Enter to submit
           </span>
           <button
             type="submit"
