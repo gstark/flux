@@ -634,7 +634,7 @@ class Orchestrator {
       if (phase === SessionPhase.Work) {
         cleanExit = await this.handleWorkExit(exitCode);
       } else if (phase === SessionPhase.Retro) {
-        cleanExit = await this.handleRetroExit(exitCode);
+        cleanExit = await this.handleRetroExit();
       } else if (phase === SessionPhase.Review) {
         cleanExit = await this.handleReviewExit(exitCode);
       }
@@ -845,7 +845,7 @@ class Orchestrator {
    * Handle retro session exit. Retro is advisory — never blocks the pipeline.
    * Always proceeds to review regardless of retro outcome.
    */
-  private async handleRetroExit(_exitCode: number): Promise<boolean> {
+  private async handleRetroExit(): Promise<boolean> {
     const active = this.requireActiveSession("handleRetroExit");
     const { sessionId, issue } = active;
     const convex = getConvexClient();
