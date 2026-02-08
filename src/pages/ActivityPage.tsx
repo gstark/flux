@@ -275,10 +275,11 @@ function activityNodeEqual(
   if (prev.node.key !== next.node.key) return false;
   if (prev.node.type !== next.node.type) return false;
   if (prev.node.type === "tool_call" && next.node.type === "tool_call") {
-    // Result can arrive after the initial tool_use
-    if (prev.node.pair.toolResult !== next.node.pair.toolResult) return false;
-    // Input can be enriched from content_block_start → full assistant message
-    if (prev.node.pair.toolUse.toolInput !== next.node.pair.toolUse.toolInput)
+    // groupActivityNodes creates fresh objects on every call, so reference
+    // comparison always fails. Both fields transition exactly once from null
+    // to non-null (result arrives / input enriched), so nullness is sufficient.
+    if (!prev.node.pair.toolResult !== !next.node.pair.toolResult) return false;
+    if (!prev.node.pair.toolUse.toolInput !== !next.node.pair.toolUse.toolInput)
       return false;
   }
   return true;
