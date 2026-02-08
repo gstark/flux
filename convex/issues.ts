@@ -107,7 +107,9 @@ export const bulkCreate = mutation({
         updatedAt: now,
       });
       const doc = await ctx.db.get(issueId);
-      created.push(doc!);
+      if (!doc)
+        throw new Error(`Failed to read back issue ${issueId} after insert`);
+      created.push(doc);
     }
 
     await ctx.db.patch(args.projectId, { issueCounter: counter });
@@ -226,7 +228,9 @@ export const claim = mutation({
       updatedAt: Date.now(),
     });
     const updated = await ctx.db.get(issueId);
-    return { success: true as const, issue: updated! };
+    if (!updated)
+      throw new Error(`Failed to read back issue ${issueId} after claim`);
+    return { success: true as const, issue: updated };
   },
 });
 

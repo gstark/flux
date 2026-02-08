@@ -20,7 +20,9 @@ async function start() {
   };
 
   const convex = new ConvexReactClient(convexUrl);
-  const root = createRoot(document.getElementById("root")!);
+  const rootEl = document.getElementById("root");
+  if (!rootEl) throw new Error("Missing #root element in document");
+  const root = createRoot(rootEl);
   root.render(
     <ConvexProvider client={convex}>
       <App projectId={projectId} />
