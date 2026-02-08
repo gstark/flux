@@ -346,22 +346,29 @@ export function extractDispositionCandidates(text: string): string[] {
     for (let j = i; j < text.length; j++) {
       const ch = text[j];
 
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-
-      if (ch === "\\") {
-        escaped = true;
+      // Escape sequences only apply inside JSON strings.
+      // Handling them globally would cause a stray backslash outside a
+      // string (e.g. markdown `\{`) to skip the following brace.
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+          continue;
+        }
         continue;
       }
 
       if (ch === '"') {
-        inString = !inString;
+        inString = true;
         continue;
       }
-
-      if (inString) continue;
 
       if (ch === "{") depth++;
       else if (ch === "}") {
@@ -390,10 +397,9 @@ function tryParseDisposition(text: string): DispositionResult | null {
   // Try candidates in reverse order (last match wins, matching old behavior)
   for (let i = candidates.length - 1; i >= 0; i--) {
     try {
-      const parsed = JSON.parse(candidates[i] as string) as Record<
-        string,
-        unknown
-      >;
+      const candidate = candidates[i];
+      if (!candidate) continue;
+      const parsed = JSON.parse(candidate) as Record<string, unknown>;
       if (
         VALID_DISPOSITIONS.has(parsed.disposition as string) &&
         typeof parsed.note === "string"
