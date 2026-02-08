@@ -150,20 +150,21 @@ export async function daemonInstall(): Promise<void> {
   const envVars = resolveEnvVars();
   const programArguments = [bunPath, "run", "dev"];
 
-  // Build PATH: bun's directory + user-local bin + standard system paths.
-  // concurrently spawns children via the shell, so bun/bunx/convex must be findable.
-  // ~/.local/bin is where Claude Code and other user-installed binaries live.
+  // Capture the user's full interactive $PATH at install time so that agents
+  // spawned by the daemon can find all user-installed tools (claude, git, npm,
+  // cargo, homebrew binaries, etc.). Ensure bun's directory is first.
   const bunDir = join(bunPath, "..");
-  const localBin = join(home, ".local/bin");
-  const pathEnv = [
-    bunDir,
-    localBin,
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    "/usr/sbin",
-    "/sbin",
-  ].join(":");
+  const userPath = process.env.PATH ?? "";
+  const seen = new Set<string>();
+  const pathDirs: string[] = [];
+  // Bun first, then everything from the user's shell PATH (deduped)
+  for (const dir of [bunDir, ...userPath.split(":")]) {
+    if (dir && !seen.has(dir)) {
+      seen.add(dir);
+      pathDirs.push(dir);
+    }
+  }
+  const pathEnv = pathDirs.join(":");
 
   console.log(`Bun:        ${bunPath}`);
   console.log(`Mode:       dev`);
