@@ -11,6 +11,7 @@ import {
   faPlus,
 } from "./Icon";
 import { OrchestratorStatus } from "./OrchestratorStatus";
+import { ProjectSwitcher } from "./ProjectSwitcher";
 
 export function Navbar({
   onSearchClick,
@@ -37,9 +38,13 @@ export function Navbar({
           />
         </label>
       </div>
-      <Link to="/" className="flex-1 px-4 font-bold text-lg hover:opacity-80">
-        Flux
-      </Link>
+      <div className="flex flex-1 items-center gap-1 px-4">
+        <Link to="/" className="font-bold text-lg hover:opacity-80">
+          Flux
+        </Link>
+        <span className="text-base-content/30">/</span>
+        <ProjectSwitcher />
+      </div>
       <div className="navbar-end flex items-center gap-2 pr-4">
         {onCreateClick && (
           <button
