@@ -13,8 +13,9 @@ export async function resolveRepoRoot(cwd?: string): Promise<string> {
     }
     return result;
   } catch {
+    const location = cwd ? ` (cwd: ${cwd})` : "";
     throw new Error(
-      "Error: Not in a git repository. Flux requires git for project resolution and change tracking.",
+      `Error: Not in a git repository${location}. Flux requires git for project resolution and change tracking.`,
     );
   }
 }
