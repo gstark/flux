@@ -75,6 +75,9 @@ function updateAccumulator(
     for (const item of items) {
       if (item.kind === "tool_use" && item.blockIndex !== null) {
         acc.blockToTool.set(item.blockIndex, item.toolId);
+        // Clear stale chunks — block indexes reset each turn, so a new
+        // tool_use at the same index means a different tool call.
+        acc.blockJsonChunks.delete(item.blockIndex);
         dirtyBlocks.add(item.blockIndex);
       } else if (item.kind === "tool_input_delta") {
         let chunks = acc.blockJsonChunks.get(item.blockIndex);
