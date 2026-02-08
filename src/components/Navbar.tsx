@@ -1,9 +1,11 @@
 import { useRouteContext } from "@tanstack/react-router";
-import { FontAwesomeIcon, faBars } from "./Icon";
+import { useNotifications } from "../hooks/useNotifications";
+import { FontAwesomeIcon, faBars, faBell, faBellSlash } from "./Icon";
 import { OrchestratorStatus } from "./OrchestratorStatus";
 
 export function Navbar() {
   const { projectId } = useRouteContext({ from: "__root__" });
+  const { enabled, supported, toggle } = useNotifications();
 
   return (
     <div className="navbar w-full bg-base-300">
@@ -21,7 +23,23 @@ export function Navbar() {
         </label>
       </div>
       <div className="flex-1 px-4 font-bold text-lg">Flux</div>
-      <div className="navbar-end pr-4">
+      <div className="navbar-end flex items-center gap-2 pr-4">
+        {supported && (
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm ${enabled ? "text-primary" : "text-base-content/40"}`}
+            onClick={toggle}
+            aria-label={
+              enabled ? "Disable notifications" : "Enable notifications"
+            }
+            title={enabled ? "Notifications on" : "Notifications off"}
+          >
+            <FontAwesomeIcon
+              icon={enabled ? faBell : faBellSlash}
+              aria-hidden="true"
+            />
+          </button>
+        )}
         <OrchestratorStatus projectId={projectId} />
       </div>
     </div>
