@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { IssuePriorityValue } from "$convex/schema";
 import { IssuePriority } from "$convex/schema";
+import { useDismissableError } from "../hooks/useDismissableError";
+import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faPlus } from "./Icon";
 
 const PRIORITY_OPTIONS: { value: IssuePriorityValue; label: string }[] = [
@@ -26,7 +28,7 @@ export function CreateIssueModal() {
     IssuePriority.Medium,
   );
   const [titleError, setTitleError] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { error: submitError, showError, clearError } = useDismissableError();
   const [submitting, setSubmitting] = useState(false);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -49,7 +51,7 @@ export function CreateIssueModal() {
     setDescription("");
     setPriority(IssuePriority.Medium);
     setTitleError(false);
-    setSubmitError(null);
+    clearError();
     setSubmitting(false);
     setIsOpen(false);
   }
@@ -64,7 +66,6 @@ export function CreateIssueModal() {
     }
 
     setSubmitting(true);
-    setSubmitError(null);
 
     let issueId: string;
     try {
@@ -75,9 +76,7 @@ export function CreateIssueModal() {
         priority,
       });
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Failed to create issue",
-      );
+      showError(err);
       setSubmitting(false);
       return;
     }
@@ -149,11 +148,7 @@ export function CreateIssueModal() {
               </select>
             </fieldset>
 
-            {submitError && (
-              <div role="alert" className="alert alert-error text-sm">
-                {submitError}
-              </div>
-            )}
+            <ErrorBanner error={submitError} onDismiss={clearError} />
 
             {/* Actions */}
             <div className="modal-action">

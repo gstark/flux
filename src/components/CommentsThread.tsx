@@ -4,7 +4,9 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { CommentAuthorValue } from "$convex/schema";
 import { CommentAuthor } from "$convex/schema";
+import { useDismissableError } from "../hooks/useDismissableError";
 import { formatRelativeTime } from "../lib/format";
+import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faPaperPlane, Icon } from "./Icon";
 import { Markdown } from "./Markdown";
 
@@ -35,7 +37,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
 
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { error: submitError, showError, clearError } = useDismissableError();
 
   async function handleSubmit(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault();
@@ -43,7 +45,6 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
     if (!trimmed || submitting) return;
 
     setSubmitting(true);
-    setSubmitError(null);
     try {
       await createComment({
         issueId,
@@ -52,9 +53,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
       });
       setDraft("");
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Failed to add comment",
-      );
+      showError(err);
     } finally {
       setSubmitting(false);
     }
@@ -100,11 +99,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
         </div>
       )}
 
-      {submitError && (
-        <div role="alert" className="alert alert-error text-sm">
-          {submitError}
-        </div>
-      )}
+      <ErrorBanner error={submitError} onDismiss={clearError} />
 
       {/* Add comment form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
