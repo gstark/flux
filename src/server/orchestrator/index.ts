@@ -348,34 +348,7 @@ class Orchestrator {
     });
 
     // 10. Wire up agentSessionId extraction from stream-json
-    const activeRef = this.activeSession;
-    monitor.onLine((line) => {
-      if (activeRef.agentSessionId) return; // Already captured
-      try {
-        const obj = JSON.parse(line) as Record<string, unknown>;
-        if (obj.type === "system" && typeof obj.session_id === "string") {
-          activeRef.agentSessionId = obj.session_id;
-          // Persist immediately so it survives hot reloads. Without this,
-          // a module re-evaluation loses the in-memory value and re-adopted
-          // sessions can't resume for retro.
-          getConvexClient()
-            .mutation(api.sessions.update, {
-              sessionId: activeRef.sessionId,
-              agentSessionId: obj.session_id,
-            })
-            .catch((err: unknown) => {
-              activeRef.agentSessionIdPersistFailed = true;
-              console.error(
-                "[Orchestrator] Failed to persist agentSessionId — " +
-                  "a hot reload before handleWorkExit will lose it:",
-                err,
-              );
-            });
-        }
-      } catch {
-        // Not JSON — ignore
-      }
-    });
+    this.wireAgentSessionIdExtraction(this.activeSession, monitor);
 
     // 11. Fire-and-forget: handle agent exit in background
     agentProcess.wait().then(
@@ -459,6 +432,57 @@ class Orchestrator {
       clearTimeout(this.activeSession.timeoutTimer);
       this.activeSession.timeoutTimer = null;
     }
+  }
+
+  // ── Agent session ID extraction ────────────────────────────────────
+
+  /**
+   * Wire up agentSessionId extraction from stream-json output.
+   *
+   * Registers a monitor.onLine() callback that parses JSON lines looking for
+   * the `{ type: "system", session_id: "..." }` message emitted by Claude.
+   * On capture, persists the ID to Convex immediately (survives hot reloads)
+   * and sets a failure flag if the persist call rejects.
+   *
+   * Resets `agentSessionId` and `agentSessionIdPersistFailed` on the active
+   * session before wiring, so callers don't need to clear stale values from
+   * previous phases.
+   */
+  private wireAgentSessionIdExtraction(
+    active: ActiveSession,
+    monitor: SessionMonitor,
+  ): void {
+    // Reset from any previous phase (e.g., work → review transition)
+    active.agentSessionId = null;
+    active.agentSessionIdPersistFailed = false;
+
+    monitor.onLine((line) => {
+      if (active.agentSessionId) return; // Already captured
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>;
+        if (obj.type === "system" && typeof obj.session_id === "string") {
+          active.agentSessionId = obj.session_id;
+          // Persist immediately so it survives hot reloads. Without this,
+          // a module re-evaluation loses the in-memory value and re-adopted
+          // sessions can't resume for retro.
+          getConvexClient()
+            .mutation(api.sessions.update, {
+              sessionId: active.sessionId,
+              agentSessionId: obj.session_id,
+            })
+            .catch((err: unknown) => {
+              active.agentSessionIdPersistFailed = true;
+              console.error(
+                "[Orchestrator] Failed to persist agentSessionId — " +
+                  "will recover in exit handler:",
+                err,
+              );
+            });
+        }
+      } catch {
+        // Not JSON — ignore
+      }
+    });
   }
 
   // ── PID watchdog ────────────────────────────────────────────────────
@@ -1223,35 +1247,9 @@ class Orchestrator {
     active.monitor = reviewMonitor;
     active.monitorDone = reviewMonitorDone;
     active.phase = SessionPhase.Review;
-    // Reset agentSessionId for the new session record (work phase values are stale)
-    active.agentSessionId = null;
-    active.agentSessionIdPersistFailed = false;
 
-    // Wire up agentSessionId extraction from stream-json (same as work phase)
-    reviewMonitor.onLine((line) => {
-      if (active.agentSessionId) return; // Already captured
-      try {
-        const obj = JSON.parse(line) as Record<string, unknown>;
-        if (obj.type === "system" && typeof obj.session_id === "string") {
-          active.agentSessionId = obj.session_id;
-          getConvexClient()
-            .mutation(api.sessions.update, {
-              sessionId: active.sessionId,
-              agentSessionId: obj.session_id,
-            })
-            .catch((err: unknown) => {
-              active.agentSessionIdPersistFailed = true;
-              console.error(
-                "[Orchestrator] Failed to persist review agentSessionId — " +
-                  "will recover in handleReviewExit:",
-                err,
-              );
-            });
-        }
-      } catch {
-        // Not JSON — ignore
-      }
-    });
+    // Wire up agentSessionId extraction (resets stale values from previous phase)
+    this.wireAgentSessionIdExtraction(active, reviewMonitor);
 
     // Notify SSE clients about the new monitor
     this.emitLifecycle({ type: "monitor_changed", monitor: reviewMonitor });
