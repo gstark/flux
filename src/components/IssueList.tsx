@@ -1,4 +1,4 @@
-import { useNavigate, useRouteContext } from "@tanstack/react-router";
+import { Link, useRouteContext } from "@tanstack/react-router";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
@@ -41,7 +41,6 @@ export function IssueList() {
     clearError: clearActionError,
   } = useDismissableError();
   const [undeferringId, setUndeferringId] = useState<Id<"issues"> | null>(null);
-  const navigate = useNavigate();
 
   async function handleUndefer(issueId: Id<"issues">) {
     setUndeferringId(issueId);
@@ -134,50 +133,70 @@ export function IssueList() {
             </thead>
             <tbody>
               {issues.map((issue) => (
-                <tr
-                  key={issue._id}
-                  className="cursor-pointer hover:bg-base-200"
-                  onClick={() =>
-                    navigate({
-                      to: "/issues/$issueId",
-                      params: { issueId: issue._id },
-                    })
-                  }
-                >
-                  <td>
-                    <span className="font-mono text-sm">{issue.shortId}</span>
+                <tr key={issue._id} className="hover:bg-base-200">
+                  <td className="p-0">
+                    <Link
+                      to="/issues/$issueId"
+                      params={{ issueId: issue._id }}
+                      className="block px-4 py-3"
+                    >
+                      <span className="font-mono text-sm">{issue.shortId}</span>
+                    </Link>
                   </td>
-                  <td>{issue.title}</td>
-                  <td>
-                    <div className="flex flex-wrap gap-1">
-                      {(issue.labelIds ?? []).map((id) => {
-                        const label = labelMap.get(id);
-                        if (!label) return null;
-                        return (
-                          <LabelBadge
-                            key={id}
-                            name={label.name}
-                            color={label.color}
-                          />
-                        );
-                      })}
-                    </div>
+                  <td className="p-0">
+                    <Link
+                      to="/issues/$issueId"
+                      params={{ issueId: issue._id }}
+                      className="block px-4 py-3"
+                    >
+                      {issue.title}
+                    </Link>
                   </td>
-                  <td>
-                    <StatusBadge status={issue.status} />
+                  <td className="p-0">
+                    <Link
+                      to="/issues/$issueId"
+                      params={{ issueId: issue._id }}
+                      className="block px-4 py-3"
+                    >
+                      <div className="flex flex-wrap gap-1">
+                        {(issue.labelIds ?? []).map((id) => {
+                          const label = labelMap.get(id);
+                          if (!label) return null;
+                          return (
+                            <LabelBadge
+                              key={id}
+                              name={label.name}
+                              color={label.color}
+                            />
+                          );
+                        })}
+                      </div>
+                    </Link>
                   </td>
-                  <td>
-                    <PriorityBadge priority={issue.priority} />
+                  <td className="p-0">
+                    <Link
+                      to="/issues/$issueId"
+                      params={{ issueId: issue._id }}
+                      className="block px-4 py-3"
+                    >
+                      <StatusBadge status={issue.status} />
+                    </Link>
+                  </td>
+                  <td className="p-0">
+                    <Link
+                      to="/issues/$issueId"
+                      params={{ issueId: issue._id }}
+                      className="block px-4 py-3"
+                    >
+                      <PriorityBadge priority={issue.priority} />
+                    </Link>
                   </td>
                   <td>
                     {issue.status === IssueStatus.Deferred ? (
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUndefer(issue._id);
-                        }}
+                        onClick={() => handleUndefer(issue._id)}
                         disabled={undeferringId === issue._id}
                       >
                         {undeferringId === issue._id ? (
@@ -194,10 +213,7 @@ export function IssueList() {
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deferRef.current?.open(issue._id);
-                        }}
+                        onClick={() => deferRef.current?.open(issue._id)}
                       >
                         <FontAwesomeIcon
                           icon={faCirclePause}
