@@ -3,6 +3,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { ProjectState, type ProjectStateValue } from "$convex/schema";
 import { inferProjectSlug, validateProjectPath } from "./git";
+import { sanitizeConvexError } from "./sanitizeError";
 
 /**
  * Extract the Convex document ID from the URL path.
@@ -77,7 +78,9 @@ async function handleList(convex: ConvexClient): Promise<Response> {
     );
     return Response.json(results);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeConvexError(
+      err instanceof Error ? err.message : String(err),
+    );
     return Response.json({ error: message }, { status: 500 });
   }
 }
@@ -105,7 +108,9 @@ async function handleGet(convex: ConvexClient, id: string): Promise<Response> {
       issueCounts: counts,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeConvexError(
+      err instanceof Error ? err.message : String(err),
+    );
     return Response.json({ error: message }, { status: 500 });
   }
 }
@@ -162,7 +167,9 @@ async function handleCreate(
       { status: 201 },
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeConvexError(
+      err instanceof Error ? err.message : String(err),
+    );
     // Convex throws on duplicate slug — surface as 409 Conflict
     if (message.includes("already exists")) {
       return Response.json({ error: message }, { status: 409 });
@@ -245,7 +252,9 @@ async function handleUpdate(
       state: project.state ?? null,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeConvexError(
+      err instanceof Error ? err.message : String(err),
+    );
     if (message.includes("not found")) {
       return Response.json({ error: message }, { status: 404 });
     }
@@ -273,7 +282,9 @@ async function handleDelete(
     });
     return new Response(null, { status: 204 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeConvexError(
+      err instanceof Error ? err.message : String(err),
+    );
     if (message.includes("not found")) {
       return Response.json({ error: message }, { status: 404 });
     }

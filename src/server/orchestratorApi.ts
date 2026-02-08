@@ -3,6 +3,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { ProjectState } from "$convex/schema";
 import type { Orchestrator } from "./orchestrator";
+import { sanitizeConvexError } from "./sanitizeError";
 
 type OrchestratorAction = "enable" | "stop" | "kill" | "status";
 
@@ -100,7 +101,9 @@ export function createOrchestratorApiHandler(
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = sanitizeConvexError(
+        err instanceof Error ? err.message : String(err),
+      );
       return Response.json({ error: message }, { status: 500 });
     }
   };
