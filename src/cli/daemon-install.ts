@@ -29,7 +29,8 @@ function resolveEnvVars(): { CONVEX_URL: string; FLUX_PORT: string } {
         const match = line.match(/^CONVEX_URL\s*=\s*(.+)/);
         const value = match?.[1];
         if (value) {
-          convexUrl = value.trim();
+          // Strip surrounding quotes (single or double) common in .env files
+          convexUrl = value.trim().replace(/^(['"])(.*)\1$/, "$2");
           break;
         }
       }
@@ -155,12 +156,17 @@ export async function daemonInstall(): Promise<void> {
   mkdirSync(launchAgentsDir, { recursive: true });
 
   // 3. If already loaded, unload first (idempotent reinstall)
-  try {
-    execSync(`launchctl list ${LABEL}`, { stdio: "pipe" });
+  const isLoaded = (() => {
+    try {
+      execSync(`launchctl list ${LABEL}`, { stdio: "pipe" });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  if (isLoaded) {
     console.log(`Unloading existing ${LABEL}...`);
     execSync(`launchctl unload ${plistPath}`, { stdio: "pipe" });
-  } catch {
-    // Not currently loaded — that's fine
   }
 
   // 4. Write the plist
