@@ -1779,7 +1779,16 @@ export function getOrchestrator(
     // covers the PATCH /api/projects/:id flow where the database path is
     // updated but the in-memory orchestrator still holds the old value.
     if (projectPath && projectPath !== existing.getProjectPath()) {
-      existing.updateProjectPath(projectPath);
+      const { state } = existing.getStatus();
+      if (state === OrchestratorState.Stopped) {
+        existing.updateProjectPath(projectPath);
+      } else {
+        console.warn(
+          `[Orchestrator] projectPath for ${projectId} changed ` +
+            `("${existing.getProjectPath()}" → "${projectPath}") ` +
+            `but orchestrator is "${state}" — deferring update until stopped.`,
+        );
+      }
     }
     return existing;
   }
