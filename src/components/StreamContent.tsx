@@ -2,8 +2,10 @@ import { type ParsedLine, summarizeToolInput } from "../lib/parseStreamLine";
 import { FontAwesomeIcon, faCircleCheck, faScrewdriverWrench } from "./Icon";
 
 /**
- * Shared renderer for parsed stream-json lines.
- * Used by both the Activity feed (real-time) and Session transcript (historical).
+ * Renderer for parsed stream-json lines.
+ * Primary consumer is the Activity feed (real-time streaming).
+ * SessionDetail uses this only for `text` kind nodes; tool calls
+ * are rendered via ToolCallCard directly.
  */
 export function StreamContent({ parsed }: { parsed: ParsedLine }) {
   switch (parsed.kind) {
