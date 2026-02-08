@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /**
  * Lightweight markdown renderer for issue descriptions, close reasons, and comments.
- * Supports: headings, fenced code blocks, inline code, bold, italic, links (markdown & bare URLs), unordered/ordered lists.
+ * Supports: headings, fenced code blocks, horizontal rules, inline code, bold, italic, links (markdown & bare URLs), unordered/ordered lists.
  * No external dependencies — intentionally minimal for our use case.
  */
 
@@ -147,6 +147,13 @@ function parseMarkdown(source: string): ReactNode[] {
           {parseInline(content)}
         </Tag>,
       );
+      i++;
+      continue;
+    }
+
+    // Horizontal rule: three or more -, *, or _ on a line by themselves
+    if (/^[ \t]*(-{3,}|\*{3,}|_{3,})[ \t]*$/.test(line)) {
+      elements.push(<hr key={`hr-${i}`} className="border-base-300" />);
       i++;
       continue;
     }
