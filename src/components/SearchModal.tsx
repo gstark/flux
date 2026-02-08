@@ -1,6 +1,12 @@
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { api } from "$convex/_generated/api";
 import { FontAwesomeIcon, faMagnifyingGlass } from "./Icon";
 import { PriorityBadge } from "./PriorityBadge";
@@ -30,19 +36,12 @@ export function SearchModal({
     isOpen && deferredSearch ? { projectId, query: deferredSearch } : "skip",
   );
 
-  // Expose open() to parent via ref
-  useEffect(() => {
-    if (!ref) return;
-    (ref as React.MutableRefObject<SearchModalHandle | null>).current = {
-      open() {
-        dialogRef.current?.showModal();
-        setIsOpen(true);
-      },
-    };
-    return () => {
-      (ref as React.MutableRefObject<SearchModalHandle | null>).current = null;
-    };
-  }, [ref]);
+  function open() {
+    dialogRef.current?.showModal();
+    setIsOpen(true);
+  }
+
+  useImperativeHandle(ref, () => ({ open }));
 
   // Focus input when dialog opens
   useEffect(() => {
@@ -66,6 +65,13 @@ export function SearchModal({
 
   const isStale = deferredSearch !== search.trim();
   const items = results ?? [];
+
+  // Clamp selectedIndex when results shrink
+  useEffect(() => {
+    if (items.length > 0 && selectedIndex >= items.length) {
+      setSelectedIndex(items.length - 1);
+    }
+  }, [items.length, selectedIndex]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {

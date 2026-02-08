@@ -9,6 +9,8 @@ import {
 } from "./Icon";
 import { OrchestratorStatus } from "./OrchestratorStatus";
 
+const modKey = navigator.platform?.startsWith("Mac") ? "⌘" : "Ctrl+";
+
 export function Navbar({ onSearchClick }: { onSearchClick?: () => void }) {
   const { projectId } = useRouteContext({ from: "__root__" });
   const { enabled, supported, toggle } = useNotifications();
@@ -35,10 +37,10 @@ export function Navbar({ onSearchClick }: { onSearchClick?: () => void }) {
             type="button"
             className="btn btn-ghost btn-sm gap-2"
             onClick={onSearchClick}
-            title="Search issues (⌘K)"
+            title={`Search issues (${modKey}K)`}
           >
             <FontAwesomeIcon icon={faMagnifyingGlass} aria-hidden="true" />
-            <kbd className="kbd kbd-xs">⌘K</kbd>
+            <kbd className="kbd kbd-xs">{modKey}K</kbd>
           </button>
         )}
         {supported && (

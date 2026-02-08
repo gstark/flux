@@ -1,6 +1,12 @@
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { api } from "$convex/_generated/api";
 import type { IssuePriorityValue } from "$convex/schema";
 import { IssuePriority } from "$convex/schema";
@@ -42,17 +48,7 @@ export function CreateIssueModal({
     setIsOpen(true);
   }, []);
 
-  // Expose open() to parent via ref for keyboard shortcut triggering
-  useEffect(() => {
-    if (!ref) return;
-    (ref as React.MutableRefObject<CreateIssueModalHandle | null>).current = {
-      open,
-    };
-    return () => {
-      (ref as React.MutableRefObject<CreateIssueModalHandle | null>).current =
-        null;
-    };
-  }, [ref, open]);
+  useImperativeHandle(ref, () => ({ open }), [open]);
 
   useEffect(() => {
     if (isOpen) titleInputRef.current?.focus();
