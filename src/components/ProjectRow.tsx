@@ -249,6 +249,7 @@ export function ProjectRow({ project }: { project: Project }) {
             type="button"
             className="btn btn-ghost btn-sm"
             onClick={startEdit}
+            aria-label="Edit project"
             title="Edit project"
           >
             <FontAwesomeIcon icon={faPen} aria-hidden="true" />
@@ -275,6 +276,7 @@ export function ProjectRow({ project }: { project: Project }) {
               type="button"
               className="btn btn-ghost btn-sm text-error"
               onClick={() => setConfirmDelete(true)}
+              aria-label="Remove project"
               title="Remove project"
             >
               <FontAwesomeIcon icon={faTrash} aria-hidden="true" />
