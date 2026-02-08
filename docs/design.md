@@ -1249,6 +1249,9 @@ When a session exceeds `sessionTimeoutMs`, the orchestrator:
 4. Marks session as `failed` with `exitCode: null` and `disposition: "fault"`
 5. Issue remains `in_progress` — human must review and decide
 
+**Per-Phase Timeout:**
+The `sessionTimeoutMs` timer restarts independently for each phase transition within an issue lifecycle (work → retro → review). Each phase is a separate agent invocation — either a new process (review) or a resumed session with a new prompt (retro) — so each deserves its own full timeout window. This means a single issue could run for up to ~3× the configured timeout in the worst case (e.g., 30min work + 30min retro + 30min review = 90min). This is intentional: capping total wall-clock time per issue would penalize complex work that legitimately needs time in each phase.
+
 ### Retry / Backoff Strategy
 
 The scheduler implements intelligent retry with exponential backoff:
