@@ -343,6 +343,7 @@ const issues_defer = typedHandler(
       const updated = await ctx.convex.mutation(api.issues.update, {
         issueId: issueId as Id<"issues">,
         status: IssueStatus.Deferred,
+        deferNote: note,
       });
       await ctx.convex.mutation(api.comments.create, {
         issueId: issueId as Id<"issues">,
@@ -377,6 +378,7 @@ const issues_undefer = typedHandler(
       const updated = await ctx.convex.mutation(api.issues.update, {
         issueId: issueId as Id<"issues">,
         status: IssueStatus.Open,
+        deferNote: "",
       });
       await ctx.convex.mutation(api.comments.create, {
         issueId: issueId as Id<"issues">,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { CloseTypeValue, IssuePriorityValue } from "$convex/schema";
-import { CommentAuthor, IssueStatus } from "$convex/schema";
+import { IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { callTool } from "../lib/api";
@@ -23,8 +23,6 @@ import { LabelPicker } from "./LabelPicker";
 import { Markdown } from "./Markdown";
 import { StatusBadge } from "./StatusBadge";
 
-const DEFER_PREFIX = "Deferred: ";
-
 export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const { projectId } = useRouteContext({ from: "__root__" });
   const issue = useQuery(api.issues.get, { issueId });
@@ -32,7 +30,6 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const updateIssue = useMutation(api.issues.update);
   const retryIssue = useMutation(api.issues.retry);
   const closeIssue = useMutation(api.issues.close);
-  const comments = useQuery(api.comments.list, { issueId });
 
   const [saving, setSaving] = useState(false);
 
@@ -70,17 +67,8 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const isInProgress = currentIssue.status === IssueStatus.InProgress;
   const isStuck = currentIssue.status === IssueStatus.Stuck;
 
-  // Extract the most recent defer reason from Flux-authored "Deferred: ..." comments
-  const deferReason = isDeferred
-    ? (comments ?? [])
-        .filter(
-          (c) =>
-            c.author === CommentAuthor.Flux &&
-            c.content.startsWith(DEFER_PREFIX),
-        )
-        .at(-1)
-        ?.content.slice(DEFER_PREFIX.length)
-    : undefined;
+  // Read defer reason directly from the issue field (set by issues_defer handler)
+  const deferReason = isDeferred ? currentIssue.deferNote : undefined;
 
   // Any mutation in flight — disables interactive controls
   const busy = saving || deferring || undeferring || resetting;

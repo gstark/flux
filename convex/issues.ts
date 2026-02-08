@@ -317,6 +317,7 @@ export const update = mutation({
     sourceIssueId: v.optional(v.id("issues")),
     closeType: v.optional(closeTypeValidator),
     closeReason: v.optional(v.string()),
+    deferNote: v.optional(v.string()),
     epicId: v.optional(v.id("epics")),
     labelIds: v.optional(v.array(v.id("labels"))),
   },
