@@ -37,7 +37,11 @@ export function IssueList() {
   const [deferTargetId, setDeferTargetId] = useState<Id<"issues"> | null>(null);
   const [deferNote, setDeferNote] = useState("");
   const [deferring, setDeferring] = useState(false);
-  const [deferError, setDeferError] = useState<string | null>(null);
+  const {
+    error: deferError,
+    showError: showDeferError,
+    clearError: clearDeferError,
+  } = useDismissableError();
   const {
     error: actionError,
     showError: showActionError,
@@ -55,7 +59,7 @@ export function IssueList() {
   function openDeferModal(issueId: Id<"issues">) {
     setDeferTargetId(issueId);
     setDeferNote("");
-    setDeferError(null);
+    clearDeferError();
     dialogRef.current?.showModal();
   }
 
@@ -63,13 +67,13 @@ export function IssueList() {
     dialogRef.current?.close();
     setDeferTargetId(null);
     setDeferNote("");
-    setDeferError(null);
+    clearDeferError();
   }
 
   async function handleDefer() {
     if (!deferTargetId) return;
     setDeferring(true);
-    setDeferError(null);
+    clearDeferError();
     try {
       await callTool("issues_defer", {
         issueId: deferTargetId,
@@ -77,9 +81,7 @@ export function IssueList() {
       });
       closeDeferModal();
     } catch (err) {
-      setDeferError(
-        err instanceof Error ? err.message : "Failed to defer issue",
-      );
+      showDeferError(err);
     } finally {
       setDeferring(false);
     }
@@ -290,11 +292,7 @@ export function IssueList() {
               rows={3}
             />
           </fieldset>
-          {deferError && (
-            <div role="alert" className="alert alert-error mt-3 text-sm">
-              {deferError}
-            </div>
-          )}
+          <ErrorBanner error={deferError} onDismiss={clearDeferError} />
           <div className="modal-action">
             <button
               type="button"
