@@ -1590,6 +1590,7 @@ $ flux daemon start    # Managed by OS
 | 2026-02-08 | Deep Engine Vision | Anvil enables runtime introspection, not just CLI | ✅ Insight |
 | 2026-02-08 | Ambient Context | Pre-called queries, keyword triggers, live dashboard | ✅ Insight |
 | 2026-02-08 | Native Agent Vision | Deep integration, push updates, learned patterns | 📝 Exploration |
+| 2026-02-08 | External Feedback | Peer review on Anvil, planning, verification, build order | ✅ Incorporated |
 
 ---
 
