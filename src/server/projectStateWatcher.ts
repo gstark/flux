@@ -116,6 +116,37 @@ async function handleTransition(
 }
 
 /**
+ * Reset project state in Convex after a failed transition.
+ * This ensures the UI reflects reality: if enable() failed, the project
+ * isn't actually running.
+ */
+async function resetProjectState(
+  projectId: Id<"projects">,
+  rollbackState: ProjectStateValue,
+  originalError: unknown,
+): Promise<void> {
+  console.error(
+    `[ProjectStateWatcher] Resetting project ${projectId} to "${rollbackState}" after failed transition`,
+  );
+  try {
+    const convex = getConvexClient();
+    await convex.mutation(api.projects.update, {
+      projectId,
+      state: rollbackState,
+    });
+  } catch (resetErr) {
+    // If even the rollback fails, we're in a bad spot — log both errors
+    // so the operator can investigate. The project state in Convex is now
+    // desynchronized from the orchestrator.
+    console.error(
+      `[ProjectStateWatcher] CRITICAL: Failed to reset project ${projectId} to "${rollbackState}". ` +
+        `Project state is desynchronized.`,
+      { originalError, resetErr },
+    );
+  }
+}
+
+/**
  * running → create orchestrator (if not exists) and enable().
  * Subscribes to ready issues and starts scheduling.
  */
@@ -138,6 +169,8 @@ async function handleRunning(project: ProjectSnapshot): Promise<void> {
       `[ProjectStateWatcher] Failed to enable orchestrator for project ${project._id}:`,
       err,
     );
+    // Orchestrator never started — reset to stopped so UI reflects reality
+    await resetProjectState(project._id, ProjectState.Stopped, err);
   }
 }
 
@@ -163,6 +196,8 @@ async function handlePaused(project: ProjectSnapshot): Promise<void> {
       `[ProjectStateWatcher] Failed to stop orchestrator for project ${project._id}:`,
       err,
     );
+    // stop() failed — orchestrator is still running, reset to running
+    await resetProjectState(project._id, ProjectState.Running, err);
   }
 }
 
@@ -201,6 +236,9 @@ async function handleStopped(project: ProjectSnapshot): Promise<void> {
       `[ProjectStateWatcher] Failed to stop/remove orchestrator for project ${project._id}:`,
       err,
     );
+    // Kill/cleanup failed — orchestrator is still alive, reset to paused
+    // (it may be partially stopped but not fully cleaned up)
+    await resetProjectState(project._id, ProjectState.Paused, err);
   }
 }
 
