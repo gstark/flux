@@ -47,6 +47,8 @@ interface ActiveSession {
   startHead: string;
   /** Claude session UUID captured from stream-json output */
   agentSessionId: string | null;
+  /** True if persisting agentSessionId to Convex failed. A hot reload would lose it. */
+  agentSessionIdPersistFailed: boolean;
   /** Issue context for prompt building */
   issue: WorkPromptContext;
   /** Current phase of the issue lifecycle */
@@ -323,6 +325,7 @@ class Orchestrator {
       timedOut: false,
       startHead,
       agentSessionId: null,
+      agentSessionIdPersistFailed: false,
       issue: issueCtx,
       phase: SessionPhase.Work,
       timeoutTimer: null,
@@ -353,12 +356,14 @@ class Orchestrator {
               sessionId: activeRef.sessionId,
               agentSessionId: obj.session_id,
             })
-            .catch((err: unknown) =>
+            .catch((err: unknown) => {
+              activeRef.agentSessionIdPersistFailed = true;
               console.error(
-                "[Orchestrator] Failed to persist agentSessionId:",
+                "[Orchestrator] Failed to persist agentSessionId — " +
+                  "a hot reload before handleWorkExit will lose it:",
                 err,
-              ),
-            );
+              );
+            });
         }
       } catch {
         // Not JSON — ignore
@@ -640,7 +645,13 @@ class Orchestrator {
     const allLines = active.monitor.buffer.getAll();
     const dispositionResult = parseDisposition(allLines);
 
-    // Update session record
+    // Update session record (also persists agentSessionId if the early persist failed)
+    if (active.agentSessionIdPersistFailed && active.agentSessionId) {
+      console.warn(
+        `[Orchestrator] Early agentSessionId persist had failed for ${issue.shortId} — ` +
+          "recovering via handleWorkExit session update.",
+      );
+    }
     await convex.mutation(api.sessions.update, {
       sessionId,
       status: SessionStatus.Completed,
@@ -1392,6 +1403,7 @@ class Orchestrator {
       timedOut: false,
       startHead: session.startHead ?? "",
       agentSessionId: session.agentSessionId ?? null,
+      agentSessionIdPersistFailed: false,
       issue: {
         shortId: issue.shortId,
         title: issue.title,
