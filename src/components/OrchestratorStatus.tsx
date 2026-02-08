@@ -149,7 +149,7 @@ export function OrchestratorStatus({
     );
   const handleStop = () =>
     handleAction("stop", () =>
-      updateProject({ projectId, state: ProjectState.Stopped }),
+      updateProject({ projectId, state: ProjectState.Paused }),
     );
   // Kill remains a direct HTTP call — it terminates a process, not a state transition.
   const handleKill = () =>

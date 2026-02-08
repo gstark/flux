@@ -248,11 +248,13 @@ const orchestrator_enable: ToolHandler = safeHandler(async (_args, ctx) => {
 const orchestrator_stop: ToolHandler = safeHandler(async (_args, ctx) => {
   // Route through Convex project state — the project state watcher
   // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
+  // Uses Paused (graceful: finish current session, then idle) not Stopped
+  // (aggressive: kill active session + remove orchestrator instance).
   await ctx.convex.mutation(api.projects.update, {
     projectId: ctx.projectId,
-    state: ProjectState.Stopped,
+    state: ProjectState.Paused,
   });
-  return ok(ctx, { state: ProjectState.Stopped });
+  return ok(ctx, { state: ProjectState.Paused });
 });
 
 const sessions_list = typedHandler(

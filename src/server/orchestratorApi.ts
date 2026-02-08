@@ -73,12 +73,14 @@ export function createOrchestratorApiHandler(
 
         case "stop":
           // Route through Convex project state — the project state watcher
-          // will observe the transition and call orchestrator.stop().
+          // will observe the transition and call orchestrator.stop() (graceful).
+          // Uses Paused, not Stopped: Paused = finish current session then idle,
+          // Stopped = kill active session + remove orchestrator instance.
           await convex.mutation(api.projects.update, {
             projectId,
-            state: ProjectState.Stopped,
+            state: ProjectState.Paused,
           });
-          return Response.json({ state: ProjectState.Stopped });
+          return Response.json({ state: ProjectState.Paused });
 
         case "kill": {
           const orchestrator = getOrchestrator();
