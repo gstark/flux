@@ -12,6 +12,14 @@ type Session = {
 
 const sessions = new Map<string, Session>();
 
+// Schema validation flow inside mcp.tool():
+// The raw Zod shapes we pass are transformed by the MCP SDK before reaching our handler:
+//   1. getZodSchemaObject() wraps the shape into z.object() if it isn't one already
+//   2. normalizeObjectSchema() normalizes nested unions/optionals for JSON schema generation
+//   3. toJsonSchemaCompat() converts to JSON Schema (different codepaths for Zod v3 vs v4)
+//   4. validateToolInput() runs safeParseAsync() on incoming args BEFORE calling our handler
+// So tool.schema is never used raw — the SDK validates and coerces args for us.
+// See: sdk/server/mcp.js, sdk/server/zod-compat.js, sdk/server/zod-json-schema-compat.js
 function registerTools(mcp: McpServer, ctx: ToolContext) {
   for (const tool of allTools) {
     const handler = handlers[tool.name];
