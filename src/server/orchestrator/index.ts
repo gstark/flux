@@ -1,3 +1,7 @@
+import {
+  type OrchestratorActiveSession,
+  OrchestratorState,
+} from "@/shared/orchestrator";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { SessionPhaseValue } from "$convex/schema";
@@ -28,20 +32,6 @@ import {
   StatusMessages,
 } from "./agents";
 import { SessionMonitor } from "./monitor";
-
-/**
- * Orchestrator states — runtime state of the Flux daemon.
- * STOPPED: scheduler disabled, no auto-scheduling.
- * IDLE: scheduler enabled, waiting for work.
- * BUSY: active session in progress.
- */
-const OrchestratorState = {
-  Stopped: "stopped",
-  Idle: "idle",
-  Busy: "busy",
-} as const;
-type OrchestratorState =
-  (typeof OrchestratorState)[keyof typeof OrchestratorState];
 
 /** Runtime info about the currently active session. */
 interface ActiveSession {
@@ -79,7 +69,7 @@ export type OrchestratorLifecycleEvent =
     }
   | {
       type: "session_end";
-      state: "stopped" | "idle";
+      state: Exclude<OrchestratorState, "busy">;
     }
   | {
       type: "monitor_changed";
@@ -126,12 +116,7 @@ class Orchestrator {
     state: OrchestratorState;
     schedulerEnabled: boolean;
     readyCount: number;
-    activeSession: {
-      sessionId: string;
-      issueId: string;
-      pid: number;
-      phase: SessionPhaseValue;
-    } | null;
+    activeSession: OrchestratorActiveSession | null;
   } {
     return {
       state: this.state,
@@ -1515,4 +1500,6 @@ export function getOrchestrator(projectId: Id<"projects">): Orchestrator {
   return _global.__fluxOrchestrator;
 }
 
-export { Orchestrator, OrchestratorState };
+export { Orchestrator };
+export type { OrchestratorActiveSession } from "@/shared/orchestrator";
+export { OrchestratorState } from "@/shared/orchestrator";

@@ -1,6 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  OrchestratorState,
+  OrchestratorStatusData,
+} from "@/shared/orchestrator";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { SessionPhaseValue } from "$convex/schema";
@@ -10,25 +14,11 @@ import { FontAwesomeIcon, faPlay, faSkull, faStop } from "./Icon";
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type OrchestratorStatusData = {
-  status: {
-    state: "stopped" | "idle" | "busy";
-    schedulerEnabled: boolean;
-    readyCount: number;
-    activeSession: {
-      sessionId: string;
-      issueId: string;
-      pid: number;
-      phase: SessionPhaseValue;
-    } | null;
-  };
-};
-
 /** A pending transition: action was accepted, waiting for state to settle. */
 type Transition = {
   action: "stop" | "kill" | "enable";
   /** The state we expect to leave (used to detect when transition completes). */
-  fromState: "stopped" | "idle" | "busy";
+  fromState: OrchestratorState;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -73,7 +63,7 @@ const NORMAL_POLL_MS = 3_000;
  */
 function isTransitionComplete(
   transition: Transition,
-  currentState: "stopped" | "idle" | "busy",
+  currentState: OrchestratorState,
 ): boolean {
   return currentState !== transition.fromState;
 }
