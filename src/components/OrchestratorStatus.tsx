@@ -24,6 +24,13 @@ type OrchestratorStatusData = {
   };
 };
 
+/** A pending transition: action was accepted, waiting for state to settle. */
+type Transition = {
+  action: "stop" | "kill" | "enable";
+  /** The state we expect to leave (used to detect when transition completes). */
+  fromState: "stopped" | "idle" | "busy";
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 const PHASE_LABELS: Record<SessionPhaseValue, string> = {
@@ -38,6 +45,39 @@ const PHASE_ABBREV: Record<SessionPhaseValue, string> = {
   [SessionPhase.Review]: "Rev",
 };
 
+const TRANSITION_LABELS: Record<Transition["action"], string> = {
+  stop: "Stopping…",
+  kill: "Killing…",
+  enable: "Starting…",
+};
+
+const TRANSITION_SHORT_LABELS: Record<Transition["action"], string> = {
+  stop: "Stop…",
+  kill: "Kill…",
+  enable: "Start…",
+};
+
+/** Max time (ms) to show a transition before giving up and clearing it. */
+const TRANSITION_TIMEOUT_MS = 15_000;
+
+/** Poll interval during a transition (ms). */
+const FAST_POLL_MS = 500;
+
+/** Normal poll interval (ms). */
+const NORMAL_POLL_MS = 3_000;
+
+/**
+ * Returns true when the polled state indicates the transition is complete.
+ * - stop/kill: complete when state is no longer the fromState (busy → idle/stopped)
+ * - enable: complete when state is no longer "stopped"
+ */
+function isTransitionComplete(
+  transition: Transition,
+  currentState: "stopped" | "idle" | "busy",
+): boolean {
+  return currentState !== transition.fromState;
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function OrchestratorStatus({
@@ -50,12 +90,18 @@ export function OrchestratorStatus({
   );
   const [error, setError] = useState<string | null>(null);
   const [inflightAction, setInflightAction] = useState<string | null>(null);
+  const [transition, setTransition] = useState<Transition | null>(null);
 
   // Subscribe to orchestratorConfig for the `enabled` flag (real-time via Convex)
   const config = useQuery(api.orchestratorConfig.get, { projectId });
 
-  // Poll orchestrator_status every 3s
+  // Poll orchestrator_status — faster during transitions
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transitionRef = useRef<Transition | null>(null);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep ref in sync so fetchStatus closure always sees current transition
+  transitionRef.current = transition;
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -64,18 +110,42 @@ export function OrchestratorStatus({
       );
       setStatus(data.status);
       setError(null);
+
+      // Check if an active transition has completed
+      const currentTransition = transitionRef.current;
+      if (
+        currentTransition &&
+        isTransitionComplete(currentTransition, data.status.state)
+      ) {
+        setTransition(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   }, []);
 
+  // Manage poll interval — restart interval when transition state changes
   useEffect(() => {
     fetchStatus();
-    pollRef.current = setInterval(fetchStatus, 3000);
+    const interval = transition ? FAST_POLL_MS : NORMAL_POLL_MS;
+    pollRef.current = setInterval(fetchStatus, interval);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchStatus]);
+  }, [fetchStatus, transition]);
+
+  // Safety timeout: clear transition if it lingers too long
+  useEffect(() => {
+    if (transition) {
+      transitionTimerRef.current = setTimeout(() => {
+        setTransition(null);
+      }, TRANSITION_TIMEOUT_MS);
+      return () => {
+        if (transitionTimerRef.current)
+          clearTimeout(transitionTimerRef.current);
+      };
+    }
+  }, [transition]);
 
   // Resolve issue shortId when busy
   const activeIssueId = status?.activeSession?.issueId ?? null;
@@ -87,11 +157,14 @@ export function OrchestratorStatus({
   // ── Actions ──────────────────────────────────────────────────────
 
   const handleAction = useCallback(
-    async (tool: string, label: string) => {
-      setInflightAction(label);
+    async (tool: string, action: Transition["action"]) => {
+      const currentState = status?.state ?? "stopped";
+      setInflightAction(action);
       try {
         await callTool(tool);
-        // Immediately refresh status after action
+        // Enter transition state — persist until poll confirms new state
+        setTransition({ action, fromState: currentState });
+        // Kick off an immediate poll
         await fetchStatus();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -99,7 +172,7 @@ export function OrchestratorStatus({
         setInflightAction(null);
       }
     },
-    [fetchStatus],
+    [fetchStatus, status?.state],
   );
 
   const handleEnable = () => handleAction("orchestrator_enable", "enable");
@@ -110,40 +183,45 @@ export function OrchestratorStatus({
 
   const state = status?.state ?? "stopped";
   const enabled = config?.enabled ?? false;
+  const isTransitioning = transition !== null;
 
   // Determine dot color + animation
-  const dotClass =
-    state === "busy"
+  const dotClass = isTransitioning
+    ? "status-warning"
+    : state === "busy"
       ? "status-warning"
       : state === "idle" && enabled
         ? "status-success"
         : "status-neutral";
 
-  const showPing = state === "busy";
+  const showPing = state === "busy" || isTransitioning;
 
   // State label (full for desktop, condensed for mobile)
   const activePhase = status?.activeSession?.phase;
-  const stateLabel =
-    state === "busy" && activePhase
-      ? `${PHASE_LABELS[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`
-      : state === "idle"
-        ? enabled
-          ? "Idle"
-          : "Disabled"
-        : "Stopped";
 
-  const shortLabel =
-    state === "busy" && activePhase
-      ? `${PHASE_ABBREV[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`
-      : stateLabel;
+  let stateLabel: string;
+  let shortLabel: string;
+  if (isTransitioning) {
+    stateLabel = TRANSITION_LABELS[transition.action];
+    shortLabel = TRANSITION_SHORT_LABELS[transition.action];
+  } else if (state === "busy" && activePhase) {
+    stateLabel = `${PHASE_LABELS[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`;
+    shortLabel = `${PHASE_ABBREV[activePhase]}${issue?.shortId ? ` ${issue.shortId}` : ""}`;
+  } else if (state === "idle") {
+    stateLabel = enabled ? "Idle" : "Disabled";
+    shortLabel = stateLabel;
+  } else {
+    stateLabel = "Stopped";
+    shortLabel = stateLabel;
+  }
 
   // Session link target
   const activeSessionId = status?.activeSession?.sessionId ?? null;
 
-  // Button visibility
-  const showEnable = state === "stopped";
-  const showStop = state === "idle" || state === "busy";
-  const showKill = state === "busy";
+  // Button visibility — hide all during transitions
+  const showEnable = !isTransitioning && state === "stopped";
+  const showStop = !isTransitioning && (state === "idle" || state === "busy");
+  const showKill = !isTransitioning && state === "busy";
 
   // ── Render ───────────────────────────────────────────────────────
 
@@ -171,7 +249,7 @@ export function OrchestratorStatus({
       </div>
 
       {/* State label: link to active session when busy, plain text otherwise */}
-      {activeSessionId ? (
+      {activeSessionId && !isTransitioning ? (
         <Link
           to="/sessions/$sessionId"
           params={{ sessionId: activeSessionId }}
