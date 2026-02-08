@@ -21,7 +21,6 @@ import {
   getCurrentHead,
   getDiff,
   hasNewCommits,
-  resolveRepoRoot,
 } from "../git";
 import { isProcessAlive } from "../process";
 import type { AgentProcess, AgentProvider, WorkPromptContext } from "./agents";
@@ -88,6 +87,8 @@ class Orchestrator {
   private activeSession: ActiveSession | null = null;
   private provider: AgentProvider;
   private projectId: Id<"projects">;
+  /** Filesystem path for the project — used as CWD when spawning agents. */
+  private projectPath: string;
   private unsubscribeReady: (() => void) | null = null;
   private pendingStop = false;
   private readyIssues: Array<{ _id: Id<"issues"> }> = [];
@@ -99,8 +100,13 @@ class Orchestrator {
     (event: OrchestratorLifecycleEvent) => void
   >();
 
-  constructor(projectId: Id<"projects">, provider?: AgentProvider) {
+  constructor(
+    projectId: Id<"projects">,
+    projectPath: string,
+    provider?: AgentProvider,
+  ) {
     this.projectId = projectId;
+    this.projectPath = projectPath;
     this.provider = provider ?? new ClaudeCodeProvider();
   }
 
@@ -275,6 +281,22 @@ class Orchestrator {
   ): Promise<{ sessionId: Id<"sessions">; pid: number }> {
     const convex = getConvexClient();
 
+    // 0. Validate project path exists on disk before claiming
+    if (!this.projectPath) {
+      throw new Error(
+        `[Orchestrator] Cannot spawn agent: project ${this.projectId} has no path configured. ` +
+          "Set a path via PATCH /api/projects/:id.",
+      );
+    }
+    const pathExists = await Bun.file(`${this.projectPath}/.git/HEAD`).exists();
+    if (!pathExists) {
+      throw new Error(
+        `[Orchestrator] Cannot spawn agent: project path "${this.projectPath}" ` +
+          "does not exist on disk or is not a git repository. " +
+          "Was the project directory moved or deleted?",
+      );
+    }
+
     // 1. Claim the issue atomically
     const claimResult = await convex.mutation(api.issues.claim, {
       issueId,
@@ -286,8 +308,8 @@ class Orchestrator {
     }
     const issue = claimResult.issue;
 
-    // 2. Resolve repo root for cwd
-    const cwd = await resolveRepoRoot();
+    // 2. Use project's configured path as cwd
+    const cwd = this.projectPath;
 
     // 3. Record startHead before spawning
     const startHead = await getCurrentHead(cwd);
@@ -681,7 +703,7 @@ class Orchestrator {
     const active = this.requireActiveSession("handleWorkExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
-    const cwd = await resolveRepoRoot();
+    const cwd = this.projectPath;
 
     // Capture endHead — undefined if git fails so session record doesn't
     // falsely claim endHead === startHead (which hides real commits).
@@ -849,7 +871,7 @@ class Orchestrator {
     const active = this.requireActiveSession("handleRetroExit");
     const { sessionId, issue } = active;
     const convex = getConvexClient();
-    const cwd = await resolveRepoRoot();
+    const cwd = this.projectPath;
 
     // Auto-commit any retro changes (e.g., friction fixes).
     // Explicit fallback: retro commits are best-effort. If this fails, the review
@@ -923,7 +945,7 @@ class Orchestrator {
     const active = this.requireActiveSession("handleReviewExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
-    const cwd = await resolveRepoRoot();
+    const cwd = this.projectPath;
 
     // Capture endHead — undefined if git fails (see handleWorkExit comment)
     let endHead: string | undefined;
@@ -1097,7 +1119,7 @@ class Orchestrator {
    */
   private async startRetro(workNote: string): Promise<void> {
     const active = this.requireActiveSession("startRetro");
-    const cwd = await resolveRepoRoot();
+    const cwd = this.projectPath;
 
     const retroPrompt = this.provider.buildRetroPrompt({
       shortId: active.issue.shortId,
@@ -1162,7 +1184,7 @@ class Orchestrator {
     const active = this.requireActiveSession("startReviewLoop");
     const { issueId, startHead, issue } = active;
     const convex = getConvexClient();
-    const cwd = await resolveRepoRoot();
+    const cwd = this.projectPath;
 
     // Check iteration limit before starting
     const currentIssue = await convex.query(api.issues.get, { issueId });
@@ -1659,12 +1681,23 @@ function getOrchestratorMap(): Map<string, Orchestrator> {
   return _global.__fluxOrchestrators;
 }
 
-export function getOrchestrator(projectId: Id<"projects">): Orchestrator {
+export function getOrchestrator(
+  projectId: Id<"projects">,
+  projectPath?: string,
+): Orchestrator {
   const map = getOrchestratorMap();
   const existing = map.get(projectId);
   if (existing) return existing;
 
-  const instance = new Orchestrator(projectId);
+  if (!projectPath) {
+    throw new Error(
+      `[Orchestrator] Cannot create orchestrator for project ${projectId}: ` +
+        "projectPath is required on first access. This is a bug — the caller " +
+        "should pass the project's filesystem path.",
+    );
+  }
+
+  const instance = new Orchestrator(projectId, projectPath);
   map.set(projectId, instance);
   return instance;
 }

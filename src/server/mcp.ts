@@ -46,12 +46,13 @@ function registerTools(mcp: McpServer, ctx: ToolContext) {
 export function createMcpHandler(
   projectId: Id<"projects">,
   projectSlug: string,
+  projectPath: string,
 ) {
   const ctx: ToolContext = {
     convex: getConvexClient(),
     projectId,
     projectSlug,
-    getOrchestrator: () => getOrchestrator(projectId),
+    getOrchestrator: () => getOrchestrator(projectId, projectPath),
   };
 
   return async function handleMcpRequest(req: Request): Promise<Response> {

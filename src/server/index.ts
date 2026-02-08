@@ -19,7 +19,7 @@ function createToolContext(project: Project): ToolContext {
     convex: getConvexClient(),
     projectId: project._id,
     projectSlug: project.slug,
-    getOrchestrator: () => getOrchestrator(project._id),
+    getOrchestrator: () => getOrchestrator(project._id, project.path),
   };
 }
 
@@ -57,11 +57,17 @@ export async function startServer(projects: Project[]) {
   // Default context for handlers that don't yet support multi-project
   const defaultCtx = getToolContext(defaultProject._id);
 
-  const handleMcp = createMcpHandler(defaultProject._id, defaultProject.slug);
+  const handleMcp = createMcpHandler(
+    defaultProject._id,
+    defaultProject.slug,
+    defaultProject.path,
+  );
   const handleApi = createApiHandler(defaultCtx);
-  const handleSSE = createSSEHandler(() => getOrchestrator(defaultProject._id));
+  const handleSSE = createSSEHandler(() =>
+    getOrchestrator(defaultProject._id, defaultProject.path),
+  );
   const handleOrchestratorApi = createOrchestratorApiHandler(() =>
-    getOrchestrator(defaultProject._id),
+    getOrchestrator(defaultProject._id, defaultProject.path),
   );
   const handleProjectsApi = createProjectsApiHandler(getConvexClient());
 
@@ -93,6 +99,7 @@ export async function startServer(projects: Project[]) {
           _id: p._id,
           slug: p.slug,
           name: p.name,
+          path: p.path,
         })),
       });
     },

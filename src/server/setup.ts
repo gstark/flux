@@ -1,13 +1,14 @@
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { getConvexClient } from "./convex";
-import { inferProjectSlug } from "./git";
+import { inferProjectSlug, resolveRepoRoot } from "./git";
 
 /** Loaded project data passed through the server startup pipeline. */
 export type Project = {
   _id: Id<"projects">;
   slug: string;
   name: string;
+  path: string;
 };
 
 function titleize(slug: string): string {
@@ -29,7 +30,16 @@ export async function loadProjects(): Promise<Project[]> {
       _id: p._id,
       slug: p.slug,
       name: p.name,
+      path: p.path ?? "",
     }));
+    for (const p of projects) {
+      if (!p.path) {
+        console.warn(
+          `[setup] Project "${p.slug}" has no path configured — ` +
+            "agent spawning will fail until a path is set via PATCH /api/projects/:id",
+        );
+      }
+    }
     console.log(
       `Loaded ${projects.length} project(s): ${projects.map((p) => p.slug).join(", ")}`,
     );
@@ -38,6 +48,7 @@ export async function loadProjects(): Promise<Project[]> {
 
   // Zero projects — auto-register from CWD (first-run migration)
   const slug = await inferProjectSlug();
+  const repoRoot = await resolveRepoRoot();
   let name: string;
 
   if (process.stdin.isTTY) {
@@ -47,16 +58,21 @@ export async function loadProjects(): Promise<Project[]> {
     const projectId = await client.mutation(api.projects.create, {
       slug: inputSlug,
       name,
+      path: repoRoot,
     });
     console.log(`Project "${name}" created. Seeds scheduled.`);
-    return [{ _id: projectId, slug: inputSlug, name }];
+    return [{ _id: projectId, slug: inputSlug, name, path: repoRoot }];
   }
 
   name = titleize(slug);
   console.log(
     `No projects registered. Auto-creating "${name}" (${slug}) from CWD.`,
   );
-  const projectId = await client.mutation(api.projects.create, { slug, name });
+  const projectId = await client.mutation(api.projects.create, {
+    slug,
+    name,
+    path: repoRoot,
+  });
   console.log(`Project "${name}" created. Seeds scheduled.`);
-  return [{ _id: projectId, slug, name }];
+  return [{ _id: projectId, slug, name, path: repoRoot }];
 }
