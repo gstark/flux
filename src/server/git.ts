@@ -3,9 +3,11 @@ import { $ } from "bun";
 import type { SessionPhaseValue } from "$convex/schema";
 import { isProcessAlive } from "./process";
 
-export async function resolveRepoRoot(): Promise<string> {
+export async function resolveRepoRoot(cwd?: string): Promise<string> {
   try {
-    const result = (await $`git rev-parse --show-toplevel`.text()).trim();
+    const result = cwd
+      ? (await $`git -C ${cwd} rev-parse --show-toplevel`.text()).trim()
+      : (await $`git rev-parse --show-toplevel`.text()).trim();
     if (!result) {
       throw new Error("Not a git repository");
     }
@@ -82,7 +84,7 @@ export async function inferProjectSlug(cwd?: string): Promise<string> {
     const segments = cwd.replace(/\/+$/, "").split("/");
     return segments[segments.length - 1] || "unknown";
   }
-  const repoRoot = await resolveRepoRoot();
+  const repoRoot = await resolveRepoRoot(cwd);
   return repoRoot.split("/").pop() || "unknown";
 }
 
