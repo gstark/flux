@@ -186,7 +186,7 @@ Note: "discovered-from" provenance is now tracked via `sourceIssueId` on the iss
 | startHead | string? | Git HEAD when work began (recorded at session start) |
 | endHead | string? | Git HEAD when session ended (updated after each session/review) |
 | model | string? | LLM model used (e.g., "claude-sonnet-4.5"). Used with llmCost table for pricing. |
-| **Indexes** | by_project, by_project_status, by_issue | |
+| **Indexes** | by_project_startedAt, by_project_status_startedAt, by_issue | |
 
 **Session Types and Phases:**
 
@@ -1356,7 +1356,7 @@ Features and improvements intentionally deferred to after MVP:
 - **Custom agent tenets**: Per-project tenet configuration
 - **E2E test automation**: Playwright-based automated testing
 
-### Nice to-Haves (Future Exploration)
+### Nice-to-Haves (Future Exploration)
 Features to consider Post-MVP, pending user feedback:
 - **Issue relations**: Non-blocking relationships (`relates_to`, `duplicates`) for better issue linking and discovery
 - **Webhook support**: Session lifecycle events for external integrations
