@@ -2,7 +2,11 @@ import type { ConvexClient } from "convex/browser";
 import type { z } from "zod";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import { SessionEventDirection, SessionStatus } from "$convex/schema";
+import {
+  ProjectState,
+  SessionEventDirection,
+  SessionStatus,
+} from "$convex/schema";
 import type { Orchestrator } from "../orchestrator";
 import {
   CommentsCreateSchema,
@@ -230,15 +234,25 @@ const orchestrator_status: ToolHandler = safeHandler(async (_args, ctx) => {
 });
 
 const orchestrator_enable: ToolHandler = safeHandler(async (_args, ctx) => {
+  // Route through Convex project state — the project state watcher
+  // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
+  await ctx.convex.mutation(api.projects.update, {
+    projectId: ctx.projectId,
+    state: ProjectState.Running,
+  });
   const orchestrator = ctx.getOrchestrator();
-  await orchestrator.enable();
   const status = orchestrator.getStatus();
   return ok(ctx, { status });
 });
 
 const orchestrator_stop: ToolHandler = safeHandler(async (_args, ctx) => {
+  // Route through Convex project state — the project state watcher
+  // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
+  await ctx.convex.mutation(api.projects.update, {
+    projectId: ctx.projectId,
+    state: ProjectState.Stopped,
+  });
   const orchestrator = ctx.getOrchestrator();
-  await orchestrator.stop();
   const status = orchestrator.getStatus();
   return ok(ctx, { status });
 });

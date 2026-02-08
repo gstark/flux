@@ -1,12 +1,16 @@
 import type { OrchestratorStatusData } from "@/shared/orchestrator";
 
-type OrchestratorAction = "enable" | "stop" | "kill" | "status";
+type OrchestratorAction = "kill" | "status";
 
 /**
  * Call the dedicated orchestrator API endpoint for a specific project.
  *
  * Routes to `/api/projects/:projectId/orchestrator` — a purpose-built route
  * that skips the generic MCP tool dispatch layer used by agents.
+ *
+ * Note: `enable` and `stop` are handled via Convex project state mutations
+ * (see OrchestratorStatus component), not this endpoint. Only `kill` and
+ * `status` remain as direct orchestrator actions (FLUX-307).
  */
 async function callOrchestratorApi<T = unknown>(
   projectId: string,
@@ -27,20 +31,6 @@ async function callOrchestratorApi<T = unknown>(
   }
 
   return (await res.json()) as T;
-}
-
-/** Enable the orchestrator scheduler. */
-export function enableOrchestrator(
-  projectId: string,
-): Promise<OrchestratorStatusData> {
-  return callOrchestratorApi<OrchestratorStatusData>(projectId, "enable");
-}
-
-/** Gracefully stop the orchestrator scheduler. */
-export function stopOrchestrator(
-  projectId: string,
-): Promise<OrchestratorStatusData> {
-  return callOrchestratorApi<OrchestratorStatusData>(projectId, "stop");
 }
 
 /** Kill the active session (SIGTERM). */

@@ -1,3 +1,7 @@
+import type { ConvexClient } from "convex/browser";
+import { api } from "$convex/_generated/api";
+import type { Id } from "$convex/_generated/dataModel";
+import { ProjectState } from "$convex/schema";
 import type { Orchestrator } from "./orchestrator";
 
 type OrchestratorAction = "enable" | "stop" | "kill" | "status";
@@ -20,10 +24,19 @@ function isValidAction(value: string): value is OrchestratorAction {
  * This bypasses the generic MCP tool dispatch layer (`/api/tools`), giving the UI
  * a direct, purpose-built endpoint for orchestrator control.
  *
+ * `enable` and `stop` are routed through Convex project state updates so the
+ * project state watcher handles the actual orchestrator lifecycle. This prevents
+ * desync between Convex project state and runtime orchestrator state (FLUX-307).
+ *
+ * `kill` and `status` remain direct orchestrator actions — they don't affect
+ * lifecycle state that the watcher manages.
+ *
  * The MCP tool handlers remain available for agent consumption via `/mcp/projects/:projectId`.
  */
 export function createOrchestratorApiHandler(
   getOrchestrator: () => Orchestrator,
+  convex: ConvexClient,
+  projectId: Id<"projects">,
 ) {
   return async function handleOrchestratorApi(req: Request): Promise<Response> {
     if (req.method !== "POST") {
@@ -50,11 +63,21 @@ export function createOrchestratorApiHandler(
     try {
       switch (action) {
         case "enable":
-          await orchestrator.enable();
+          // Route through Convex project state — the project state watcher
+          // will observe the transition and call orchestrator.enable().
+          await convex.mutation(api.projects.update, {
+            projectId,
+            state: ProjectState.Running,
+          });
           return Response.json({ status: orchestrator.getStatus() });
 
         case "stop":
-          await orchestrator.stop();
+          // Route through Convex project state — the project state watcher
+          // will observe the transition and call orchestrator.stop().
+          await convex.mutation(api.projects.update, {
+            projectId,
+            state: ProjectState.Stopped,
+          });
           return Response.json({ status: orchestrator.getStatus() });
 
         case "kill":

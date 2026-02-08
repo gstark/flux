@@ -146,8 +146,10 @@ export async function startServer(projects: Project[]) {
             { status: 400 },
           );
         }
-        const handler = createOrchestratorApiHandler(() =>
-          getOrchestrator(projectId as Id<"projects">, projectPath),
+        const handler = createOrchestratorApiHandler(
+          () => getOrchestrator(projectId as Id<"projects">, projectPath),
+          convex,
+          projectId as Id<"projects">,
         );
         return handler(req);
       }

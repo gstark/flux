@@ -1,19 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrchestratorState } from "@/shared/orchestrator";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { SessionPhaseValue } from "$convex/schema";
-import { SessionPhase } from "$convex/schema";
+import { ProjectState, SessionPhase } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useOrchestratorStatus } from "../hooks/useOrchestratorStatus";
 import { useProjectSlug } from "../hooks/useProjectId";
-import {
-  enableOrchestrator,
-  killOrchestrator,
-  stopOrchestrator,
-} from "../lib/orchestratorApi";
+import { killOrchestrator } from "../lib/orchestratorApi";
 import { FontAwesomeIcon, faPlay, faSkull, faStop } from "./Icon";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -91,6 +87,10 @@ export function OrchestratorStatus({
   // Subscribe to orchestratorConfig for the `enabled` flag (real-time via Convex)
   const config = useQuery(api.orchestratorConfig.get, { projectId });
 
+  // Convex mutation for updating project state — drives orchestrator lifecycle
+  // via the project state watcher (FLUX-307).
+  const updateProject = useMutation(api.projects.update);
+
   // Clear transition when SSE-driven status update shows new state
   useEffect(() => {
     if (!status || !transition) return;
@@ -141,10 +141,17 @@ export function OrchestratorStatus({
     [refetch, status?.state, clearActionError, showActionError],
   );
 
+  // Enable/stop route through Convex project state — the project state watcher
+  // handles the orchestrator lifecycle, preventing state desync (FLUX-307).
   const handleEnable = () =>
-    handleAction("enable", () => enableOrchestrator(projectId));
+    handleAction("enable", () =>
+      updateProject({ projectId, state: ProjectState.Running }),
+    );
   const handleStop = () =>
-    handleAction("stop", () => stopOrchestrator(projectId));
+    handleAction("stop", () =>
+      updateProject({ projectId, state: ProjectState.Stopped }),
+    );
+  // Kill remains a direct HTTP call — it terminates a process, not a state transition.
   const handleKill = () =>
     handleAction("kill", () => killOrchestrator(projectId));
 
