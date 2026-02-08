@@ -82,8 +82,10 @@ export function ProjectRow({ project }: { project: Project }) {
           }),
         });
         if (!res.ok) {
-          const data = (await res.json()) as { error?: string };
-          throw new Error(data.error ?? `Update failed (${res.status})`);
+          const data = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(data?.error ?? `Update failed (${res.status})`);
         }
         setEditing(false);
         clearError();
@@ -224,6 +226,7 @@ export function ProjectRow({ project }: { project: Project }) {
       <td>
         <select
           className="select select-ghost select-xs"
+          aria-label="Project state"
           value={currentState}
           onChange={(e) =>
             handleStateChange(e.target.value as ProjectStateValue)

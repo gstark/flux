@@ -28,8 +28,10 @@ export function AddProjectForm({ onCreated }: { onCreated: () => void }) {
       });
 
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? `Request failed (${res.status})`);
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? `Request failed (${res.status})`);
       }
 
       setPath("");
