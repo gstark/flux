@@ -447,8 +447,10 @@ const issues_bulk_update: ToolHandler = async (args, ctx) => {
     if (result.status === "fulfilled") {
       succeeded.push(result.value);
     } else {
+      const update = updates[i];
+      if (!update) continue;
       failed.push({
-        issueId: updates[i]!.issueId,
+        issueId: update.issueId,
         error: String(
           result.reason instanceof Error
             ? result.reason.message
@@ -459,8 +461,10 @@ const issues_bulk_update: ToolHandler = async (args, ctx) => {
   }
 
   if (failed.length > 0 && succeeded.length === 0) {
+    const firstFailure = failed[0];
+    if (!firstFailure) throw new Error("failed array empty after length check");
     return error(
-      `All ${failed.length} updates failed. First error: ${failed[0]!.error}`,
+      `All ${failed.length} updates failed. First error: ${firstFailure.error}`,
     );
   }
 
