@@ -1249,8 +1249,39 @@ Realtime view of agent output in the dashboard. Dual storage for reliability:
 - Render in a `<pre>` with monospace font for terminal feel
 
 ### Concurrency
-- Single session at a time per project (for now)
-- `maxConcurrentSessions` could be added to orchestratorConfig later
+
+**Intentional Design: Single Session Per Project**
+
+Flux enforces single-session execution within a project. This is not a limitation to be overcome—it's a deliberate architectural choice that keeps the system simple and reliable.
+
+**Why No Parallel Execution Within a Project:**
+
+1. **Merge Conflicts**: Two agents modifying the same files (e.g., `utils.ts`) create conflicts that require manual resolution, defeating the purpose of automation.
+
+2. **Overlapping Changes**: Agents fixing the same bug differently or making incompatible refactors result in review nightmares and duplicated work.
+
+3. **Test Contention**: Concurrent test runs create flaky results, state conflicts, and resource contention.
+
+4. **Session Coordination Complexity**: Who owns the review? Who does retro on what? The work→retro→review lifecycle assumes a single agent's context.
+
+5. **Git Worktree Management**: While worktrees technically allow parallel checkouts, they introduce:
+   - Orphaned worktrees on crashes
+   - Disk bloat (N copies of repo)
+   - Cross-worktree state leakage
+   - Complex cleanup logic
+
+**What About Speed?**
+
+Sequential execution with a fast agent is usually sufficient. Issues are already parallelizable *across projects*—run multiple orchestrator instances on different machines, each handling different repos. This is the simpler, more scalable path.
+
+**The Real Parallelism:**
+
+- **Across Projects**: Different Convex projects, different repos, different orchestrators
+- **Multi-Instance**: Run orchestrator on laptop + VPS + CI, each claiming from the shared queue
+- **Natural Distribution**: Atomic `claim` mutation ensures only one orchestrator gets each issue
+
+**Current Behavior:**
+- Single session at a time per project
 - Critical arriving during medium work: queued, picked up after current session completes
 - No preemption — finish current work before starting new work
 
@@ -1350,7 +1381,7 @@ Features and improvements intentionally deferred to after MVP:
 - **CI/CD integration**: Trigger Flux reviews on PR creation
 
 ### Advanced Features
-- **Concurrent sessions**: `maxConcurrentSessions` config for parallel issue processing
+- **Concurrent sessions**: Multi-orchestrator deployment for parallel processing *across* projects (not within same project using worktrees)
 - **Branch management**: Flux-managed feature branches per issue
 - **Preemption**: Critical issues interrupt lower-priority work
 - **Custom agent tenets**: Per-project tenet configuration
