@@ -5,6 +5,7 @@ import type { Id } from "$convex/_generated/dataModel";
 import type { CommentAuthorValue } from "$convex/schema";
 import { CommentAuthor } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
+import { useTrackedAction } from "../hooks/useTrackedAction";
 import { formatRelativeTime } from "../lib/format";
 import { modKey } from "../lib/platform";
 import { ErrorBanner } from "./ErrorBanner";
@@ -37,28 +38,22 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
   const createComment = useMutation(api.comments.create);
 
   const [draft, setDraft] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const { error: submitError, showError, clearError } = useDismissableError();
+
+  const [submitComment, submitting] = useTrackedAction(async () => {
+    await createComment({
+      issueId,
+      content: draft.trim(),
+      author: CommentAuthor.User,
+    });
+    setDraft("");
+  }, showError);
 
   async function handleSubmit(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault();
-    const trimmed = draft.trim();
-    if (!trimmed || submitting) return;
-
-    setSubmitting(true);
+    if (!draft.trim() || submitting) return;
     clearError();
-    try {
-      await createComment({
-        issueId,
-        content: trimmed,
-        author: CommentAuthor.User,
-      });
-      setDraft("");
-    } catch (err) {
-      showError(err);
-    } finally {
-      setSubmitting(false);
-    }
+    await submitComment();
   }
 
   if (comments === undefined) {

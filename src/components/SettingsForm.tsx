@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { useDismissableError } from "../hooks/useDismissableError";
+import { useTrackedAction } from "../hooks/useTrackedAction";
 import { ErrorBanner } from "./ErrorBanner";
 
 export function SettingsForm() {
@@ -20,9 +21,28 @@ export function SettingsForm() {
   const [sessionTimeoutMin, setSessionTimeoutMin] = useState("");
 
   const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const { error, showError, clearError } = useDismissableError();
   const [saved, setSaved] = useState(false);
+
+  const [saveConfig, saving] = useTrackedAction(
+    async (args: {
+      reviewIter: number;
+      failures: number;
+      timeoutMin: number;
+    }) => {
+      await updateConfig({
+        projectId,
+        maxReviewIterations: args.reviewIter,
+        maxFailures: args.failures,
+        sessionTimeoutMs: args.timeoutMin * 60_000,
+        focusEpicId:
+          focusEpicId === "all" ? null : (focusEpicId as Id<"epics">),
+      });
+      setDirty(false);
+      setSaved(true);
+    },
+    showError,
+  );
 
   // Sync form state from server config
   useEffect(() => {
@@ -60,23 +80,7 @@ export function SettingsForm() {
       return;
     }
 
-    setSaving(true);
-    try {
-      await updateConfig({
-        projectId,
-        maxReviewIterations: reviewIter,
-        maxFailures: failures,
-        sessionTimeoutMs: timeoutMin * 60_000,
-        focusEpicId:
-          focusEpicId === "all" ? null : (focusEpicId as Id<"epics">),
-      });
-      setDirty(false);
-      setSaved(true);
-    } catch (err) {
-      showError(err);
-    } finally {
-      setSaving(false);
-    }
+    await saveConfig({ reviewIter, failures, timeoutMin });
   }
 
   // Loading state
