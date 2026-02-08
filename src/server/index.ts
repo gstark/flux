@@ -67,12 +67,6 @@ export async function startServer(projects: Project[]) {
 
   const port = Number(process.env.FLUX_PORT) || DEFAULT_PORT;
 
-  // Index projects by ID for per-request lookup
-  const projectsById = new Map<string, Project>();
-  for (const p of projects) {
-    projectsById.set(p._id, p);
-  }
-
   const handleProjectsApi = createProjectsApiHandler(getConvexClient());
 
   const convex = getConvexClient();
