@@ -278,11 +278,18 @@ class Orchestrator {
     // 3. Record startHead before spawning
     const startHead = await getCurrentHead(cwd);
 
-    // 4. Auto-commit dirty tree before starting work (non-blocking)
+    // 4. Auto-commit dirty tree before starting work.
+    // Explicit fallback: if this fails, the session proceeds with a dirty tree.
+    // This is acceptable because the auto-commit is a safety net — agents commit
+    // their own changes. A git failure here should not block the session pipeline.
     try {
       await autoCommitDirtyTree(cwd, issue.shortId, "pre-session");
     } catch (err) {
-      console.error("[Orchestrator] Auto-commit before session failed:", err);
+      console.warn(
+        `[Orchestrator] Auto-commit before session failed for ${issue.shortId} — ` +
+          "proceeding with dirty tree:",
+        err,
+      );
     }
 
     // 5. Build prompt and spawn agent
@@ -730,7 +737,10 @@ class Orchestrator {
       return true;
     }
 
-    // Done with commits — auto-commit dirty tree, then proceed to retro
+    // Done with commits — auto-commit dirty tree, then proceed to retro.
+    // Explicit fallback: if auto-commit fails, uncommitted changes survive in the
+    // working tree and the next phase (retro/review) can still proceed. The agent
+    // is responsible for committing its own work; this is a safety net only.
     try {
       await autoCommitDirtyTree(
         cwd,
@@ -740,7 +750,11 @@ class Orchestrator {
         active.process.pid,
       );
     } catch (err) {
-      console.error("[Orchestrator] Auto-commit after work failed:", err);
+      console.warn(
+        `[Orchestrator] Auto-commit after work failed for ${issue.shortId} — ` +
+          "uncommitted changes remain in working tree:",
+        err,
+      );
     }
 
     // Proceed to retro if we can resume, otherwise skip to review
@@ -786,7 +800,9 @@ class Orchestrator {
     const convex = getConvexClient();
     const cwd = await resolveRepoRoot();
 
-    // Auto-commit any retro changes (e.g., friction fixes)
+    // Auto-commit any retro changes (e.g., friction fixes).
+    // Explicit fallback: retro commits are best-effort. If this fails, the review
+    // phase still proceeds — uncommitted retro changes persist in the working tree.
     try {
       await autoCommitDirtyTree(
         cwd,
@@ -796,7 +812,11 @@ class Orchestrator {
         active.process.pid,
       );
     } catch (err) {
-      console.error("[Orchestrator] Auto-commit after retro failed:", err);
+      console.warn(
+        `[Orchestrator] Auto-commit after retro failed for ${issue.shortId} — ` +
+          "uncommitted changes remain in working tree:",
+        err,
+      );
     }
 
     // Update session endHead after retro
@@ -953,7 +973,10 @@ class Orchestrator {
       return true;
     }
 
-    // Review made commits — auto-commit dirty tree
+    // Review made commits — auto-commit dirty tree.
+    // Explicit fallback: review auto-commit is best-effort. If it fails, the
+    // session closes normally — uncommitted review changes persist in the tree
+    // for the next session or manual intervention.
     try {
       await autoCommitDirtyTree(
         cwd,
@@ -963,7 +986,11 @@ class Orchestrator {
         active.process.pid,
       );
     } catch (err) {
-      console.error("[Orchestrator] Auto-commit after review failed:", err);
+      console.warn(
+        `[Orchestrator] Auto-commit after review failed for ${issue.shortId} — ` +
+          "uncommitted changes remain in working tree:",
+        err,
+      );
     }
 
     // Check iteration limit
