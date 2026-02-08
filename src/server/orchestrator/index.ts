@@ -53,7 +53,7 @@ interface ActiveSession {
   startHead: string;
   /** Claude session UUID captured from stream-json output */
   agentSessionId: string | null;
-  /** True if persisting agentSessionId to Convex failed. A hot reload would lose it. */
+  /** True if persisting agentSessionId to Convex failed. A process restart would lose it. */
   agentSessionIdPersistFailed: boolean;
   /** Issue context for prompt building */
   issue: WorkPromptContext;
@@ -1158,7 +1158,7 @@ class ProjectRunner {
 
   /**
    * Recover orphaned sessions — running sessions whose PID is no longer alive,
-   * or re-adopt live sessions that were orphaned by a hot reload.
+   * or re-adopt live sessions that were orphaned by a process restart.
    */
   private async recoverOrphanedSessions(): Promise<OrphanRecoveryStats> {
     const convex = getConvexClient();

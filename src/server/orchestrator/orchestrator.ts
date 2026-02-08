@@ -10,7 +10,7 @@ import { type OrphanRecoveryStats, ProjectRunner } from "./index";
  * ProjectRunner instances for enabled projects with valid paths,
  * and tears them down when projects are disabled or deleted.
  *
- * Stored on `globalThis.__fluxOrchestrator` for hot-reload survival.
+ * Singleton instance — created once per process lifetime.
  */
 class Orchestrator {
   private runners = new Map<Id<"projects">, ProjectRunner>();
@@ -151,17 +151,14 @@ class Orchestrator {
   }
 }
 
-// Survive hot reloads: globalThis persists across Bun HMR re-evaluations.
-const _global = globalThis as unknown as {
-  __fluxOrchestrator?: Orchestrator;
-};
+let _instance: Orchestrator | null = null;
 
 /** Get or create the singleton Orchestrator. */
 export function getOrCreateOrchestrator(): Orchestrator {
-  if (!_global.__fluxOrchestrator) {
-    _global.__fluxOrchestrator = new Orchestrator();
+  if (!_instance) {
+    _instance = new Orchestrator();
   }
-  return _global.__fluxOrchestrator;
+  return _instance;
 }
 
 function logRecoveryStats(slug: string, stats: OrphanRecoveryStats): void {

@@ -876,7 +876,7 @@ Flux uses a **stdio MCP transport** that proxies tool calls to the Bun server vi
 Claude Code → stdio → bin/flux-mcp-stdio.ts → POST /api/projects/:id/tools → Bun Server → handlers
 ```
 
-**Why stdio over HTTP?** The HTTP MCP transport loses sessions on Bun hot-reload, requiring constant `/mcp/projects/:id` reconnects. With stdio, the MCP process is stable while the Bun server hot-reloads behind it — handler changes take effect immediately with zero reconnection.
+**Why stdio over HTTP?** The HTTP MCP transport loses sessions on Bun server restarts (`--watch` mode), requiring constant `/mcp/projects/:id` reconnects. With stdio, the MCP process is stable while the Bun server restarts behind it — handler changes take effect immediately with zero reconnection.
 
 All tool schemas are registered upfront in `src/server/tools/schema.ts`. Unimplemented tools return "Not implemented" errors. As handlers land, agents see them immediately.
 
@@ -898,7 +898,7 @@ The bridge auto-discovers the project ID at startup by calling `GET /api/project
 
 ### REST Tool Endpoint
 
-`POST /api/projects/:id/tools` accepts `{ "tool": "<name>", "args": {...} }` and dispatches to the handler. This is the bridge between the stdio MCP process and the hot-reloading Bun server.
+`POST /api/projects/:id/tools` accepts `{ "tool": "<name>", "args": {...} }` and dispatches to the handler. This is the bridge between the stdio MCP process and the Bun server (which restarts on file changes via `--watch`).
 
 ## Testing Strategy
 

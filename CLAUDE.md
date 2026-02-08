@@ -102,7 +102,7 @@ import { IssueStatus, issueStatusValidator } from "./schema";
 2. **Convex** — backend sync
 3. **Vite** (`:5173`) — React SPA with HMR via `@tailwindcss/vite`
 
-Open the app at `http://localhost:5173` during development. Vite proxies API requests to Bun automatically. Code changes to `src/` are picked up by `bun --hot`; changes to `convex/` are deployed by `convex dev`. If hot reload gets stuck, see "Restarting the Daemon" below.
+Open the app at `http://localhost:5173` during development. Vite proxies API requests to Bun automatically. Code changes to `src/` trigger a full process restart via `bun --watch` (reliable for transitive dependencies); changes to `convex/` are deployed by `convex dev`. If a restart gets stuck, see "Restarting the Daemon" below.
 
 For production: `bun run build:frontend` builds to `dist/`, then `bun run start` serves the static files from Bun at `:8042`.
 
@@ -299,10 +299,10 @@ Headless browser automation for UI validation. Available to all agents via `.mcp
 The accessibility tree approach means you identify elements by their role and name (e.g., "button 'Defer'") rather than CSS selectors — robust even as styles change.
 
 **Verification after code changes:**
-Hot reload picks up changes to `src/` automatically. After making a change:
+`bun --watch` restarts the server process when `src/` files change. After making a change:
 1. Confirm compilation: `bun run typecheck`
 2. Verify behavior: Use Playwright to navigate, snapshot, and interact
-3. If hot reload didn't fire: `launchctl stop dev.flux.daemon` and retry
+3. If the restart didn't fire: `launchctl stop dev.flux.daemon` and retry
 
 For API changes, verify with `curl` or the Convex MCP `run` tool before declaring done.
 
