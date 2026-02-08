@@ -73,10 +73,12 @@ function parseInline(text: string): ReactNode[] {
       }
     } else if (full.startsWith("**")) {
       // Bold
-      nodes.push(<strong key={matchIndex}>{full.slice(2, -2)}</strong>);
+      nodes.push(
+        <strong key={matchIndex}>{parseInline(full.slice(2, -2))}</strong>,
+      );
     } else if (full.startsWith("*")) {
       // Italic
-      nodes.push(<em key={matchIndex}>{full.slice(1, -1)}</em>);
+      nodes.push(<em key={matchIndex}>{parseInline(full.slice(1, -1))}</em>);
     }
 
     lastIndex = matchIndex + full.length;
