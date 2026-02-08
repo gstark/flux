@@ -244,9 +244,6 @@ export async function startServer(projects: Project[]) {
       }
       return Response.json({
         convexUrl,
-        // Backward compat: single projectId for current UI
-        projectId: defaultProject._id,
-        // Full project list for multi-project consumers
         projects: projects.map((p) => ({
           _id: p._id,
           slug: p.slug,
