@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /**
  * Lightweight markdown renderer for issue descriptions, close reasons, and comments.
- * Supports: fenced code blocks, inline code, bold, italic, links (markdown & bare URLs), unordered/ordered lists.
+ * Supports: headings, fenced code blocks, inline code, bold, italic, links (markdown & bare URLs), unordered/ordered lists.
  * No external dependencies — intentionally minimal for our use case.
  */
 
@@ -121,6 +121,31 @@ function parseMarkdown(source: string): ReactNode[] {
           <code data-lang={lang || undefined}>{codeLines.join("\n")}</code>
         </pre>,
       );
+      continue;
+    }
+
+    // Headings: # through ######
+    const headingMatch = /^(#{1,6}) (.+)$/.exec(line);
+    if (headingMatch) {
+      const level = (headingMatch[1] as string).length as 1 | 2 | 3 | 4 | 5 | 6;
+      const content = headingMatch[2] as string;
+      const Tag = `h${level}` as const;
+      const sizeClass = (
+        {
+          1: "text-2xl font-bold",
+          2: "text-xl font-bold",
+          3: "text-lg font-semibold",
+          4: "text-base font-semibold",
+          5: "text-sm font-semibold",
+          6: "text-sm font-medium text-base-content/70",
+        } as const
+      )[level];
+      elements.push(
+        <Tag key={`h-${i}`} className={sizeClass}>
+          {parseInline(content)}
+        </Tag>,
+      );
+      i++;
       continue;
     }
 
