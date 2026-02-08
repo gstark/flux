@@ -33,29 +33,20 @@ let nextEventId = 0;
 
 const MAX_EVENTS = 2000;
 
-function appendEvent(
-  prev: KeyedStreamEvent[],
-  event: StreamEvent,
-): KeyedStreamEvent[] {
-  const next = [...prev, { ...event, id: nextEventId++ }];
-  return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
-}
-
 /** Parse SSE JSON payload, returning null (and surfacing the error) on failure. */
 function parseSSE<T>(
   e: MessageEvent,
   eventName: string,
-  setEvents: React.Dispatch<React.SetStateAction<KeyedStreamEvent[]>>,
+  buffer: KeyedStreamEvent[],
 ): T | null {
   try {
     return JSON.parse(e.data) as T;
   } catch {
-    setEvents((prev) =>
-      appendEvent(prev, {
-        type: "activity",
-        content: `[ERROR] Malformed ${eventName} payload: ${e.data}`,
-      }),
-    );
+    buffer.push({
+      type: "activity",
+      content: `[ERROR] Malformed ${eventName} payload: ${e.data}`,
+      id: nextEventId++,
+    });
     return null;
   }
 }
@@ -63,6 +54,10 @@ function parseSSE<T>(
 /**
  * Hook that connects to /sse/activity and streams live agent output.
  * Handles reconnection on disconnect with exponential backoff.
+ *
+ * Events are buffered in a ref and flushed to React state on a
+ * requestAnimationFrame cadence (~60fps), collapsing hundreds of
+ * per-line SSE events into at most ~60 re-renders per second.
  */
 export function useActivityStream(): ActivityStreamState & {
   clear: () => void;
@@ -75,7 +70,41 @@ export function useActivityStream(): ActivityStreamState & {
   const retryDelay = useRef(1000);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- Batching machinery ---
+  // Incoming events accumulate here between animation frames.
+  const bufferRef = useRef<KeyedStreamEvent[]>([]);
+  // Whether we have a pending rAF flush scheduled.
+  const flushScheduledRef = useRef(false);
+
+  /** Schedule a flush on the next animation frame (if not already scheduled). */
+  const scheduleFlush = useCallback(() => {
+    if (flushScheduledRef.current) return;
+    flushScheduledRef.current = true;
+    requestAnimationFrame(() => {
+      flushScheduledRef.current = false;
+      const pending = bufferRef.current;
+      if (pending.length === 0) return;
+      // Swap the buffer so new events accumulate in a fresh array
+      // while we hand the batch to React.
+      bufferRef.current = [];
+      setEvents((prev) => {
+        const merged = prev.concat(pending);
+        return merged.length > MAX_EVENTS ? merged.slice(-MAX_EVENTS) : merged;
+      });
+    });
+  }, []);
+
+  /** Push an event into the buffer and schedule a flush. */
+  const enqueue = useCallback(
+    (event: StreamEvent) => {
+      bufferRef.current.push({ ...event, id: nextEventId++ });
+      scheduleFlush();
+    },
+    [scheduleFlush],
+  );
+
   const clear = useCallback(() => {
+    bufferRef.current = [];
     setEvents([]);
     setCurrentSession(null);
   }, []);
@@ -98,8 +127,11 @@ export function useActivityStream(): ActivityStreamState & {
           sessionId: string;
           issueId: string;
           pid: number;
-        }>(e, "session_start", setEvents);
-        if (!data) return;
+        }>(e, "session_start", bufferRef.current);
+        if (!data) {
+          scheduleFlush();
+          return;
+        }
         const sessionEvent: SessionStartEvent = {
           type: "session_start" as const,
           sessionId: data.sessionId,
@@ -107,41 +139,43 @@ export function useActivityStream(): ActivityStreamState & {
           pid: data.pid,
         };
         setCurrentSession(sessionEvent);
-        setEvents((prev) => appendEvent(prev, sessionEvent));
+        enqueue(sessionEvent);
       });
 
       es.addEventListener("activity", (e: MessageEvent) => {
         const data = parseSSE<{ type: string; content: string }>(
           e,
           "activity",
-          setEvents,
+          bufferRef.current,
         );
-        if (!data) return;
-        setEvents((prev) =>
-          appendEvent(prev, {
-            type: "activity" as const,
-            content: data.content,
-          }),
-        );
+        if (!data) {
+          scheduleFlush();
+          return;
+        }
+        enqueue({
+          type: "activity" as const,
+          content: data.content,
+        });
       });
 
       es.addEventListener("status", (e: MessageEvent) => {
         const data = parseSSE<{
           state: "stopped" | "idle" | "busy";
           message: string;
-        }>(e, "status", setEvents);
-        if (!data) return;
+        }>(e, "status", bufferRef.current);
+        if (!data) {
+          scheduleFlush();
+          return;
+        }
         // Clear the sticky session banner when no session is active
         if (data.state === "idle" || data.state === "stopped") {
           setCurrentSession(null);
         }
-        setEvents((prev) =>
-          appendEvent(prev, {
-            type: "status" as const,
-            state: data.state,
-            message: data.message,
-          }),
-        );
+        enqueue({
+          type: "status" as const,
+          state: data.state,
+          message: data.message,
+        });
       });
 
       es.addEventListener("error", () => {
@@ -165,7 +199,7 @@ export function useActivityStream(): ActivityStreamState & {
       es?.close();
       if (retryTimer.current) clearTimeout(retryTimer.current);
     };
-  }, []);
+  }, [enqueue, scheduleFlush]);
 
   return { events, connected, clear, currentSession };
 }
