@@ -3,6 +3,8 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { useDismissableError } from "../hooks/useDismissableError";
+import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faPen, faPlus, faTrash } from "./Icon";
 
 const DEFAULT_COLORS: [string, ...string[]] = [
@@ -37,7 +39,7 @@ function CreateLabelForm({
 
   const [name, setName] = useState("");
   const [color, setColor] = useState(DEFAULT_COLORS[0]);
-  const [error, setError] = useState<string | null>(null);
+  const { error, showError, clearError } = useDismissableError();
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -50,14 +52,14 @@ function CreateLabelForm({
     if (!trimmed) return;
 
     setSubmitting(true);
-    setError(null);
+    clearError();
     try {
       await createLabel({ projectId, name: trimmed, color });
       setName("");
       setColor(DEFAULT_COLORS[0]);
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create label");
+      showError(err);
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +113,7 @@ function CreateLabelForm({
         Add Label
       </button>
 
-      {error && <span className="text-error text-sm">{error}</span>}
+      <ErrorBanner error={error} onDismiss={clearError} />
     </form>
   );
 }
@@ -132,7 +134,7 @@ function LabelRow({
   const [nameDraft, setNameDraft] = useState(label.name);
   const [colorDraft, setColorDraft] = useState(label.color);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { error, showError, clearError } = useDismissableError();
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
@@ -145,7 +147,7 @@ function LabelRow({
     setNameDraft(label.name);
     setColorDraft(label.color);
     setEditing(true);
-    setError(null);
+    clearError();
   }
 
   async function saveEdit() {
@@ -172,9 +174,9 @@ function LabelRow({
         ...(colorChanged ? { color: colorDraft } : {}),
       });
       setEditing(false);
-      setError(null);
+      clearError();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update label");
+      showError(err);
     } finally {
       savingRef.current = false;
     }
@@ -193,7 +195,7 @@ function LabelRow({
     try {
       await removeLabel({ labelId: label._id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete label");
+      showError(err);
       setConfirmDelete(false);
     }
   }
@@ -220,7 +222,7 @@ function LabelRow({
               onBlur={saveEdit}
             />
           </div>
-          {error && <p className="mt-1 text-error text-sm">{error}</p>}
+          <ErrorBanner error={error} onDismiss={clearError} />
         </td>
         <td className="text-right">
           <button
@@ -243,7 +245,7 @@ function LabelRow({
           <ColorSwatch color={label.color} />
           <span>{label.name}</span>
         </div>
-        {error && <p className="mt-1 text-error text-sm">{error}</p>}
+        <ErrorBanner error={error} onDismiss={clearError} />
       </td>
       <td className="text-right">
         <div className="flex items-center justify-end gap-1">

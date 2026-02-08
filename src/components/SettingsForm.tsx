@@ -3,6 +3,8 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { useDismissableError } from "../hooks/useDismissableError";
+import { ErrorBanner } from "./ErrorBanner";
 
 export function SettingsForm() {
   const { projectId } = useRouteContext({ from: "__root__" });
@@ -19,7 +21,7 @@ export function SettingsForm() {
 
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { error, showError, clearError } = useDismissableError();
   const [saved, setSaved] = useState(false);
 
   // Sync form state from server config
@@ -39,22 +41,22 @@ export function SettingsForm() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    clearError();
 
     const reviewIter = Number(maxReviewIterations);
     const failures = Number(maxFailures);
     const timeoutMin = Number(sessionTimeoutMin);
 
     if (!Number.isInteger(reviewIter) || reviewIter < 1) {
-      setError("Max Review Iterations must be a positive integer");
+      showError("Max Review Iterations must be a positive integer");
       return;
     }
     if (!Number.isInteger(failures) || failures < 1) {
-      setError("Max Failures must be a positive integer");
+      showError("Max Failures must be a positive integer");
       return;
     }
     if (!Number.isInteger(timeoutMin) || timeoutMin < 1) {
-      setError("Session Timeout must be a positive integer (minutes)");
+      showError("Session Timeout must be a positive integer (minutes)");
       return;
     }
 
@@ -71,7 +73,7 @@ export function SettingsForm() {
       setDirty(false);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      showError(err);
     } finally {
       setSaving(false);
     }
@@ -219,8 +221,8 @@ export function SettingsForm() {
             {saved && (
               <span className="text-sm text-success">Settings saved</span>
             )}
-            {error && <span className="text-error text-sm">{error}</span>}
           </div>
+          <ErrorBanner error={error} onDismiss={clearError} />
         </section>
       </form>
     </div>

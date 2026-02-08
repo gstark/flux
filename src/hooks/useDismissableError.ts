@@ -20,7 +20,11 @@ export function useDismissableError() {
 
   const showError = useCallback((err: unknown) => {
     const msg =
-      err instanceof Error ? err.message : "An unexpected error occurred";
+      typeof err === "string"
+        ? err
+        : err instanceof Error
+          ? err.message
+          : "An unexpected error occurred";
     setError(msg);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setError(null), AUTO_DISMISS_MS);
