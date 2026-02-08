@@ -165,8 +165,6 @@ export const remove = mutation({
       )
       .collect();
 
-    const issueIds = new Set(issues.map((i) => i._id));
-
     for (const issue of issues) {
       const comments = await ctx.db
         .query("comments")
@@ -185,16 +183,15 @@ export const remove = mutation({
         await ctx.db.delete(dep._id);
       }
 
-      // Dependencies where this issue is blocked — skip if already
-      // deleted via the blocker side (both issues in same project)
+      // Dependencies where this issue is blocked (blocker in another project).
+      // Intra-project deps are already deleted from the blocker side above —
+      // Convex reads within a mutation see prior writes, so they won't appear here.
       const blockedDeps = await ctx.db
         .query("dependencies")
         .withIndex("by_blocked", (q) => q.eq("blockedId", issue._id))
         .collect();
       for (const dep of blockedDeps) {
-        if (!issueIds.has(dep.blockerId)) {
-          await ctx.db.delete(dep._id);
-        }
+        await ctx.db.delete(dep._id);
       }
 
       await ctx.db.delete(issue._id);
