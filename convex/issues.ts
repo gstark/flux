@@ -426,3 +426,21 @@ export const retry = mutation({
     return await retryHandler(ctx, issueId);
   },
 });
+
+export const counts = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const issues = await ctx.db
+      .query("issues")
+      .withIndex("by_project_deletedAt_status", (q) =>
+        q.eq("projectId", args.projectId).eq("deletedAt", undefined),
+      )
+      .collect();
+
+    const counts: Record<string, number> = {};
+    for (const issue of issues) {
+      counts[issue.status] = (counts[issue.status] ?? 0) + 1;
+    }
+    return counts;
+  },
+});

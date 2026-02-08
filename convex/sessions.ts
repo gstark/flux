@@ -160,3 +160,19 @@ export const listWithIssues = query({
     return enriched;
   },
 });
+
+export const counts = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    const counts: Record<string, number> = {};
+    for (const session of sessions) {
+      counts[session.status] = (counts[session.status] ?? 0) + 1;
+    }
+    return counts;
+  },
+});

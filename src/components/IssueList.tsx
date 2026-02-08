@@ -99,6 +99,8 @@ export function IssueList() {
     status: statusFilter ?? undefined,
   });
 
+  const issueCounts = useQuery(api.issues.counts, { projectId });
+
   const allLabels = useQuery(api.labels.list, { projectId });
   const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
 
@@ -117,17 +119,28 @@ export function IssueList() {
       </div>
 
       <div role="tablist" className="tabs tabs-box">
-        {TABS.map((tab) => (
-          <button
-            key={tab.label}
-            role="tab"
-            type="button"
-            className={`tab ${statusFilter === tab.value ? "tab-active" : ""}`}
-            onClick={() => setStatusFilter(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const count =
+            issueCounts === undefined
+              ? undefined
+              : tab.value === null
+                ? Object.values(issueCounts).reduce((a, b) => a + b, 0)
+                : (issueCounts[tab.value] ?? 0);
+          return (
+            <button
+              key={tab.label}
+              role="tab"
+              type="button"
+              className={`tab ${statusFilter === tab.value ? "tab-active" : ""}`}
+              onClick={() => setStatusFilter(tab.value)}
+            >
+              {tab.label}
+              {count !== undefined && (
+                <span className="badge badge-sm ml-1.5">{count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <ErrorBanner error={actionError} onDismiss={clearActionError} />

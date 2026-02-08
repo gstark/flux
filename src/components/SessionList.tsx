@@ -31,6 +31,8 @@ export function SessionList() {
     status: statusFilter ?? undefined,
   });
 
+  const sessionCounts = useQuery(api.sessions.counts, { projectId });
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -45,17 +47,28 @@ export function SessionList() {
       </div>
 
       <div role="tablist" className="tabs tabs-box">
-        {TABS.map((tab) => (
-          <button
-            key={tab.label}
-            role="tab"
-            type="button"
-            className={`tab ${statusFilter === tab.value ? "tab-active" : ""}`}
-            onClick={() => setStatusFilter(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const count =
+            sessionCounts === undefined
+              ? undefined
+              : tab.value === null
+                ? Object.values(sessionCounts).reduce((a, b) => a + b, 0)
+                : (sessionCounts[tab.value] ?? 0);
+          return (
+            <button
+              key={tab.label}
+              role="tab"
+              type="button"
+              className={`tab ${statusFilter === tab.value ? "tab-active" : ""}`}
+              onClick={() => setStatusFilter(tab.value)}
+            >
+              {tab.label}
+              {count !== undefined && (
+                <span className="badge badge-sm ml-1.5">{count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {sessions === undefined ? (
