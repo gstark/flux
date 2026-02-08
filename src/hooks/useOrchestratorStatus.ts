@@ -34,16 +34,14 @@ export function useOrchestratorStatus() {
     const retryDelay = { current: 1000 };
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Initial fetch
-    fetchStatus();
-
     function connect() {
       if (disposed) return;
       es = new EventSource("/sse/activity");
 
       es.addEventListener("open", () => {
         retryDelay.current = 1000;
-        // Refetch on reconnect — state may have changed while disconnected
+        // Fetch on every (re)connect — covers initial mount and reconnects
+        // where state may have changed while disconnected.
         fetchStatus();
       });
 
