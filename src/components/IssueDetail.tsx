@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { CloseTypeValue, IssuePriorityValue } from "$convex/schema";
-import { IssuePriority, IssueStatus } from "$convex/schema";
+import { CommentAuthor, IssuePriority, IssueStatus } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { callTool } from "../lib/api";
@@ -36,6 +36,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const updateIssue = useMutation(api.issues.update);
   const unstickIssue = useMutation(api.issues.unstick);
   const closeIssue = useMutation(api.issues.close);
+  const comments = useQuery(api.comments.list, { issueId });
 
   const [saving, setSaving] = useState(false);
 
@@ -72,6 +73,19 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const isDeferred = currentIssue.status === IssueStatus.Deferred;
   const isInProgress = currentIssue.status === IssueStatus.InProgress;
   const isStuck = currentIssue.status === IssueStatus.Stuck;
+
+  // Extract the most recent defer reason from Flux-authored "Deferred: ..." comments
+  const DEFER_PREFIX = "Deferred: ";
+  const deferReason = isDeferred
+    ? (comments ?? [])
+        .filter(
+          (c) =>
+            c.author === CommentAuthor.Flux &&
+            c.content.startsWith(DEFER_PREFIX),
+        )
+        .at(-1)
+        ?.content.slice(DEFER_PREFIX.length)
+    : undefined;
 
   // Any mutation in flight — disables interactive controls
   const busy = saving || deferring || undeferring || resetting;
@@ -292,6 +306,16 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           onUndefer={handleUndefer}
           onClose={handleClose}
         />
+      )}
+
+      {/* Defer reason (for deferred issues) */}
+      {isDeferred && deferReason && (
+        <div className="rounded-lg bg-base-200 p-4">
+          <h3 className="mb-1 font-medium text-base-content/60 text-sm">
+            Defer Reason
+          </h3>
+          <Markdown content={deferReason} />
+        </div>
       )}
 
       {/* Close reason (for already-closed issues) */}
