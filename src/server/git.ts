@@ -16,9 +16,19 @@ export async function resolveRepoRoot(): Promise<string> {
   }
 }
 
-export async function inferProjectSlug(): Promise<string> {
+/**
+ * Infer a project slug from a git repository.
+ * Tries the git remote origin URL first, falls back to directory name.
+ *
+ * @param cwd — When provided, uses `git -C <cwd>` and falls back to
+ *   the last segment of `cwd`. Without it, runs bare `git` from the
+ *   process CWD and falls back via `resolveRepoRoot()`.
+ */
+export async function inferProjectSlug(cwd?: string): Promise<string> {
   try {
-    const remote = (await $`git remote get-url origin`.text()).trim();
+    const remote = cwd
+      ? (await $`git -C ${cwd} remote get-url origin`.text()).trim()
+      : (await $`git remote get-url origin`.text()).trim();
     // Parse various git remote formats:
     // - https://github.com/user/repo.git
     // - git@github.com:user/repo.git
@@ -32,6 +42,10 @@ export async function inferProjectSlug(): Promise<string> {
   }
 
   // Fallback: use directory name
+  if (cwd) {
+    const segments = cwd.replace(/\/+$/, "").split("/");
+    return segments[segments.length - 1] || "unknown";
+  }
   const repoRoot = await resolveRepoRoot();
   return repoRoot.split("/").pop() || "flux";
 }

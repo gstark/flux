@@ -1,28 +1,8 @@
-import { $ } from "bun";
 import type { ConvexClient } from "convex/browser";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { ProjectState, type ProjectStateValue } from "$convex/schema";
-
-/**
- * Infer a project slug from a git repository path.
- * Tries the git remote origin URL first, falls back to directory name.
- */
-async function inferSlugFromPath(repoPath: string): Promise<string> {
-  try {
-    const remote = (
-      await $`git -C ${repoPath} remote get-url origin`.text()
-    ).trim();
-    const match = remote.match(/\/([^/]+?)(?:\.git)?$/);
-    if (match?.[1]) {
-      return match[1];
-    }
-  } catch {
-    // No remote — fall through to directory name
-  }
-  const segments = repoPath.replace(/\/+$/, "").split("/");
-  return segments[segments.length - 1] || "unknown";
-}
+import { inferProjectSlug } from "./git";
 
 /**
  * Extract the Convex document ID from the URL path.
@@ -149,7 +129,7 @@ async function handleCreate(
     );
   }
 
-  const slug = await inferSlugFromPath(path);
+  const slug = await inferProjectSlug(path);
   const name = slug; // Use slug as initial display name
 
   try {
