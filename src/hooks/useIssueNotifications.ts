@@ -58,31 +58,9 @@ export function useIssueNotifications(
         if (!ready) continue;
 
         if (curr === IssueStatus.Stuck) {
-          const n = notify(`${issue.shortId} is stuck`, {
-            body: issue.title,
-            tag: `flux-stuck-${issue._id}`,
-          });
-          if (n) {
-            const issueId = issue._id;
-            n.onclick = () => {
-              window.focus();
-              window.location.hash = "";
-              window.location.pathname = `/issues/${issueId}`;
-            };
-          }
+          fireNotification(notify, `${issue.shortId} is stuck`, issue);
         } else if (curr === IssueStatus.Closed) {
-          const n = notify(`${issue.shortId} completed`, {
-            body: issue.title,
-            tag: `flux-closed-${issue._id}`,
-          });
-          if (n) {
-            const issueId = issue._id;
-            n.onclick = () => {
-              window.focus();
-              window.location.hash = "";
-              window.location.pathname = `/issues/${issueId}`;
-            };
-          }
+          fireNotification(notify, `${issue.shortId} completed`, issue);
         }
       }
     }
@@ -95,4 +73,23 @@ export function useIssueNotifications(
       }
     }
   }, [issues, notify, ready]);
+}
+
+/** Fire a browser notification that navigates to the issue on click. */
+function fireNotification(
+  notify: (
+    title: string,
+    options?: NotificationOptions,
+  ) => Notification | undefined,
+  title: string,
+  issue: { _id: Id<"issues">; title: string; status: string },
+) {
+  const tag = `flux-${issue.status}-${issue._id}`;
+  const n = notify(title, { body: issue.title, tag });
+  if (n) {
+    n.onclick = () => {
+      window.focus();
+      window.location.href = `/issues/${issue._id}`;
+    };
+  }
 }
