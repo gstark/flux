@@ -248,7 +248,9 @@ export default defineSchema({
     direction: sessionEventDirectionValidator,
     content: v.string(),
     timestamp: v.number(),
-  }).index("by_session", ["sessionId"]),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_sequence", ["sessionId", "sequence"]),
 
   orchestratorConfig: defineTable({
     projectId: v.id("projects"),

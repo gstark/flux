@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { sessionEventDirectionValidator } from "./schema";
@@ -40,22 +41,6 @@ export const batchInsert = mutation({
   },
 });
 
-export const list = query({
-  args: {
-    sessionId: v.id("sessions"),
-  },
-  handler: async (ctx, args) => {
-    const events = await ctx.db
-      .query("sessionEvents")
-      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
-      .collect();
-
-    // Return in chronological order by sequence
-    events.sort((a, b) => a.sequence - b.sequence);
-    return events;
-  },
-});
-
 export const recent = query({
   args: {
     sessionId: v.id("sessions"),
@@ -71,5 +56,20 @@ export const recent = query({
 
     // Return in chronological order
     return events.reverse();
+  },
+});
+
+export const listPaginated = query({
+  args: {
+    sessionId: v.id("sessions"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("sessionEvents")
+      .withIndex("by_session_sequence", (q) =>
+        q.eq("sessionId", args.sessionId),
+      )
+      .paginate(args.paginationOpts);
   },
 });

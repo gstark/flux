@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { useMemo } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
@@ -274,13 +274,21 @@ function isDisplayableEvent(direction: string, content: string): boolean {
 
 export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
   const session = useQuery(api.sessions.getWithIssue, { sessionId });
-  const events = useQuery(api.sessionEvents.list, { sessionId });
+  const {
+    results: events,
+    status: paginationStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.sessionEvents.listPaginated,
+    { sessionId },
+    { initialNumItems: 200 },
+  );
 
   const displayableEvents = useMemo(
     () =>
-      events?.filter((event) =>
+      events.filter((event) =>
         isDisplayableEvent(event.direction, event.content),
-      ) ?? [],
+      ),
     [events],
   );
 
@@ -483,15 +491,16 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
       <div>
         <h3 className="mb-3 font-medium text-base-content/60 text-sm">
           Transcript
-          {events && (
+          {displayableEvents.length > 0 && (
             <span className="ml-2 text-base-content/40">
-              ({displayableEvents.length}{" "}
+              ({displayableEvents.length}
+              {paginationStatus !== "Exhausted" ? "+" : ""}{" "}
               {displayableEvents.length === 1 ? "event" : "events"})
             </span>
           )}
         </h3>
 
-        {events === undefined ? (
+        {paginationStatus === "LoadingFirstPage" ? (
           <div className="flex justify-center p-8">
             <span className="loading loading-spinner loading-md" />
           </div>
@@ -531,6 +540,20 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
                 }
               }
             })}
+            {paginationStatus === "CanLoadMore" && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-center"
+                onClick={() => loadMore(200)}
+              >
+                Load more events
+              </button>
+            )}
+            {paginationStatus === "LoadingMore" && (
+              <div className="flex justify-center p-4">
+                <span className="loading loading-spinner loading-sm" />
+              </div>
+            )}
           </div>
         )}
       </div>
