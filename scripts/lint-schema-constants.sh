@@ -40,32 +40,13 @@ run_check() {
   local label="$1"
   local constant="$2"
   local pattern="$3"
+  local pcre="${4:-}"
+
+  local rg_flags=("${RG_BASE[@]}")
+  [[ "$pcre" == "pcre" ]] && rg_flags+=("-P")
 
   local results rc=0
-  results=$(rg "${RG_BASE[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>&1) || rc=$?
-  # rg exit codes: 0=matches, 1=no matches, 2=error (bad pattern, I/O, etc.)
-  if [[ $rc -eq 2 ]]; then
-    echo "FATAL: rg failed for check '$label': $results" >&2
-    exit 2
-  fi
-
-  if [[ -n "$results" ]]; then
-    echo ""
-    echo "✗ $label — use $constant instead:"
-    echo "$results" | while IFS= read -r line; do
-      echo "  $line"
-    done
-    violations=$((violations + $(echo "$results" | wc -l)))
-  fi
-}
-
-run_check_pcre() {
-  local label="$1"
-  local constant="$2"
-  local pattern="$3"
-
-  local results rc=0
-  results=$(rg -P "${RG_BASE[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>&1) || rc=$?
+  results=$(rg "${rg_flags[@]}" "$pattern" "${SCAN_DIRS[@]}" 2>&1) || rc=$?
   # rg exit codes: 0=matches, 1=no matches, 2=error (bad pattern, I/O, etc.)
   if [[ $rc -eq 2 ]]; then
     echo "FATAL: rg failed for check '$label': $results" >&2
@@ -121,10 +102,11 @@ run_check \
 
 # IssueStatus assignments: status: "open", status: "closed", etc.
 # Uses PCRE2 lookbehind to avoid matching inside words like "sessionStatus"
-run_check_pcre \
+run_check \
   "Raw IssueStatus assignment" \
   "IssueStatus.*" \
-  '(?<!\w)status:\s*"(open|closed|in_progress|deferred|stuck)"'
+  '(?<!\w)status:\s*"(open|closed|in_progress|deferred|stuck)"' \
+  pcre
 
 # IssuePriority assignments: priority: "critical", priority: "high", etc.
 # Constant: IssuePriority.Critical, IssuePriority.High, etc.
@@ -149,10 +131,11 @@ run_check \
 
 # SessionStatus assignments: status: "running", etc.
 # Uses PCRE2 lookbehind to avoid matching inside words like "sessionStatus"
-run_check_pcre \
+run_check \
   "Raw SessionStatus assignment" \
   "SessionStatus.*" \
-  '(?<!\w)status:\s*"(running|completed|failed)"'
+  '(?<!\w)status:\s*"(running|completed|failed)"' \
+  pcre
 
 # Disposition assignments: disposition: "done", etc.
 # Constant: Disposition.Done, Disposition.Noop, Disposition.Fault
@@ -191,10 +174,11 @@ run_check \
 # SessionType assignments: type: "work", type: "review"
 # Constant: SessionType.Work, SessionType.Review
 # Uses PCRE2 lookbehind to avoid matching inside words like "sessionType"
-run_check_pcre \
+run_check \
   "Raw SessionType assignment" \
   "SessionType.*" \
-  '(?<!\w)type:\s*"(work|review)"'
+  '(?<!\w)type:\s*"(work|review)"' \
+  pcre
 
 # SessionType comparisons: .type === "work", .type === "review"
 # Constant: SessionType.Work, SessionType.Review
@@ -213,10 +197,11 @@ run_check \
 # SessionPhase assignments: phase: "work", phase: "retro", phase: "review"
 # Constant: SessionPhase.Work, SessionPhase.Retro, SessionPhase.Review
 # Uses PCRE2 lookbehind to avoid matching inside words like "sessionPhase"
-run_check_pcre \
+run_check \
   "Raw SessionPhase assignment" \
   "SessionPhase.*" \
-  '(?<!\w)phase:\s*"(work|retro|review)"'
+  '(?<!\w)phase:\s*"(work|retro|review)"' \
+  pcre
 
 # SessionPhase comparisons: .phase === "work", .phase === "retro", etc.
 # Constant: SessionPhase.Work, SessionPhase.Retro, SessionPhase.Review
