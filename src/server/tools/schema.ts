@@ -266,37 +266,6 @@ export const OrchestratorEnableSchema = z.object({});
 
 export const OrchestratorStopSchema = z.object({});
 
-// ── Inferred arg types for handlers ──────────────────────────────────
-
-export type IssuesCreateArgs = z.infer<typeof IssuesCreateSchema>;
-export type IssuesListArgs = z.infer<typeof IssuesListSchema>;
-export type IssuesGetArgs = z.infer<typeof IssuesGetSchema>;
-export type IssuesUpdateArgs = z.infer<typeof IssuesUpdateSchema>;
-export type IssuesCloseArgs = z.infer<typeof IssuesCloseSchema>;
-export type IssuesReadyArgs = z.infer<typeof IssuesReadySchema>;
-export type IssuesDeferArgs = z.infer<typeof IssuesDeferSchema>;
-export type IssuesUndeferArgs = z.infer<typeof IssuesUndeferSchema>;
-export type IssuesRetryArgs = z.infer<typeof IssuesRetrySchema>;
-export type IssuesSearchArgs = z.infer<typeof IssuesSearchSchema>;
-export type CommentsListArgs = z.infer<typeof CommentsListSchema>;
-export type CommentsCreateArgs = z.infer<typeof CommentsCreateSchema>;
-export type EpicsListArgs = z.infer<typeof EpicsListSchema>;
-export type EpicsCreateArgs = z.infer<typeof EpicsCreateSchema>;
-export type EpicsShowArgs = z.infer<typeof EpicsShowSchema>;
-export type EpicsUpdateArgs = z.infer<typeof EpicsUpdateSchema>;
-export type EpicsCloseArgs = z.infer<typeof EpicsCloseSchema>;
-export type LabelsCreateArgs = z.infer<typeof LabelsCreateSchema>;
-export type LabelsUpdateArgs = z.infer<typeof LabelsUpdateSchema>;
-export type LabelsDeleteArgs = z.infer<typeof LabelsDeleteSchema>;
-export type DepsAddArgs = z.infer<typeof DepsAddSchema>;
-export type DepsRemoveArgs = z.infer<typeof DepsRemoveSchema>;
-export type DepsListForIssueArgs = z.infer<typeof DepsListForIssueSchema>;
-export type IssuesBulkCreateArgs = z.infer<typeof IssuesBulkCreateSchema>;
-export type IssuesBulkUpdateArgs = z.infer<typeof IssuesBulkUpdateSchema>;
-export type SessionsListArgs = z.infer<typeof SessionsListSchema>;
-export type SessionsShowArgs = z.infer<typeof SessionsShowSchema>;
-export type OrchestratorRunArgs = z.infer<typeof OrchestratorRunSchema>;
-
 // ── ToolDef instances (derive .schema from Zod object .shape) ────────
 
 const issues_create: ToolDef = {
