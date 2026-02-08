@@ -1579,6 +1579,10 @@ class Orchestrator {
           );
         }
       } catch (err) {
+        // Explicit fallback: proceeding with an empty/partial buffer is
+        // acceptable here. Disposition parsing will produce a 'malformed'
+        // result, which triggers incrementFailure — the correct degradation
+        // path for a re-adopted session whose tmp log output was lost.
         console.error(
           `[Orchestrator] Failed to read tmp log for re-adopted session:`,
           err,
