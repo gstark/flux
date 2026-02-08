@@ -156,6 +156,93 @@ export const remove = mutation({
     if (!project) {
       throw new Error(`Project ${projectId} not found`);
     }
+
+    // ── Cascade through issues: comments + dependencies ──────────
+    const issues = await ctx.db
+      .query("issues")
+      .withIndex("by_project_deletedAt_status", (q) =>
+        q.eq("projectId", projectId),
+      )
+      .collect();
+
+    const issueIds = new Set(issues.map((i) => i._id));
+
+    for (const issue of issues) {
+      const comments = await ctx.db
+        .query("comments")
+        .withIndex("by_issue", (q) => q.eq("issueId", issue._id))
+        .collect();
+      for (const comment of comments) {
+        await ctx.db.delete(comment._id);
+      }
+
+      // Dependencies where this issue is the blocker
+      const blockerDeps = await ctx.db
+        .query("dependencies")
+        .withIndex("by_blocker_blocked", (q) => q.eq("blockerId", issue._id))
+        .collect();
+      for (const dep of blockerDeps) {
+        await ctx.db.delete(dep._id);
+      }
+
+      // Dependencies where this issue is blocked — skip if already
+      // deleted via the blocker side (both issues in same project)
+      const blockedDeps = await ctx.db
+        .query("dependencies")
+        .withIndex("by_blocked", (q) => q.eq("blockedId", issue._id))
+        .collect();
+      for (const dep of blockedDeps) {
+        if (!issueIds.has(dep.blockerId)) {
+          await ctx.db.delete(dep._id);
+        }
+      }
+
+      await ctx.db.delete(issue._id);
+    }
+
+    // ── Cascade through sessions: sessionEvents ──────────────────
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_project_startedAt", (q) => q.eq("projectId", projectId))
+      .collect();
+
+    for (const session of sessions) {
+      const events = await ctx.db
+        .query("sessionEvents")
+        .withIndex("by_session_sequence", (q) => q.eq("sessionId", session._id))
+        .collect();
+      for (const event of events) {
+        await ctx.db.delete(event._id);
+      }
+      await ctx.db.delete(session._id);
+    }
+
+    // ── Direct children ──────────────────────────────────────────
+    const labels = await ctx.db
+      .query("labels")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+    for (const label of labels) {
+      await ctx.db.delete(label._id);
+    }
+
+    const epics = await ctx.db
+      .query("epics")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+    for (const epic of epics) {
+      await ctx.db.delete(epic._id);
+    }
+
+    const configs = await ctx.db
+      .query("orchestratorConfig")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+    for (const config of configs) {
+      await ctx.db.delete(config._id);
+    }
+
+    // ── Finally, delete the project itself ────────────────────────
     await ctx.db.delete(projectId);
   },
 });
