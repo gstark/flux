@@ -1395,6 +1395,7 @@ class Orchestrator {
           await convex.mutation(api.issues.update, {
             issueId: session.issueId,
             status: IssueStatus.Open,
+            assignee: null,
           });
         }
         continue;
