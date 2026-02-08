@@ -22,7 +22,7 @@ function isValidAction(value: string): value is OrchestratorAction {
  * Dedicated API handler for orchestrator actions.
  *
  * Accepts POST requests with JSON body `{ action: "enable" | "stop" | "kill" | "status" }`.
- * This bypasses the generic MCP tool dispatch layer (`/api/tools`), giving the UI
+ * This bypasses the generic MCP tool dispatch layer (`/api/projects/:id/tools`), giving the UI
  * a direct, purpose-built endpoint for orchestrator control.
  *
  * `enable` and `stop` are routed through Convex project state updates so the

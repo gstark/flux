@@ -936,7 +936,7 @@ Features deferred until core system is validated:
 Flux uses a **stdio MCP transport** that proxies tool calls to the Bun server via REST:
 
 ```
-Claude Code → stdio → bin/flux-mcp-stdio.ts → POST /api/tools → Bun Server → handlers
+Claude Code → stdio → bin/flux-mcp-stdio.ts → POST /api/projects/:id/tools → Bun Server → handlers
 ```
 
 **Why stdio over HTTP?** The HTTP MCP transport loses sessions on Bun hot-reload, requiring constant `/mcp/projects/:id` reconnects. With stdio, the MCP process is stable while the Bun server hot-reloads behind it — handler changes take effect immediately with zero reconnection.
@@ -951,7 +951,10 @@ All tool schemas are registered upfront in `src/server/tools/schema.ts`. Unimple
     "flux": {
       "type": "stdio",
       "command": "bun",
-      "args": ["run", "/Users/jason/Projects/flux/src/server/index.ts"]
+      "args": ["run", "/Users/jason/Projects/flux/bin/flux-mcp-stdio.ts"],
+      "env": {
+        "FLUX_PROJECT_ID": "${FLUX_PROJECT_ID}"
+      }
     }
   }
 }
@@ -959,7 +962,7 @@ All tool schemas are registered upfront in `src/server/tools/schema.ts`. Unimple
 
 ### REST Tool Endpoint
 
-`POST /api/tools` accepts `{ "tool": "<name>", "args": {...} }` and dispatches to the handler. This is the bridge between the stdio MCP process and the hot-reloading Bun server.
+`POST /api/projects/:id/tools` accepts `{ "tool": "<name>", "args": {...} }` and dispatches to the handler. This is the bridge between the stdio MCP process and the hot-reloading Bun server.
 
 ## Testing Strategy
 
