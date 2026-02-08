@@ -428,15 +428,39 @@ export const search = query({
   handler: async (ctx, args) => {
     const cap = Math.min(args.limit ?? 20, 100);
 
-    // Full-text search on title via search index (relevance-ranked, excludes deleted)
-    const results = await ctx.db
+    // If the query looks like a shortId (e.g. "FLUX-42"), do a direct index lookup first
+    const shortIdMatch = /^[A-Za-z]+-\d+$/.test(args.query.trim())
+      ? await ctx.db
+          .query("issues")
+          .withIndex("by_project_shortId", (q) =>
+            q
+              .eq("projectId", args.projectId)
+              .eq("shortId", args.query.trim().toUpperCase()),
+          )
+          .first()
+      : null;
+
+    // Full-text search on title via search index (relevance-ranked)
+    const textResults = await ctx.db
       .query("issues")
       .withSearchIndex("search_title", (q) =>
         q.search("title", args.query).eq("projectId", args.projectId),
       )
       .take(cap);
 
-    return results.filter((i) => i.deletedAt === undefined);
+    // Merge: shortId hit first, then full-text results (deduped), exclude deleted
+    const seen = new Set<string>();
+    const merged: Doc<"issues">[] = [];
+    for (const issue of [
+      ...(shortIdMatch ? [shortIdMatch] : []),
+      ...textResults,
+    ]) {
+      if (issue.deletedAt !== undefined) continue;
+      if (seen.has(issue._id)) continue;
+      seen.add(issue._id);
+      merged.push(issue);
+    }
+    return merged.slice(0, cap);
   },
 });
 

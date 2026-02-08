@@ -179,6 +179,7 @@ export default defineSchema({
       "priorityOrder",
     ])
     .index("by_epic", ["epicId"])
+    .index("by_project_shortId", ["projectId", "shortId"])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["projectId"],

@@ -257,7 +257,7 @@ function IssuePicker({
         ref={searchInputRef}
         type="text"
         className="input input-sm mb-2 w-full"
-        placeholder="Search issues by title..."
+        placeholder="Search by title or ID (e.g. FLUX-42)..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />

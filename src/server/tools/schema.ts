@@ -342,7 +342,7 @@ const issues_unstick: ToolDef = {
 const issues_search: ToolDef = {
   name: "issues_search",
   description:
-    "Search issues by title (full-text via search index) and description (substring match). Title matches rank first. Scoped to the current project.",
+    "Search issues by title (full-text) or shortId (e.g. FLUX-42). ShortId matches rank first. Scoped to the current project.",
   schema: IssuesSearchSchema.shape,
 };
 
