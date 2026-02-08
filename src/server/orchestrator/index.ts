@@ -902,7 +902,13 @@ class Orchestrator {
     const allLines = active.monitor.buffer.getAll();
     const dispositionResult = parseDisposition(allLines);
 
-    // Update review session record
+    // Update review session record (also persists agentSessionId if the early persist failed)
+    if (active.agentSessionIdPersistFailed && active.agentSessionId) {
+      console.warn(
+        `[Orchestrator] Early agentSessionId persist had failed for review of ${issue.shortId} — ` +
+          "recovering via handleReviewExit session update.",
+      );
+    }
     await convex.mutation(api.sessions.update, {
       sessionId,
       status: SessionStatus.Completed,
@@ -912,6 +918,7 @@ class Orchestrator {
         ? dispositionResult.disposition
         : undefined,
       note: dispositionResult.success ? dispositionResult.note : undefined,
+      agentSessionId: active.agentSessionId ?? undefined,
       ...(endHead !== undefined && { endHead }),
     });
 
@@ -1216,6 +1223,35 @@ class Orchestrator {
     active.monitor = reviewMonitor;
     active.monitorDone = reviewMonitorDone;
     active.phase = SessionPhase.Review;
+    // Reset agentSessionId for the new session record (work phase values are stale)
+    active.agentSessionId = null;
+    active.agentSessionIdPersistFailed = false;
+
+    // Wire up agentSessionId extraction from stream-json (same as work phase)
+    reviewMonitor.onLine((line) => {
+      if (active.agentSessionId) return; // Already captured
+      try {
+        const obj = JSON.parse(line) as Record<string, unknown>;
+        if (obj.type === "system" && typeof obj.session_id === "string") {
+          active.agentSessionId = obj.session_id;
+          getConvexClient()
+            .mutation(api.sessions.update, {
+              sessionId: active.sessionId,
+              agentSessionId: obj.session_id,
+            })
+            .catch((err: unknown) => {
+              active.agentSessionIdPersistFailed = true;
+              console.error(
+                "[Orchestrator] Failed to persist review agentSessionId — " +
+                  "will recover in handleReviewExit:",
+                err,
+              );
+            });
+        }
+      } catch {
+        // Not JSON — ignore
+      }
+    });
 
     // Notify SSE clients about the new monitor
     this.emitLifecycle({ type: "monitor_changed", monitor: reviewMonitor });
