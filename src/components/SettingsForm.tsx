@@ -242,7 +242,20 @@ export function SettingsForm() {
     );
   }
 
-  const currentState = project?.state ?? ProjectState.Stopped;
+  if (project === null) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="font-bold text-xl">Settings</h1>
+        <div className="rounded-lg border border-error/30 bg-base-200 p-6">
+          <p className="text-base-content/70">
+            Project not found. It may have been removed.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentState = project.state ?? ProjectState.Stopped;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
