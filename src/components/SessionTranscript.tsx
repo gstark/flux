@@ -1,3 +1,4 @@
+import type { PaginationStatus } from "convex/react";
 import type { TranscriptNode } from "../lib/groupTranscriptEvents";
 import { Markdown } from "./Markdown";
 import { ToolCallCard } from "./ToolCallCard";
@@ -5,11 +6,7 @@ import { ToolCallCard } from "./ToolCallCard";
 interface SessionTranscriptProps {
   nodes: TranscriptNode[];
   eventCount: number;
-  paginationStatus:
-    | "LoadingFirstPage"
-    | "CanLoadMore"
-    | "LoadingMore"
-    | "Exhausted";
+  paginationStatus: PaginationStatus;
   onLoadMore: () => void;
 }
 
