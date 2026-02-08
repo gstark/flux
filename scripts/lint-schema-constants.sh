@@ -74,19 +74,33 @@ run_check_pcre() {
 
 echo "Checking for raw string literals that should use schema constants..."
 
-# CloseType values: completed, noop, duplicate, wontfix
+# CloseType assignments: closeType: "completed", closeType: "noop", etc.
 # Constant: CloseType.Completed, CloseType.Noop, etc.
 run_check \
-  "Raw CloseType string" \
+  "Raw CloseType assignment" \
   "CloseType.*" \
   'closeType:\s*"(completed|noop|duplicate|wontfix)"'
 
-# CommentAuthor values: user, agent, flux
+# CloseType comparisons: .closeType === "completed", etc.
+# Constant: CloseType.Completed, CloseType.Noop, etc.
+run_check \
+  "Raw CloseType comparison" \
+  "CloseType.*" \
+  '\.closeType\s*(===|!==)\s*"(completed|noop|duplicate|wontfix)"'
+
+# CommentAuthor assignments: author: "user", author: "agent", etc.
 # Constant: CommentAuthor.User, CommentAuthor.Agent, CommentAuthor.Flux
 run_check \
-  "Raw CommentAuthor string" \
+  "Raw CommentAuthor assignment" \
   "CommentAuthor.*" \
   'author:\s*"(user|agent|flux)"'
+
+# CommentAuthor comparisons: .author === "user", etc.
+# Constant: CommentAuthor.User, CommentAuthor.Agent, CommentAuthor.Flux
+run_check \
+  "Raw CommentAuthor comparison" \
+  "CommentAuthor.*" \
+  '\.author\s*(===|!==)\s*"(user|agent|flux)"'
 
 # IssueStatus comparisons: .status === "open", .status !== "deferred", etc.
 # Constant: IssueStatus.Open, IssueStatus.Closed, etc.
@@ -188,10 +202,11 @@ run_check \
 
 # SessionPhase assignments: phase: "work", phase: "retro", phase: "review"
 # Constant: SessionPhase.Work, SessionPhase.Retro, SessionPhase.Review
-run_check \
+# Uses PCRE2 lookbehind to avoid matching inside words like "sessionPhase"
+run_check_pcre \
   "Raw SessionPhase assignment" \
   "SessionPhase.*" \
-  'phase:\s*"(work|retro|review)"'
+  '(?<!\w)phase:\s*"(work|retro|review)"'
 
 # SessionPhase comparisons: .phase === "work", .phase === "retro", etc.
 # Constant: SessionPhase.Work, SessionPhase.Retro, SessionPhase.Review
