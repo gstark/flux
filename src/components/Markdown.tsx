@@ -46,7 +46,7 @@ function parseInline(text: string): ReactNode[] {
             rel="noopener noreferrer"
             className="link link-primary"
           >
-            {linkText}
+            {parseInline(linkText)}
           </a>,
         );
       } else {
