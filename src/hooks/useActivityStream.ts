@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OrchestratorState } from "@/shared/orchestrator";
+import { useSSE } from "./useSSE";
 
 /** Event types from the SSE endpoint */
 export interface SessionStartEvent {
@@ -53,23 +54,20 @@ function parseSSE<T>(
 }
 
 /**
- * Hook that connects to /sse/activity and streams live agent output.
- * Handles reconnection on disconnect with exponential backoff.
+ * Hook that streams live agent output from the shared SSE connection.
+ * Handles rAF batching to collapse hundreds of per-line SSE events
+ * into at most ~60 re-renders per second.
  *
- * Events are buffered in a ref and flushed to React state on a
- * requestAnimationFrame cadence (~60fps), collapsing hundreds of
- * per-line SSE events into at most ~60 re-renders per second.
+ * Requires an <SSEProvider> ancestor.
  */
 export function useActivityStream(): ActivityStreamState & {
   clear: () => void;
   currentSession: SessionStartEvent | null;
 } {
+  const { connected, subscribe } = useSSE();
   const [events, setEvents] = useState<KeyedStreamEvent[]>([]);
-  const [connected, setConnected] = useState(false);
   const [currentSession, setCurrentSession] =
     useState<SessionStartEvent | null>(null);
-  const retryDelay = useRef(1000);
-  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Batching machinery ---
   // Incoming events accumulate here between animation frames.
@@ -113,20 +111,12 @@ export function useActivityStream(): ActivityStreamState & {
     setCurrentSession(null);
   }, []);
 
+  // Subscribe to SSE events from the shared provider.
   useEffect(() => {
-    let es: EventSource | null = null;
-    let disposed = false;
+    const unsubs: Array<() => void> = [];
 
-    function connect() {
-      if (disposed) return;
-      es = new EventSource("/sse/activity");
-
-      es.addEventListener("open", () => {
-        setConnected(true);
-        retryDelay.current = 1000; // Reset backoff on successful connect
-      });
-
-      es.addEventListener("session_start", (e: MessageEvent) => {
+    unsubs.push(
+      subscribe("session_start", (e: MessageEvent) => {
         const data = parseSSE<{
           sessionId: string;
           issueId: string;
@@ -144,9 +134,11 @@ export function useActivityStream(): ActivityStreamState & {
         };
         setCurrentSession(sessionEvent);
         enqueue(sessionEvent);
-      });
+      }),
+    );
 
-      es.addEventListener("activity", (e: MessageEvent) => {
+    unsubs.push(
+      subscribe("activity", (e: MessageEvent) => {
         const data = parseSSE<{ type: string; content: string }>(
           e,
           "activity",
@@ -160,9 +152,11 @@ export function useActivityStream(): ActivityStreamState & {
           type: "activity" as const,
           content: data.content,
         });
-      });
+      }),
+    );
 
-      es.addEventListener("status", (e: MessageEvent) => {
+    unsubs.push(
+      subscribe("status", (e: MessageEvent) => {
         const data = parseSSE<{
           state: OrchestratorState;
           message: string;
@@ -180,31 +174,14 @@ export function useActivityStream(): ActivityStreamState & {
           state: data.state,
           message: data.message,
         });
-      });
-
-      es.addEventListener("error", () => {
-        setConnected(false);
-        es?.close();
-        es = null;
-        // Reconnect with exponential backoff (max 30s)
-        if (!disposed) {
-          retryTimer.current = setTimeout(() => {
-            retryDelay.current = Math.min(retryDelay.current * 2, 30_000);
-            connect();
-          }, retryDelay.current);
-        }
-      });
-    }
-
-    connect();
+      }),
+    );
 
     return () => {
-      disposed = true;
-      es?.close();
-      if (retryTimer.current) clearTimeout(retryTimer.current);
+      for (const unsub of unsubs) unsub();
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [enqueue, scheduleFlush]);
+  }, [subscribe, enqueue, scheduleFlush]);
 
   return { events, connected, clear, currentSession };
 }

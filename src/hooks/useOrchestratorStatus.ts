@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import type { OrchestratorStatusData } from "@/shared/orchestrator";
 import { callTool } from "../lib/api";
+import { useSSE } from "./useSSE";
 
 /**
- * Hook that provides real-time orchestrator status via SSE.
+ * Hook that provides real-time orchestrator status via the shared SSE connection.
  *
- * Fetches the full status on mount, then subscribes to `/sse/activity`
- * for state-changing events (session_start, status). When an event
- * arrives, it triggers an immediate re-fetch for the complete status
- * shape — no polling interval needed.
+ * Fetches the full status on mount and on every SSE (re)connect, then
+ * re-fetches whenever a state-changing event (session_start, status)
+ * arrives — no polling interval needed.
+ *
+ * Requires an <SSEProvider> ancestor.
  */
 export function useOrchestratorStatus() {
+  const { subscribe } = useSSE();
   const [status, setStatus] = useState<OrchestratorStatusData["status"] | null>(
     null,
   );
@@ -29,52 +32,22 @@ export function useOrchestratorStatus() {
   }, []);
 
   useEffect(() => {
-    let es: EventSource | null = null;
-    let disposed = false;
-    const retryDelay = { current: 1000 };
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const unsubs: Array<() => void> = [];
 
-    function connect() {
-      if (disposed) return;
-      es = new EventSource("/sse/activity");
+    // Fetch on every (re)connect — covers initial mount and reconnects
+    // where state may have changed while disconnected.
+    unsubs.push(subscribe("open", () => fetchStatus()));
 
-      es.addEventListener("open", () => {
-        retryDelay.current = 1000;
-        // Fetch on every (re)connect — covers initial mount and reconnects
-        // where state may have changed while disconnected.
-        fetchStatus();
-      });
+    // Session started → refetch for full status (includes activeSession, phase)
+    unsubs.push(subscribe("session_start", () => fetchStatus()));
 
-      // Session started → refetch for full status (includes activeSession, phase)
-      es.addEventListener("session_start", () => {
-        fetchStatus();
-      });
-
-      // State change (session_end, enable, stop) → refetch for full status
-      es.addEventListener("status", () => {
-        fetchStatus();
-      });
-
-      es.addEventListener("error", () => {
-        es?.close();
-        es = null;
-        if (!disposed) {
-          retryTimer = setTimeout(() => {
-            retryDelay.current = Math.min(retryDelay.current * 2, 30_000);
-            connect();
-          }, retryDelay.current);
-        }
-      });
-    }
-
-    connect();
+    // State change (session_end, enable, stop) → refetch for full status
+    unsubs.push(subscribe("status", () => fetchStatus()));
 
     return () => {
-      disposed = true;
-      es?.close();
-      if (retryTimer) clearTimeout(retryTimer);
+      for (const unsub of unsubs) unsub();
     };
-  }, [fetchStatus]);
+  }, [subscribe, fetchStatus]);
 
   return { status, error, refetch: fetchStatus };
 }
