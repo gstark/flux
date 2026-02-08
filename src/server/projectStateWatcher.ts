@@ -26,6 +26,29 @@ type ProjectSnapshot = {
 };
 
 /**
+ * Per-project transition lock. Transitions are async (enable, stop, kill all
+ * involve network calls), but Convex's onUpdate callback is synchronous and
+ * fire-and-forget. Without serialization, rapid state changes (e.g. running →
+ * stopped) can race: handleRunning's enable() hasn't finished when handleStopped
+ * checks for an existing orchestrator, finds none, and returns — leaving the
+ * orchestrator enabled with no one to stop it.
+ *
+ * Each project chains its transitions: a new transition awaits the previous
+ * one before executing. Errors are caught per-transition so a failure doesn't
+ * block future transitions.
+ */
+const transitionLocks = new Map<Id<"projects">, Promise<void>>();
+
+function enqueueTransition(
+  projectId: Id<"projects">,
+  fn: () => Promise<void>,
+): void {
+  const prev = transitionLocks.get(projectId) ?? Promise.resolve();
+  const next = prev.then(fn, fn); // Run fn regardless of previous outcome
+  transitionLocks.set(projectId, next);
+}
+
+/**
  * Start watching all projects for state transitions.
  * Returns an unsubscribe function.
  */
@@ -55,10 +78,10 @@ export function startProjectStateWatcher(): () => void {
       // Skip if state hasn't changed (or first observation with no state set)
       if (prev === next) continue;
 
-      // Apply transition: covers both first observation (server restart re-sync)
-      // and normal state changes.
+      // Enqueue transition: serialized per project to prevent races between
+      // rapid state changes (e.g. running → stopped before enable() completes).
       if (next !== undefined) {
-        handleTransition(project, next);
+        enqueueTransition(project._id, () => handleTransition(project, next));
       }
     }
 
@@ -67,6 +90,7 @@ export function startProjectStateWatcher(): () => void {
     for (const id of previousStates.keys()) {
       if (!currentIds.has(id)) {
         previousStates.delete(id);
+        transitionLocks.delete(id);
       }
     }
   });
@@ -74,19 +98,19 @@ export function startProjectStateWatcher(): () => void {
   return unsubscribe;
 }
 
-function handleTransition(
+async function handleTransition(
   project: ProjectSnapshot,
   targetState: ProjectStateValue,
-): void {
+): Promise<void> {
   switch (targetState) {
     case ProjectState.Running:
-      handleRunning(project);
+      await handleRunning(project);
       break;
     case ProjectState.Paused:
-      handlePaused(project);
+      await handlePaused(project);
       break;
     case ProjectState.Stopped:
-      handleStopped(project);
+      await handleStopped(project);
       break;
   }
 }
