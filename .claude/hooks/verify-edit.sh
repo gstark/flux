@@ -12,7 +12,8 @@ if [[ -z "$FILE_PATH" ]]; then
   exit 0
 fi
 
-CHECKSUM_FILE="/tmp/flux-edit-checksum"
+# Derive the same unique checksum file that verify-edit-pre.sh wrote.
+CHECKSUM_FILE="/tmp/flux-edit-checksum-$(echo "$FILE_PATH" | shasum | cut -d' ' -f1)"
 
 if [[ ! -f "$CHECKSUM_FILE" ]]; then
   # No pre-snapshot — file was new, nothing to compare

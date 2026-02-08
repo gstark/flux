@@ -6,13 +6,14 @@
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')
 
-CHECKSUM_FILE="/tmp/flux-edit-checksum"
-
 if [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]]; then
   # New file — nothing to snapshot
-  rm -f "$CHECKSUM_FILE" 2>/dev/null
   exit 0
 fi
+
+# Derive a unique checksum file per target path to avoid races between
+# concurrent edit_file calls (e.g. parallel agents on the same machine).
+CHECKSUM_FILE="/tmp/flux-edit-checksum-$(echo "$FILE_PATH" | shasum | cut -d' ' -f1)"
 
 # Use shasum (available on macOS and Linux) for consistent output format
 shasum "$FILE_PATH" | cut -d' ' -f1 > "$CHECKSUM_FILE"
