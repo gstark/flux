@@ -1669,13 +1669,24 @@ export function getOrchestrator(projectId: Id<"projects">): Orchestrator {
   return instance;
 }
 
-/** Remove an orchestrator instance for a project (e.g. when stopping a project). */
+/** Remove an orchestrator instance for a project (e.g. when stopping a project).
+ *  Throws if the orchestrator is not stopped — caller must call stop() first. */
 export function removeOrchestrator(projectId: Id<"projects">): boolean {
-  return getOrchestratorMap().delete(projectId);
+  const map = getOrchestratorMap();
+  const instance = map.get(projectId);
+  if (!instance) return false;
+
+  const { state } = instance.getStatus();
+  if (state !== OrchestratorState.Stopped) {
+    throw new Error(
+      `Cannot remove orchestrator for project ${projectId}: state is "${state}", expected "stopped". Call stop() first.`,
+    );
+  }
+  return map.delete(projectId);
 }
 
-/** Return all active orchestrator instances, keyed by projectId. */
-export function getAllOrchestrators(): Map<string, Orchestrator> {
+/** Return a read-only snapshot of active orchestrator instances, keyed by projectId. */
+export function getAllOrchestrators(): ReadonlyMap<string, Orchestrator> {
   return getOrchestratorMap();
 }
 
