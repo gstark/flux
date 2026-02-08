@@ -38,6 +38,7 @@ export function ProjectRow({ project }: { project: Project }) {
     setNameDraft(project.name);
     setSlugDraft(project.slug);
     setPathDraft(project.path ?? "");
+    setConfirmDelete(false);
     setEditing(true);
     clearError();
   }
