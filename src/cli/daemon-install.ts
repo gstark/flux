@@ -76,24 +76,24 @@ function resolveBunPath(): string {
 
 /** Generate the plist XML content. */
 function generatePlist(opts: {
-  programArguments: string[];
+  /** The shell command to exec (e.g. "/path/to/bun run dev") */
+  shellCommand: string;
   workingDirectory: string;
   logDir: string;
-  envVars: { PATH: string; CONVEX_URL: string; FLUX_PORT: string };
+  envVars: { CONVEX_URL: string; FLUX_PORT: string };
 }): string {
-  const programArgs = opts.programArguments
-    .map((arg) => `\t\t<string>${escapeXml(arg)}</string>`)
-    .join("\n");
-
   const e = {
     label: escapeXml(LABEL),
     workDir: escapeXml(opts.workingDirectory),
-    path: escapeXml(opts.envVars.PATH),
+    shellCmd: escapeXml(opts.shellCommand),
     convexUrl: escapeXml(opts.envVars.CONVEX_URL),
     fluxPort: escapeXml(opts.envVars.FLUX_PORT),
     logDir: escapeXml(opts.logDir),
   };
 
+  // Launch through a login shell (`zsh -l -c`) so the user's full PATH from
+  // .zshrc/.zprofile is available on every start — no need to snapshot PATH
+  // at install time. Agents inherit this PATH and can find all user tools.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -106,13 +106,14 @@ function generatePlist(opts: {
 
 	<key>ProgramArguments</key>
 	<array>
-${programArgs}
+		<string>/bin/zsh</string>
+		<string>-l</string>
+		<string>-c</string>
+		<string>exec ${e.shellCmd}</string>
 	</array>
 
 	<key>EnvironmentVariables</key>
 	<dict>
-		<key>PATH</key>
-		<string>${e.path}</string>
 		<key>CONVEX_URL</key>
 		<string>${e.convexUrl}</string>
 		<key>FLUX_PORT</key>
@@ -148,26 +149,10 @@ export async function daemonInstall(): Promise<void> {
   // 1. Resolve dependencies
   const bunPath = resolveBunPath();
   const envVars = resolveEnvVars();
-  const programArguments = [bunPath, "run", "dev"];
-
-  // Capture the user's full interactive $PATH at install time so that agents
-  // spawned by the daemon can find all user-installed tools (claude, git, npm,
-  // cargo, homebrew binaries, etc.). Ensure bun's directory is first.
-  const bunDir = join(bunPath, "..");
-  const userPath = process.env.PATH ?? "";
-  const seen = new Set<string>();
-  const pathDirs: string[] = [];
-  // Bun first, then everything from the user's shell PATH (deduped)
-  for (const dir of [bunDir, ...userPath.split(":")]) {
-    if (dir && !seen.has(dir)) {
-      seen.add(dir);
-      pathDirs.push(dir);
-    }
-  }
-  const pathEnv = pathDirs.join(":");
+  const shellCommand = `${bunPath} run dev`;
 
   console.log(`Bun:        ${bunPath}`);
-  console.log(`Mode:       dev`);
+  console.log(`Shell:      /bin/zsh -l -c "exec ${shellCommand}"`);
   console.log(`CONVEX_URL: ${envVars.CONVEX_URL}`);
   console.log(`FLUX_PORT:  ${envVars.FLUX_PORT}`);
 
@@ -191,10 +176,10 @@ export async function daemonInstall(): Promise<void> {
 
   // 4. Write the plist
   const plist = generatePlist({
-    programArguments,
+    shellCommand,
     workingDirectory: root,
     logDir,
-    envVars: { PATH: pathEnv, ...envVars },
+    envVars,
   });
   writeFileSync(plistPath, plist);
   console.log(`Wrote ${plistPath}`);
