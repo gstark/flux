@@ -72,6 +72,7 @@ export function IssueDeferFormPanel({
     try {
       await onDefer(deferNote.trim() || "Deferred from UI");
       setDeferNote("");
+      onCancel();
     } catch {
       // Parent handles error display — keep form open so user doesn't lose input
     }
