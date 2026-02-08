@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { ProjectState, projectStateValidator } from "./schema";
 
@@ -47,7 +48,7 @@ export const update = mutation({
       throw new Error(`Project ${args.projectId} not found`);
     }
 
-    const updates: Record<string, string> = {};
+    const updates: Partial<Doc<"projects">> = {};
     if (args.name !== undefined) updates.name = args.name;
     if (args.path !== undefined) updates.path = args.path;
     if (args.state !== undefined) updates.state = args.state;
