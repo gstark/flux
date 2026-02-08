@@ -7,28 +7,61 @@ import { createMcpHandler } from "./mcp";
 import { getOrchestrator } from "./orchestrator";
 import { createOrchestratorApiHandler } from "./orchestratorApi";
 import { createProjectsApiHandler } from "./projectsApi";
+import type { Project } from "./setup";
 import { createSSEHandler } from "./sse";
 import type { ToolContext } from "./tools";
 
 const DEFAULT_PORT = 8042;
 
-export async function startServer(
-  projectId: Id<"projects">,
-  projectSlug: string,
-) {
-  const port = Number(process.env.FLUX_PORT) || DEFAULT_PORT;
-  const handleMcp = createMcpHandler(projectId, projectSlug);
-
-  const toolContext: ToolContext = {
+/** Build a ToolContext for a specific project. */
+function createToolContext(project: Project): ToolContext {
+  return {
     convex: getConvexClient(),
-    projectId,
-    projectSlug,
-    getOrchestrator: () => getOrchestrator(projectId),
+    projectId: project._id,
+    projectSlug: project.slug,
+    getOrchestrator: () => getOrchestrator(project._id),
   };
-  const handleApi = createApiHandler(toolContext);
-  const handleSSE = createSSEHandler(() => getOrchestrator(projectId));
+}
+
+export async function startServer(projects: Project[]) {
+  if (projects.length === 0) {
+    throw new Error("startServer requires at least one project");
+  }
+
+  const port = Number(process.env.FLUX_PORT) || DEFAULT_PORT;
+
+  // Index projects by ID for per-request lookup
+  const projectsById = new Map<string, Project>();
+  for (const p of projects) {
+    projectsById.set(p._id, p);
+  }
+
+  // Default project: first in the list (backward compat for single-project flows).
+  // Length check above guarantees this is defined.
+  const defaultProject = projects[0] as Project;
+
+  // Per-project ToolContext — created lazily and cached
+  const toolContextCache = new Map<string, ToolContext>();
+  function getToolContext(projectId: Id<"projects">): ToolContext {
+    const cached = toolContextCache.get(projectId);
+    if (cached) return cached;
+    const project = projectsById.get(projectId);
+    if (!project) {
+      throw new Error(`Unknown project: ${projectId}`);
+    }
+    const ctx = createToolContext(project);
+    toolContextCache.set(projectId, ctx);
+    return ctx;
+  }
+
+  // Default context for handlers that don't yet support multi-project
+  const defaultCtx = getToolContext(defaultProject._id);
+
+  const handleMcp = createMcpHandler(defaultProject._id, defaultProject.slug);
+  const handleApi = createApiHandler(defaultCtx);
+  const handleSSE = createSSEHandler(() => getOrchestrator(defaultProject._id));
   const handleOrchestratorApi = createOrchestratorApiHandler(() =>
-    getOrchestrator(projectId),
+    getOrchestrator(defaultProject._id),
   );
   const handleProjectsApi = createProjectsApiHandler(getConvexClient());
 
@@ -51,7 +84,17 @@ export async function startServer(
           { status: 500 },
         );
       }
-      return Response.json({ convexUrl, projectId });
+      return Response.json({
+        convexUrl,
+        // Backward compat: single projectId for current UI
+        projectId: defaultProject._id,
+        // Full project list for multi-project consumers
+        projects: projects.map((p) => ({
+          _id: p._id,
+          slug: p.slug,
+          name: p.name,
+        })),
+      });
     },
 
     "/mcp": (req) => handleMcp(req),

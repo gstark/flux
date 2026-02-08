@@ -1,9 +1,9 @@
 import { startServer } from "./server";
-import { ensureProject } from "./server/setup";
+import { loadProjects } from "./server/setup";
 
 async function main() {
-  const { projectId, projectSlug } = await ensureProject();
-  const server = await startServer(projectId, projectSlug);
+  const projects = await loadProjects();
+  const server = await startServer(projects);
   console.log(`Flux running at http://localhost:${server.port}`);
 }
 
