@@ -66,6 +66,7 @@ export function CreateIssueModal() {
     }
 
     setSubmitting(true);
+    clearError();
 
     let issueId: string;
     try {

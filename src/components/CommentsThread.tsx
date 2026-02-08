@@ -45,6 +45,7 @@ export function CommentsThread({ issueId }: { issueId: Id<"issues"> }) {
     if (!trimmed || submitting) return;
 
     setSubmitting(true);
+    clearError();
     try {
       await createComment({
         issueId,
