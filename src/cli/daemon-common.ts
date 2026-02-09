@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const LABEL = "dev.flux.daemon";
-export const PLIST_FILENAME = `${LABEL}.plist`;
+const PLIST_FILENAME = `${LABEL}.plist`;
 
 /** Resolve the absolute path to the daemon's launchd plist file. */
 export function plistPath(): string {
