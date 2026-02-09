@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import {
+  internalAction,
+  internalMutation,
+  mutation,
+  query,
+} from "./_generated/server";
 import { IssueStatus, SessionStatus } from "./schema";
 
 export const create = mutation({
@@ -152,89 +157,253 @@ export const remove = mutation({
       throw new Error(`Project ${projectId} not found`);
     }
 
-    // ── Cascade through issues: comments + dependencies ──────────
-    const issues = await ctx.db
-      .query("issues")
-      .withIndex("by_project_deletedAt_status", (q) =>
-        q.eq("projectId", projectId),
-      )
-      .collect();
-
-    for (const issue of issues) {
-      const comments = await ctx.db
-        .query("comments")
-        .withIndex("by_issue", (q) => q.eq("issueId", issue._id))
-        .collect();
-      for (const comment of comments) {
-        await ctx.db.delete(comment._id);
-      }
-
-      // Dependencies where this issue is the blocker
-      const blockerDeps = await ctx.db
-        .query("dependencies")
-        .withIndex("by_blocker_blocked", (q) => q.eq("blockerId", issue._id))
-        .collect();
-      for (const dep of blockerDeps) {
-        await ctx.db.delete(dep._id);
-      }
-
-      // Dependencies where this issue is blocked (blocker in another project).
-      // Intra-project deps are already deleted from the blocker side above —
-      // Convex reads within a mutation see prior writes, so they won't appear here.
-      const blockedDeps = await ctx.db
-        .query("dependencies")
-        .withIndex("by_blocked", (q) => q.eq("blockedId", issue._id))
-        .collect();
-      for (const dep of blockedDeps) {
-        await ctx.db.delete(dep._id);
-      }
-
-      await ctx.db.delete(issue._id);
-    }
-
-    // ── Cascade through sessions: sessionEvents ──────────────────
-    const sessions = await ctx.db
-      .query("sessions")
-      .withIndex("by_project_startedAt", (q) => q.eq("projectId", projectId))
-      .collect();
-
-    for (const session of sessions) {
-      const events = await ctx.db
-        .query("sessionEvents")
-        .withIndex("by_session_sequence", (q) => q.eq("sessionId", session._id))
-        .collect();
-      for (const event of events) {
-        await ctx.db.delete(event._id);
-      }
-      await ctx.db.delete(session._id);
-    }
-
-    // ── Direct children ──────────────────────────────────────────
-    const labels = await ctx.db
-      .query("labels")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .collect();
-    for (const label of labels) {
-      await ctx.db.delete(label._id);
-    }
-
-    const epics = await ctx.db
-      .query("epics")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .collect();
-    for (const epic of epics) {
-      await ctx.db.delete(epic._id);
-    }
-
-    const configs = await ctx.db
-      .query("orchestratorConfig")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .collect();
-    for (const config of configs) {
-      await ctx.db.delete(config._id);
-    }
-
-    // ── Finally, delete the project itself ────────────────────────
+    // Delete the project row immediately — prevents new data from referencing it.
+    // Child data becomes orphaned and is cleaned up by the scheduled cascade.
     await ctx.db.delete(projectId);
+
+    // Schedule background cascade cleanup for all child data.
+    await ctx.scheduler.runAfter(0, internal.projects.cascadeDeleteProject, {
+      projectId,
+    });
+  },
+});
+
+// ── Chunked cascade deletion ─────────────────────────────────────────
+//
+// Convex limits ~8192 document operations per mutation. A project with many
+// issues (each with comments, dependencies), sessions (each with events),
+// labels, epics, and configs can exceed this in a single transaction.
+//
+// Strategy: an internalAction loops through cleanup steps, calling an
+// internalMutation per batch. Each batch stays well under the limit.
+
+/**
+ * Maximum documents to delete per batch mutation.
+ * Each doc requires a read + delete = 2 operations. 500 deletes ≈ 1000 ops,
+ * well under the ~8192 limit even accounting for index queries.
+ */
+const CASCADE_BATCH_SIZE = 500;
+
+/**
+ * Cascade cleanup steps, processed in order. Leaf data (comments, deps,
+ * sessionEvents) is deleted before their parents (issues, sessions) so
+ * indexes remain consistent within each batch mutation.
+ */
+type CascadeStep =
+  | "comments"
+  | "dependencies_blocker"
+  | "dependencies_blocked"
+  | "sessionEvents"
+  | "issues"
+  | "sessions"
+  | "labels"
+  | "epics"
+  | "orchestratorConfig";
+
+const CASCADE_STEPS: CascadeStep[] = [
+  "comments",
+  "dependencies_blocker",
+  "dependencies_blocked",
+  "sessionEvents",
+  "issues",
+  "sessions",
+  "labels",
+  "epics",
+  "orchestratorConfig",
+];
+
+/**
+ * Background action that orchestrates chunked cascade deletion.
+ * Loops through each table, deleting in batches until all child data is gone.
+ */
+export const cascadeDeleteProject = internalAction({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    for (const step of CASCADE_STEPS) {
+      let hasMore = true;
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.projects.cascadeDeleteBatch,
+          { projectId, step, batchSize: CASCADE_BATCH_SIZE },
+        );
+        hasMore = result.deleted >= CASCADE_BATCH_SIZE;
+      }
+    }
+  },
+});
+
+/**
+ * Delete up to `batchSize` orphaned documents for one cascade step.
+ * Returns the count of documents deleted so the action knows whether to loop.
+ */
+export const cascadeDeleteBatch = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    step: v.string(),
+    batchSize: v.number(),
+  },
+  handler: async (ctx, { projectId, step, batchSize }) => {
+    let deleted = 0;
+
+    switch (step as CascadeStep) {
+      case "comments": {
+        // Comments reference issues which reference the project.
+        // We must find the project's issues first, then their comments.
+        const issues = await ctx.db
+          .query("issues")
+          .withIndex("by_project_deletedAt_status", (q) =>
+            q.eq("projectId", projectId),
+          )
+          .collect();
+        for (const issue of issues) {
+          if (deleted >= batchSize) break;
+          const comments = await ctx.db
+            .query("comments")
+            .withIndex("by_issue", (q) => q.eq("issueId", issue._id))
+            .take(batchSize - deleted);
+          for (const comment of comments) {
+            await ctx.db.delete(comment._id);
+            deleted++;
+          }
+        }
+        break;
+      }
+
+      case "dependencies_blocker": {
+        const issues = await ctx.db
+          .query("issues")
+          .withIndex("by_project_deletedAt_status", (q) =>
+            q.eq("projectId", projectId),
+          )
+          .collect();
+        for (const issue of issues) {
+          if (deleted >= batchSize) break;
+          const deps = await ctx.db
+            .query("dependencies")
+            .withIndex("by_blocker_blocked", (q) =>
+              q.eq("blockerId", issue._id),
+            )
+            .take(batchSize - deleted);
+          for (const dep of deps) {
+            await ctx.db.delete(dep._id);
+            deleted++;
+          }
+        }
+        break;
+      }
+
+      case "dependencies_blocked": {
+        const issues = await ctx.db
+          .query("issues")
+          .withIndex("by_project_deletedAt_status", (q) =>
+            q.eq("projectId", projectId),
+          )
+          .collect();
+        for (const issue of issues) {
+          if (deleted >= batchSize) break;
+          const deps = await ctx.db
+            .query("dependencies")
+            .withIndex("by_blocked", (q) => q.eq("blockedId", issue._id))
+            .take(batchSize - deleted);
+          for (const dep of deps) {
+            await ctx.db.delete(dep._id);
+            deleted++;
+          }
+        }
+        break;
+      }
+
+      case "sessionEvents": {
+        const sessions = await ctx.db
+          .query("sessions")
+          .withIndex("by_project_startedAt", (q) =>
+            q.eq("projectId", projectId),
+          )
+          .collect();
+        for (const session of sessions) {
+          if (deleted >= batchSize) break;
+          const events = await ctx.db
+            .query("sessionEvents")
+            .withIndex("by_session_sequence", (q) =>
+              q.eq("sessionId", session._id),
+            )
+            .take(batchSize - deleted);
+          for (const event of events) {
+            await ctx.db.delete(event._id);
+            deleted++;
+          }
+        }
+        break;
+      }
+
+      case "issues": {
+        const issues = await ctx.db
+          .query("issues")
+          .withIndex("by_project_deletedAt_status", (q) =>
+            q.eq("projectId", projectId),
+          )
+          .take(batchSize);
+        for (const issue of issues) {
+          await ctx.db.delete(issue._id);
+          deleted++;
+        }
+        break;
+      }
+
+      case "sessions": {
+        const sessions = await ctx.db
+          .query("sessions")
+          .withIndex("by_project_startedAt", (q) =>
+            q.eq("projectId", projectId),
+          )
+          .take(batchSize);
+        for (const session of sessions) {
+          await ctx.db.delete(session._id);
+          deleted++;
+        }
+        break;
+      }
+
+      case "labels": {
+        const labels = await ctx.db
+          .query("labels")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .take(batchSize);
+        for (const label of labels) {
+          await ctx.db.delete(label._id);
+          deleted++;
+        }
+        break;
+      }
+
+      case "epics": {
+        const epics = await ctx.db
+          .query("epics")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .take(batchSize);
+        for (const epic of epics) {
+          await ctx.db.delete(epic._id);
+          deleted++;
+        }
+        break;
+      }
+
+      case "orchestratorConfig": {
+        const configs = await ctx.db
+          .query("orchestratorConfig")
+          .withIndex("by_project", (q) => q.eq("projectId", projectId))
+          .take(batchSize);
+        for (const config of configs) {
+          await ctx.db.delete(config._id);
+          deleted++;
+        }
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown cascade step: ${step}`);
+    }
+
+    return { deleted };
   },
 });
