@@ -216,11 +216,7 @@ export async function startServer() {
       });
     },
 
-    "/api/config": async () => {
-      console.warn(
-        "[DEPRECATED] /api/config is deprecated. Use /api/projects to discover projects. " +
-          "This endpoint will be removed after Epic 4 (Frontend Multi-Project UI).",
-      );
+    "/api/config": () => {
       const convexUrl = process.env.CONVEX_URL;
       if (!convexUrl) {
         return Response.json(
@@ -228,28 +224,7 @@ export async function startServer() {
           { status: 500 },
         );
       }
-      // Return the "default" project: if projects exist, pick the first one.
-      // This keeps the existing frontend working during the multi-project transition.
-      try {
-        const projects = await convex.query(api.projects.list, {});
-        const defaultProject = projects[0];
-        if (!defaultProject) {
-          return Response.json({ convexUrl, projectId: null });
-        }
-        return Response.json({
-          convexUrl,
-          projectId: defaultProject._id,
-          slug: defaultProject.slug,
-          name: defaultProject.name,
-          path: defaultProject.path ?? null,
-          enabled: defaultProject.enabled ?? false,
-        });
-      } catch (err) {
-        // Explicit fallback: if project query fails, still return convexUrl
-        // so the frontend can initialize Convex. Log the error — don't hide it.
-        console.error("[/api/config] Failed to query projects:", err);
-        return Response.json({ convexUrl });
-      }
+      return Response.json({ convexUrl });
     },
 
     "/mcp": () =>
