@@ -2,9 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-
-const LABEL = "dev.flux.daemon";
-const PLIST_FILENAME = `${LABEL}.plist`;
+import { plistPath as getPlistPath, LABEL } from "./daemon-common";
 
 /** Parse the output of `launchctl list <label>` into a key-value map. */
 function parseLaunchctlList(output: string): Record<string, string> {
@@ -87,14 +85,14 @@ async function fetchHealth(port: string): Promise<{
 
 export async function daemonStatus(): Promise<void> {
   const home = homedir();
-  const plistPath = join(home, "Library/LaunchAgents", PLIST_FILENAME);
+  const plist = getPlistPath();
   const logDir = join(home, ".flux/logs");
   const port = process.env.FLUX_PORT ?? "8042";
 
   // Check if plist exists
-  const installed = existsSync(plistPath);
+  const installed = existsSync(plist);
 
-  // Check if loaded in launchd
+  // Check if loaded in launchd (need the full output for status parsing)
   let loaded = false;
   let info: Record<string, string> = {};
   try {
@@ -110,7 +108,7 @@ export async function daemonStatus(): Promise<void> {
 
   // Header
   console.log(`Daemon: ${LABEL}`);
-  console.log(`Plist:  ${installed ? plistPath : "not installed"}`);
+  console.log(`Plist:  ${installed ? plist : "not installed"}`);
   console.log(`Loaded: ${loaded ? "yes" : "no"}`);
 
   if (!loaded) {
@@ -120,7 +118,7 @@ export async function daemonStatus(): Promise<void> {
       console.log(
         `\nThe plist exists but the daemon is not loaded in launchd.`,
       );
-      console.log(`Load it with: launchctl load "${plistPath}"`);
+      console.log(`Load it with: launchctl load "${plist}"`);
     }
     return;
   }

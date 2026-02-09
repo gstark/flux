@@ -1,12 +1,9 @@
 import { execSync } from "node:child_process";
-
-const LABEL = "dev.flux.daemon";
+import { isDaemonLoaded, LABEL } from "./daemon-common";
 
 export async function daemonStart(): Promise<void> {
   // Verify the daemon is loaded before attempting to start
-  try {
-    execSync(`launchctl list ${LABEL}`, { stdio: "pipe" });
-  } catch {
+  if (!isDaemonLoaded()) {
     console.error(
       `${LABEL} is not loaded in launchd. Run: flux daemon install`,
     );

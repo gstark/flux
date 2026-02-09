@@ -2,9 +2,11 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-
-const LABEL = "dev.flux.daemon";
-const PLIST_FILENAME = `${LABEL}.plist`;
+import {
+  plistPath as getPlistPath,
+  isDaemonLoaded,
+  LABEL,
+} from "./daemon-common";
 
 /** Escape XML special characters for safe interpolation into plist values. */
 function escapeXml(s: string): string {
@@ -142,8 +144,8 @@ function generatePlist(opts: {
 export async function daemonInstall(): Promise<void> {
   const root = projectRoot();
   const home = homedir();
+  const plist = getPlistPath();
   const launchAgentsDir = join(home, "Library/LaunchAgents");
-  const plistPath = join(launchAgentsDir, PLIST_FILENAME);
   const logDir = join(home, ".flux/logs");
 
   // 1. Resolve dependencies
@@ -161,42 +163,32 @@ export async function daemonInstall(): Promise<void> {
   mkdirSync(launchAgentsDir, { recursive: true });
 
   // 3. If already loaded, unload first (idempotent reinstall)
-  const isLoaded = (() => {
-    try {
-      execSync(`launchctl list ${LABEL}`, { stdio: "pipe" });
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-  if (isLoaded) {
+  if (isDaemonLoaded()) {
     console.log(`Unloading existing ${LABEL}...`);
-    execSync(`launchctl unload "${plistPath}"`, { stdio: "pipe" });
+    execSync(`launchctl unload "${plist}"`, { stdio: "pipe" });
   }
 
   // 4. Write the plist
-  const plist = generatePlist({
+  const plistContent = generatePlist({
     shellCommand,
     workingDirectory: root,
     logDir,
     envVars,
   });
-  writeFileSync(plistPath, plist);
-  console.log(`Wrote ${plistPath}`);
+  writeFileSync(plist, plistContent);
+  console.log(`Wrote ${plist}`);
 
   // 5. Load the plist
-  execSync(`launchctl load "${plistPath}"`, { stdio: "pipe" });
+  execSync(`launchctl load "${plist}"`, { stdio: "pipe" });
   console.log(`Loaded ${LABEL}`);
 
   // 6. Verify
-  try {
-    execSync(`launchctl list ${LABEL}`, { stdio: "pipe" });
-    console.log(`\n✓ ${LABEL} is registered with launchd`);
-  } catch {
+  if (!isDaemonLoaded()) {
     throw new Error(
       `Failed to verify ${LABEL} registration. Check: launchctl list | grep ${LABEL}`,
     );
   }
+  console.log(`\n✓ ${LABEL} is registered with launchd`);
 
   console.log(
     `\nLogs:\n  stdout: ${logDir}/daemon.stdout.log\n  stderr: ${logDir}/daemon.stderr.log`,
