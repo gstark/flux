@@ -13,7 +13,7 @@ export function DashboardPage() {
   // Redirect to /projects when no projects exist so users can add their first one.
   useEffect(() => {
     if (projects !== undefined && projects.length === 0) {
-      navigate({ to: "/projects" });
+      navigate({ to: "/projects", replace: true });
     }
   }, [projects, navigate]);
 
