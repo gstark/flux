@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { serve } from "bun";
 import { api } from "$convex/_generated/api";
@@ -12,6 +13,10 @@ import type { Project } from "./setup";
 import { gracefulShutdown } from "./shutdown";
 import { createSSEHandler } from "./sse";
 import type { ToolContext } from "./tools";
+
+const VERSION: string = JSON.parse(
+  readFileSync(join(import.meta.dir, "../../package.json"), "utf-8"),
+).version;
 
 const DEFAULT_PORT = 8042;
 
@@ -197,12 +202,19 @@ export async function startServer() {
     string,
     Response | ((req: Request) => Response | Promise<Response>)
   > = {
-    "/health": () =>
-      Response.json({
+    "/health": () => {
+      const health = orchestrator.getHealthInfo();
+      const rss = process.memoryUsage.rss();
+      return Response.json({
         status: "ok",
         timestamp: Date.now(),
-        uptime: process.uptime(),
-      }),
+        uptime: Math.floor(process.uptime()),
+        version: VERSION,
+        projects: health.projects,
+        sessions: health.activeSessions,
+        memory: { rss: Math.round(rss / 1024 / 1024) },
+      });
+    },
 
     "/api/config": async () => {
       console.warn(

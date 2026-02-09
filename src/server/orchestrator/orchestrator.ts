@@ -1,6 +1,7 @@
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { IssueStatus, SessionStatus } from "$convex/schema";
+import { OrchestratorState } from "../../shared/orchestrator";
 import { getConvexClient } from "../convex";
 import { isProcessAlive } from "../process";
 import { type OrphanRecoveryStats, ProjectRunner } from "./index";
@@ -179,6 +180,33 @@ class Orchestrator {
       result[projectId] = runner.getStatus();
     }
     return result;
+  }
+
+  /** Get daemon health info: project counts by runner state, active sessions. */
+  getHealthInfo(): {
+    projects: { total: number; idle: number; busy: number };
+    activeSessions: number;
+  } {
+    let idle = 0;
+    let busy = 0;
+    let activeSessions = 0;
+
+    for (const runner of this.runners.values()) {
+      const status = runner.getStatus();
+      if (status.state === OrchestratorState.Busy) {
+        busy++;
+      } else {
+        idle++;
+      }
+      if (status.activeSession) {
+        activeSessions++;
+      }
+    }
+
+    return {
+      projects: { total: this.runners.size, idle, busy },
+      activeSessions,
+    };
   }
 
   /** Shut down the orchestrator and all runners. */
