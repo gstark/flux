@@ -14,6 +14,7 @@ export const create = mutation({
     slug: v.string(),
     name: v.string(),
     path: v.optional(v.string()),
+    enabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -30,7 +31,7 @@ export const create = mutation({
       name: args.name,
       issueCounter: 0,
       path: args.path ?? "",
-      enabled: true,
+      enabled: args.enabled ?? true,
     });
 
     await ctx.scheduler.runAfter(0, internal.seeds.runAll, { projectId });

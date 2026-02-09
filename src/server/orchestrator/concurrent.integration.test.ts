@@ -216,26 +216,20 @@ describe("Concurrent orchestrator integration", () => {
     // Create projects in Convex with enabled=false so the live daemon ignores them.
     // The test's ProjectRunner instances operate directly, bypassing the Orchestrator's
     // project subscription.
-    projectIdA = await convex.mutation(api.projects.create, {
-      slug: slugA,
-      name: "Test Concurrent A",
-      path: tmpDirA,
-    });
-    // projects.create defaults enabled=true, so disable immediately
-    await convex.mutation(api.projects.update, {
-      projectId: projectIdA,
-      enabled: false,
-    });
-
-    projectIdB = await convex.mutation(api.projects.create, {
-      slug: slugB,
-      name: "Test Concurrent B",
-      path: tmpDirB,
-    });
-    await convex.mutation(api.projects.update, {
-      projectId: projectIdB,
-      enabled: false,
-    });
+    [projectIdA, projectIdB] = await Promise.all([
+      convex.mutation(api.projects.create, {
+        slug: slugA,
+        name: "Test Concurrent A",
+        path: tmpDirA,
+        enabled: false,
+      }),
+      convex.mutation(api.projects.create, {
+        slug: slugB,
+        name: "Test Concurrent B",
+        path: tmpDirB,
+        enabled: false,
+      }),
+    ]);
   }, TEST_TIMEOUT_MS);
 
   afterAll(async () => {

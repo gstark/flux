@@ -357,3 +357,40 @@ await t.mutation(api.issues.claim, { issueId, assignee: "agent-1" });
 ```
 
 **Never write:** Hand-rolled mock contexts that don't match Convex semantics.
+
+### Integration Tests Against Live Convex
+
+Integration tests that run against a live Convex deployment must isolate their data from the running daemon. The daemon's Orchestrator watches for enabled projects and will create competing runners for any test projects it discovers.
+
+**Required pattern:**
+
+1. **Create projects with `enabled: false`** — prevents the live daemon from picking them up:
+```typescript
+const projectId = await convex.mutation(api.projects.create, {
+  slug: `test-my-feature-${Date.now()}`,
+  name: "Test Project",
+  path: tmpDir,
+  enabled: false,
+});
+```
+
+2. **Use `ProjectRunner` directly** — bypass the top-level `Orchestrator` and interact with the project's runner:
+```typescript
+const runner = new ProjectRunner(projectId, tmpDir, provider);
+await runner.subscribe();
+// ... test logic ...
+await runner.destroy();
+```
+
+3. **Clean up in `afterAll`** — remove test projects via `projects.remove` (cascade-deletes issues, sessions, etc.) and temp directories:
+```typescript
+afterAll(async () => {
+  await convex.mutation(api.projects.remove, { projectId });
+  await fs.rm(tmpDir, { recursive: true, force: true });
+  await convex.close();
+});
+```
+
+**Why this matters:** The first iteration of FLUX-281 failed because test projects were created with `enabled: true`. The live daemon re-adopted orphaned sessions from the test projects, creating competing runners that interfered with the test.
+
+See `src/server/orchestrator/concurrent.integration.test.ts` for the full working example.
