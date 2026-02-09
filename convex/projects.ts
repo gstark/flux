@@ -184,9 +184,10 @@ export const remove = mutation({
 // every batch call.
 
 /**
- * Maximum delete operations per batch mutation.
- * Each doc requires a read + delete = 2 operations. 500 deletes ≈ 1000 ops,
- * well under the ~8192 limit even accounting for index queries.
+ * Soft cap on deletes per batch mutation. Gates entry to new parents — once
+ * `deleted >= CASCADE_BATCH_SIZE`, no new parent is started. A single parent
+ * may overshoot by up to 3×CHILDREN_PER_PARENT_LIMIT (one per child type),
+ * but total ops stay well under the ~8192 Convex mutation limit.
  */
 const CASCADE_BATCH_SIZE = 500;
 
