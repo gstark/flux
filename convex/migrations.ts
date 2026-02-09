@@ -9,6 +9,7 @@
  *
  * See CLAUDE.md "Schema Migrations" for the full workflow.
  */
+import type { Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
 import {
   IssuePriority,
@@ -94,12 +95,12 @@ export const stripLegacyFields = internalMutation({
       await ctx.db.replace(
         config._id,
         rest as {
-          projectId: string;
+          projectId: Id<"projects">;
           agent: string;
           sessionTimeoutMs: number;
           maxFailures: number;
           maxReviewIterations: number;
-          focusEpicId?: string;
+          focusEpicId?: Id<"epics">;
         },
       );
       configsPatched++;
