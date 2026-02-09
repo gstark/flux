@@ -1,3 +1,4 @@
+import { sanitizeConvexError } from "./sanitizeError";
 import { handlers, type ToolContext } from "./tools";
 
 /** Dispatch a single tool request against the given context. */
@@ -42,7 +43,7 @@ export async function handleToolRequest(
     const result = await handler(args ?? {}, ctx);
     return Response.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = sanitizeConvexError(err);
     return Response.json({
       content: [{ type: "text", text: message }],
       isError: true,

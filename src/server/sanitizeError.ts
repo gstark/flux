@@ -1,6 +1,9 @@
 /**
  * Sanitize Convex error messages for external API consumption.
  *
+ * Accepts `unknown` so callers can pass raw catch values directly,
+ * eliminating repeated `err instanceof Error ? err.message : String(err)`.
+ *
  * Convex errors arrive in a verbose format:
  *   [CONVEX M(module:fn)] [Request ID: xxx] Server Error
  *   Uncaught Error: Human-readable message
@@ -12,7 +15,9 @@
  * - Error class prefixes like "Uncaught Error: "
  * - Stack trace lines
  */
-export function sanitizeConvexError(message: string): string {
+export function sanitizeConvexError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
   // Not a Convex error — return as-is
   if (!message.startsWith("[CONVEX")) {
     return message;

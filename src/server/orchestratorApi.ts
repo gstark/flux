@@ -62,9 +62,7 @@ export function createOrchestratorApiHandler(getRunner: () => ProjectRunner) {
         }
       }
     } catch (err) {
-      const message = sanitizeConvexError(
-        err instanceof Error ? err.message : String(err),
-      );
+      const message = sanitizeConvexError(err);
       return Response.json({ error: message }, { status: 500 });
     }
   };

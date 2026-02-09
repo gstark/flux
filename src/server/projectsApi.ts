@@ -77,9 +77,7 @@ async function handleList(convex: ConvexClient): Promise<Response> {
     );
     return Response.json(results);
   } catch (err) {
-    const message = sanitizeConvexError(
-      err instanceof Error ? err.message : String(err),
-    );
+    const message = sanitizeConvexError(err);
     return Response.json({ error: message }, { status: 500 });
   }
 }
@@ -107,9 +105,7 @@ async function handleGet(convex: ConvexClient, id: string): Promise<Response> {
       issueCounts: counts,
     });
   } catch (err) {
-    const message = sanitizeConvexError(
-      err instanceof Error ? err.message : String(err),
-    );
+    const message = sanitizeConvexError(err);
     return Response.json({ error: message }, { status: 500 });
   }
 }
@@ -166,9 +162,7 @@ async function handleCreate(
       { status: 201 },
     );
   } catch (err) {
-    const message = sanitizeConvexError(
-      err instanceof Error ? err.message : String(err),
-    );
+    const message = sanitizeConvexError(err);
     // Convex throws on duplicate slug — surface as 409 Conflict
     if (message.includes("already exists")) {
       return Response.json({ error: message }, { status: 409 });
@@ -246,9 +240,7 @@ async function handleUpdate(
       enabled: project.enabled ?? false,
     });
   } catch (err) {
-    const message = sanitizeConvexError(
-      err instanceof Error ? err.message : String(err),
-    );
+    const message = sanitizeConvexError(err);
     if (message.includes("not found")) {
       return Response.json({ error: message }, { status: 404 });
     }
@@ -276,9 +268,7 @@ async function handleDelete(
     });
     return new Response(null, { status: 204 });
   } catch (err) {
-    const message = sanitizeConvexError(
-      err instanceof Error ? err.message : String(err),
-    );
+    const message = sanitizeConvexError(err);
     if (message.includes("not found")) {
       return Response.json({ error: message }, { status: 404 });
     }
