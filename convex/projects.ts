@@ -189,27 +189,42 @@ const CASCADE_BATCH_SIZE = 500;
  * sessionEvents) is deleted before their parents (issues, sessions) so
  * indexes remain consistent within each batch mutation.
  */
-type CascadeStep =
-  | "comments"
-  | "dependencies_blocker"
-  | "dependencies_blocked"
-  | "sessionEvents"
-  | "issues"
-  | "sessions"
-  | "labels"
-  | "epics"
-  | "orchestratorConfig";
+const CascadeSteps = {
+  Comments: "comments",
+  DependenciesBlocker: "dependencies_blocker",
+  DependenciesBlocked: "dependencies_blocked",
+  SessionEvents: "sessionEvents",
+  Issues: "issues",
+  Sessions: "sessions",
+  Labels: "labels",
+  Epics: "epics",
+  OrchestratorConfig: "orchestratorConfig",
+} as const;
+
+type CascadeStep = (typeof CascadeSteps)[keyof typeof CascadeSteps];
+
+const cascadeStepValidator = v.union(
+  v.literal(CascadeSteps.Comments),
+  v.literal(CascadeSteps.DependenciesBlocker),
+  v.literal(CascadeSteps.DependenciesBlocked),
+  v.literal(CascadeSteps.SessionEvents),
+  v.literal(CascadeSteps.Issues),
+  v.literal(CascadeSteps.Sessions),
+  v.literal(CascadeSteps.Labels),
+  v.literal(CascadeSteps.Epics),
+  v.literal(CascadeSteps.OrchestratorConfig),
+);
 
 const CASCADE_STEPS: CascadeStep[] = [
-  "comments",
-  "dependencies_blocker",
-  "dependencies_blocked",
-  "sessionEvents",
-  "issues",
-  "sessions",
-  "labels",
-  "epics",
-  "orchestratorConfig",
+  CascadeSteps.Comments,
+  CascadeSteps.DependenciesBlocker,
+  CascadeSteps.DependenciesBlocked,
+  CascadeSteps.SessionEvents,
+  CascadeSteps.Issues,
+  CascadeSteps.Sessions,
+  CascadeSteps.Labels,
+  CascadeSteps.Epics,
+  CascadeSteps.OrchestratorConfig,
 ];
 
 /**
@@ -239,14 +254,14 @@ export const cascadeDeleteProject = internalAction({
 export const cascadeDeleteBatch = internalMutation({
   args: {
     projectId: v.id("projects"),
-    step: v.string(),
+    step: cascadeStepValidator,
     batchSize: v.number(),
   },
   handler: async (ctx, { projectId, step, batchSize }) => {
     let deleted = 0;
 
-    switch (step as CascadeStep) {
-      case "comments": {
+    switch (step) {
+      case CascadeSteps.Comments: {
         // Comments reference issues which reference the project.
         // We must find the project's issues first, then their comments.
         const issues = await ctx.db
@@ -269,7 +284,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "dependencies_blocker": {
+      case CascadeSteps.DependenciesBlocker: {
         const issues = await ctx.db
           .query("issues")
           .withIndex("by_project_deletedAt_status", (q) =>
@@ -292,7 +307,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "dependencies_blocked": {
+      case CascadeSteps.DependenciesBlocked: {
         const issues = await ctx.db
           .query("issues")
           .withIndex("by_project_deletedAt_status", (q) =>
@@ -313,7 +328,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "sessionEvents": {
+      case CascadeSteps.SessionEvents: {
         const sessions = await ctx.db
           .query("sessions")
           .withIndex("by_project_startedAt", (q) =>
@@ -336,7 +351,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "issues": {
+      case CascadeSteps.Issues: {
         const issues = await ctx.db
           .query("issues")
           .withIndex("by_project_deletedAt_status", (q) =>
@@ -350,7 +365,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "sessions": {
+      case CascadeSteps.Sessions: {
         const sessions = await ctx.db
           .query("sessions")
           .withIndex("by_project_startedAt", (q) =>
@@ -364,7 +379,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "labels": {
+      case CascadeSteps.Labels: {
         const labels = await ctx.db
           .query("labels")
           .withIndex("by_project", (q) => q.eq("projectId", projectId))
@@ -376,7 +391,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "epics": {
+      case CascadeSteps.Epics: {
         const epics = await ctx.db
           .query("epics")
           .withIndex("by_project", (q) => q.eq("projectId", projectId))
@@ -388,7 +403,7 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      case "orchestratorConfig": {
+      case CascadeSteps.OrchestratorConfig: {
         const configs = await ctx.db
           .query("orchestratorConfig")
           .withIndex("by_project", (q) => q.eq("projectId", projectId))
@@ -400,8 +415,10 @@ export const cascadeDeleteBatch = internalMutation({
         break;
       }
 
-      default:
-        throw new Error(`Unknown cascade step: ${step}`);
+      default: {
+        const _exhaustive: never = step;
+        throw new Error(`Unknown cascade step: ${_exhaustive}`);
+      }
     }
 
     return { deleted };
