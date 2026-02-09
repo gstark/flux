@@ -35,18 +35,22 @@ function getUptime(pid: string): string | null {
     const elapsedMs = Date.now() - startTime.getTime();
     if (elapsedMs < 0) return null;
 
-    const seconds = Math.floor(elapsedMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-    return `${seconds}s`;
+    return formatSeconds(Math.floor(elapsedMs / 1000));
   } catch {
     return null;
   }
+}
+
+/** Format a duration in seconds into a human-readable string. */
+function formatSeconds(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${totalSeconds % 60}s`;
+  return `${totalSeconds}s`;
 }
 
 /** Read the last N lines of a file using tail. */
@@ -62,10 +66,30 @@ function tailFile(path: string, lines: number): string | null {
   }
 }
 
+/** Fetch runtime info from the daemon's /health endpoint. */
+async function fetchHealth(port: string): Promise<{
+  version: string;
+  uptime: number;
+  projects: { total: number; idle: number; busy: number };
+  sessions: number;
+  memory: { rss: number };
+} | null> {
+  try {
+    const resp = await fetch(`http://localhost:${port}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function daemonStatus(): Promise<void> {
   const home = homedir();
   const plistPath = join(home, "Library/LaunchAgents", PLIST_FILENAME);
   const logDir = join(home, ".flux/logs");
+  const port = process.env.FLUX_PORT ?? "8042";
 
   // Check if plist exists
   const installed = existsSync(plistPath);
@@ -111,6 +135,25 @@ export async function daemonStatus(): Promise<void> {
     console.log(
       `PID:    not running${exitStatus ? ` (last exit status: ${exitStatus})` : ""}`,
     );
+  }
+
+  // Runtime health info from /health endpoint
+  if (pid) {
+    const health = await fetchHealth(port);
+    if (health) {
+      console.log(`\n--- Runtime ---`);
+      console.log(`Version:  ${health.version}`);
+      console.log(`Uptime:   ${formatSeconds(health.uptime)}`);
+      console.log(
+        `Projects: ${health.projects.total} total (${health.projects.busy} busy, ${health.projects.idle} idle)`,
+      );
+      console.log(`Sessions: ${health.sessions} active`);
+      console.log(`Memory:   ${health.memory.rss} MB RSS`);
+    } else {
+      console.log(`\n--- Runtime ---`);
+      console.log(`Health:   unreachable (http://localhost:${port}/health)`);
+      console.log(`          The process may still be starting up.`);
+    }
   }
 
   // Recent logs
