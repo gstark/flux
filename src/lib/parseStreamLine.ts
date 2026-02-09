@@ -7,7 +7,7 @@
  */
 
 export type ParsedLine =
-  | { kind: "text"; text: string }
+  | { kind: "text"; text: string; source?: "delta" | "full" }
   | {
       kind: "tool_use";
       toolName: string;
@@ -145,7 +145,7 @@ export function parseStreamLine(line: string): ParsedLine[] {
   if (obj.type === "content_block_delta") {
     const delta = obj.delta as Record<string, unknown> | undefined;
     if (delta?.type === "text_delta" && typeof delta.text === "string") {
-      return [{ kind: "text", text: delta.text }];
+      return [{ kind: "text", text: delta.text, source: "delta" }];
     }
     // input_json_delta = streaming tool input chunk — expose for accumulation
     if (
@@ -199,7 +199,7 @@ export function parseStreamLine(line: string): ParsedLine[] {
         .filter((b) => b.type === "text" && typeof b.text === "string")
         .map((b) => b.text as string);
       if (texts.length > 0) {
-        results.push({ kind: "text", text: texts.join("") });
+        results.push({ kind: "text", text: texts.join(""), source: "full" });
       }
 
       // Collect ALL tool_use blocks — not just the first
@@ -221,17 +221,19 @@ export function parseStreamLine(line: string): ParsedLine[] {
   }
 
   // ── result: final output ─────────────────────────────────────────
+  // The result event repeats the final assistant text — tag as "full"
+  // so the grouper can deduplicate against preceding delta/assistant text.
   if (obj.type === "result") {
     if (Array.isArray(obj.result)) {
       const texts = (obj.result as Array<Record<string, unknown>>)
         .filter((b) => b.type === "text" && typeof b.text === "string")
         .map((b) => b.text as string);
       if (texts.length > 0) {
-        return [{ kind: "text", text: texts.join("") }];
+        return [{ kind: "text", text: texts.join(""), source: "full" }];
       }
     }
     if (typeof obj.result === "string") {
-      return [{ kind: "text", text: obj.result }];
+      return [{ kind: "text", text: obj.result, source: "full" }];
     }
     // Result with only usage/stats — skip
     return [{ kind: "skip" }];

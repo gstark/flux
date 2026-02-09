@@ -22,14 +22,30 @@ export type TranscriptNode =
 // -- Grouping logic -----------------------------------------------------------
 
 /**
- * Walk the flat list of session events and group consecutive
- * tool_use → tool_result pairs into single TranscriptNode entries.
+ * Walk the flat list of session events and produce interleaved transcript nodes.
  *
- * Algorithm: parse each event, collect pending tool_use items from output
- * events. When the next input event arrives with tool_result items, match
- * them by toolUseId (falling back to positional matching). Non-tool items
- * (text, input messages) emit immediately.
+ * Output items (text + tool_use) are accumulated in chronological order.
+ * When an input event arrives with tool_results, the pending output is flushed
+ * with tool_uses paired to their results — preserving the natural
+ * think → act → result flow instead of batching all tool calls at the end.
+ *
+ * Text deduplication: streaming produces content_block_delta fragments AND a
+ * full assistant message. Delta text is tagged source:"delta", full text is
+ * tagged source:"full". When the full text arrives, preceding deltas are dropped.
  */
+
+/**
+ * A pending output item — either text or tool_use — preserving chronological
+ * order so we can interleave think → act → result naturally.
+ */
+type PendingOutputItem =
+  | {
+      tag: "text";
+      eventId: string;
+      parsed: Extract<ParsedLine, { kind: "text" }>;
+    }
+  | { tag: "tool_use"; parsed: Extract<ParsedLine, { kind: "tool_use" }> };
+
 export function groupTranscriptEvents(
   events: Array<{
     _id: string;
@@ -39,8 +55,8 @@ export function groupTranscriptEvents(
   }>,
 ): TranscriptNode[] {
   const nodes: TranscriptNode[] = [];
-  // Pending tool_use items awaiting their results
-  let pendingToolUses: Array<Extract<ParsedLine, { kind: "tool_use" }>> = [];
+  // Pending output items (text + tool_use) in chronological order
+  let pendingOutput: PendingOutputItem[] = [];
 
   for (const event of events) {
     if (event.direction === SessionEventDirection.Input) {
@@ -54,8 +70,13 @@ export function groupTranscriptEvents(
           p.kind === "tool_result",
       );
 
+      const pendingToolUses = pendingOutput.filter(
+        (p): p is Extract<PendingOutputItem, { tag: "tool_use" }> =>
+          p.tag === "tool_use",
+      );
+
       if (toolResults.length > 0 && pendingToolUses.length > 0) {
-        // Match tool_results to pending tool_uses
+        // Match tool_results to pending tool_uses by id
         const resultById = new Map<
           string,
           Extract<ParsedLine, { kind: "tool_result" }>
@@ -72,19 +93,22 @@ export function groupTranscriptEvents(
           }
         }
 
-        // Pair each pending tool_use with its result
+        // Build a result lookup for pending tool_uses
+        const pairedResults = new Map<
+          string,
+          Extract<ParsedLine, { kind: "tool_result" }> | null
+        >();
         const consumedIds = new Set<string>();
         let unmatchedIdx = 0;
-        for (const toolUse of pendingToolUses) {
-          const byId = resultById.get(toolUse.toolId);
+        for (const item of pendingToolUses) {
+          const byId = resultById.get(item.parsed.toolId);
           const matched = byId ?? unmatchedResults[unmatchedIdx++] ?? null;
-          if (byId) consumedIds.add(toolUse.toolId);
-          nodes.push({
-            type: "tool_call",
-            key: `tool_call:${toolUse.toolId}`,
-            pair: { toolUse, toolResult: matched },
-          });
+          if (byId) consumedIds.add(item.parsed.toolId);
+          pairedResults.set(item.parsed.toolId, matched);
         }
+
+        // Emit pending output items in chronological order — interleaved
+        flushPendingInterleaved(nodes, pendingOutput, pairedResults);
 
         // Show any leftover results that didn't match a pending tool_use
         for (const [id, result] of resultById) {
@@ -123,11 +147,11 @@ export function groupTranscriptEvents(
             },
           });
         }
-        pendingToolUses = [];
+        pendingOutput = [];
       } else {
-        // Flush any unmatched pending tool_uses before the input
-        flushPending(nodes, pendingToolUses);
-        pendingToolUses = [];
+        // Flush any unmatched pending output before the input
+        flushPendingInterleaved(nodes, pendingOutput, new Map());
+        pendingOutput = [];
 
         // Non-tool input event — render as markdown (skip tool_result-only inputs that had no pending)
         if (toolResults.length > 0) {
@@ -157,35 +181,52 @@ export function groupTranscriptEvents(
         }
       }
     } else {
-      // Output event — accumulate tool_use items across consecutive output
-      // events (streaming produces content_block_start + assistant in sequence).
-      // Do NOT flush pending tool_uses here; they'll be matched when the next
-      // input event arrives with tool_results, or flushed at end-of-stream.
+      // Output event — accumulate text and tool_use items in chronological
+      // order. They'll be emitted interleaved when results arrive or at end.
       const items = parseStreamLine(event.content).filter(
         isDisplayableParsedLine,
       );
 
-      // De-duplicate tool_use items by toolId — streaming events
-      // (content_block_start) and the full assistant message both emit the
-      // same tool_use. Prefer the one with toolInput (the full assistant
-      // message) over the empty one from content_block_start.
       for (const item of items) {
         if (item.kind === "tool_use") {
-          const existingIdx = pendingToolUses.findIndex(
-            (t) => t.toolId === item.toolId,
+          // De-duplicate tool_use items by toolId — streaming events
+          // (content_block_start) and the full assistant message both emit the
+          // same tool_use. Prefer the one with toolInput (the full message).
+          const existingIdx = pendingOutput.findIndex(
+            (p) => p.tag === "tool_use" && p.parsed.toolId === item.toolId,
           );
           if (existingIdx === -1) {
-            pendingToolUses.push(item);
+            pendingOutput.push({ tag: "tool_use", parsed: item });
           } else {
-            const existing = pendingToolUses[existingIdx];
-            if (existing && !existing.toolInput && item.toolInput) {
-              pendingToolUses[existingIdx] = item;
+            const existing = pendingOutput[existingIdx];
+            if (
+              existing &&
+              existing.tag === "tool_use" &&
+              !existing.parsed.toolInput &&
+              item.toolInput
+            ) {
+              pendingOutput[existingIdx] = { tag: "tool_use", parsed: item };
             }
           }
         } else if (item.kind === "text") {
-          nodes.push({
-            type: "text",
-            key: `text:${event._id}:${nodes.length}`,
+          // Deduplicate: full text supersedes preceding delta fragments.
+          // Also skip if an identical full text already exists (assistant
+          // event + result event both emit the same complete text).
+          if (item.source === "full") {
+            const duplicate = pendingOutput.some(
+              (p) =>
+                p.tag === "text" &&
+                p.parsed.source === "full" &&
+                p.parsed.text === item.text,
+            );
+            if (duplicate) continue;
+            pendingOutput = pendingOutput.filter(
+              (p) => !(p.tag === "text" && p.parsed.source === "delta"),
+            );
+          }
+          pendingOutput.push({
+            tag: "text",
+            eventId: event._id,
             parsed: item,
           });
         }
@@ -193,23 +234,37 @@ export function groupTranscriptEvents(
     }
   }
 
-  // Flush any remaining pending tool_uses at the end (session may still be running)
-  flushPending(nodes, pendingToolUses);
+  // Flush any remaining pending output at the end (session may still be running)
+  flushPendingInterleaved(nodes, pendingOutput, new Map());
 
   return nodes;
 }
 
-/** Emit pending tool_use items as tool_call nodes without results. */
-function flushPending(
+/**
+ * Emit pending output items (text + tool_use) in chronological order.
+ * Tool_use items are paired with their results from the map; text items
+ * emit directly. This produces the natural think → act → result flow.
+ */
+function flushPendingInterleaved(
   nodes: TranscriptNode[],
-  pending: Array<Extract<ParsedLine, { kind: "tool_use" }>>,
+  pending: PendingOutputItem[],
+  results: Map<string, Extract<ParsedLine, { kind: "tool_result" }> | null>,
 ) {
-  for (const toolUse of pending) {
-    nodes.push({
-      type: "tool_call",
-      key: `tool_call:${toolUse.toolId}`,
-      pair: { toolUse, toolResult: null },
-    });
+  for (const item of pending) {
+    if (item.tag === "text") {
+      nodes.push({
+        type: "text",
+        key: `text:${item.eventId}:${nodes.length}`,
+        parsed: item.parsed,
+      });
+    } else {
+      const toolResult = results.get(item.parsed.toolId) ?? null;
+      nodes.push({
+        type: "tool_call",
+        key: `tool_call:${item.parsed.toolId}`,
+        pair: { toolUse: item.parsed, toolResult },
+      });
+    }
   }
 }
 
