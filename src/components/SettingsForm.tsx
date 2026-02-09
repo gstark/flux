@@ -6,6 +6,7 @@ import type { Id } from "$convex/_generated/dataModel";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { useTrackedAction } from "../hooks/useTrackedAction";
+import { useUpdateProject } from "../hooks/useUpdateProject";
 import { ErrorBanner } from "./ErrorBanner";
 
 export function SettingsForm() {
@@ -15,6 +16,8 @@ export function SettingsForm() {
   const project = useQuery(api.projects.getById, { projectId });
   const config = useQuery(api.orchestratorConfig.get, { projectId });
   const epics = useQuery(api.epics.list, { projectId });
+  const { save: saveProjectFields, saving: savingProject } =
+    useUpdateProject(projectId);
   const updateProject = useMutation(api.projects.update);
   const removeProject = useMutation(api.projects.remove);
   const updateConfig = useMutation(api.orchestratorConfig.update);
@@ -30,7 +33,7 @@ export function SettingsForm() {
     clearError: clearProjectError,
   } = useDismissableError();
 
-  const [saveProject, savingProject] = useTrackedAction(async () => {
+  const [saveProject] = useTrackedAction(async () => {
     const trimmedName = name.trim();
     const trimmedPath = path.trim();
 
@@ -48,28 +51,10 @@ export function SettingsForm() {
       return;
     }
 
-    // Path changes go through the REST API for server-side git validation
-    if (pathChanged) {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(nameChanged ? { name: trimmedName } : {}),
-          path: trimmedPath,
-        }),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(data?.error ?? `Update failed (${res.status})`);
-      }
-    } else {
-      await updateProject({
-        projectId,
-        ...(nameChanged ? { name: trimmedName } : {}),
-      });
-    }
+    await saveProjectFields({
+      ...(nameChanged ? { name: trimmedName } : {}),
+      ...(pathChanged ? { path: trimmedPath } : {}),
+    });
 
     setProjectDirty(false);
     setProjectSaved(true);

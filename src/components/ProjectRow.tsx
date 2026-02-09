@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Doc } from "$convex/_generated/dataModel";
 import { useDismissableError } from "../hooks/useDismissableError";
+import { useUpdateProject } from "../hooks/useUpdateProject";
 import { ErrorBanner } from "./ErrorBanner";
 import { FontAwesomeIcon, faPen, faTrash } from "./Icon";
 import { ProjectStateBadge } from "./ProjectStateBadge";
@@ -10,6 +11,7 @@ import { ProjectStateBadge } from "./ProjectStateBadge";
 type Project = Doc<"projects">;
 
 export function ProjectRow({ project }: { project: Project }) {
+  const { save: saveProject, saving } = useUpdateProject(project._id);
   const updateProject = useMutation(api.projects.update);
   const removeProject = useMutation(api.projects.remove);
 
@@ -18,7 +20,6 @@ export function ProjectRow({ project }: { project: Project }) {
   const [slugDraft, setSlugDraft] = useState(project.slug);
   const [pathDraft, setPathDraft] = useState(project.path ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [saving, setSaving] = useState(false);
   const { error, showError, clearError } = useDismissableError();
 
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -62,49 +63,16 @@ export function ProjectRow({ project }: { project: Project }) {
       return;
     }
 
-    // If path changed, use REST API for server-side validation
-    if (pathChanged) {
-      setSaving(true);
-      try {
-        const res = await fetch(`/api/projects/${project._id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...(nameChanged ? { name: trimmedName } : {}),
-            ...(slugChanged ? { slug: trimmedSlug } : {}),
-            path: trimmedPath,
-          }),
-        });
-        if (!res.ok) {
-          const data = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(data?.error ?? `Update failed (${res.status})`);
-        }
-        setEditing(false);
-        clearError();
-      } catch (err) {
-        showError(err);
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
-
-    // No path change — use Convex mutation directly
-    setSaving(true);
     try {
-      await updateProject({
-        projectId: project._id,
+      await saveProject({
         ...(nameChanged ? { name: trimmedName } : {}),
         ...(slugChanged ? { slug: trimmedSlug } : {}),
+        ...(pathChanged ? { path: trimmedPath } : {}),
       });
       setEditing(false);
       clearError();
     } catch (err) {
       showError(err);
-    } finally {
-      setSaving(false);
     }
   }
 
