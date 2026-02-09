@@ -238,9 +238,39 @@ const CASCADE_STEPS: CascadeStep[] = [
   CascadeSteps.OrchestratorConfig,
 ];
 
+/** Maximum retry attempts for each batch mutation in the cascade. */
+const CASCADE_MAX_RETRIES = 3;
+
+/** Base delay in ms for exponential backoff between retries. */
+const CASCADE_RETRY_BASE_DELAY_MS = 250;
+
+/**
+ * Retry a mutation with exponential backoff.
+ * cascadeDeleteBatch is idempotent, so retries are safe.
+ */
+async function retryMutation<T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delay = CASCADE_RETRY_BASE_DELAY_MS * 2 ** attempt;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Background action that orchestrates chunked cascade deletion.
  * Loops through each table, deleting in batches until all child data is gone.
+ * Each batch mutation is retried with exponential backoff on transient failures.
  */
 export const cascadeDeleteProject = internalAction({
   args: { projectId: v.id("projects") },
@@ -248,9 +278,14 @@ export const cascadeDeleteProject = internalAction({
     for (const step of CASCADE_STEPS) {
       let hasMore = true;
       while (hasMore) {
-        const result = await ctx.runMutation(
-          internal.projects.cascadeDeleteBatch,
-          { projectId, step, batchSize: CASCADE_BATCH_SIZE },
+        const result = await retryMutation(
+          () =>
+            ctx.runMutation(internal.projects.cascadeDeleteBatch, {
+              projectId,
+              step,
+              batchSize: CASCADE_BATCH_SIZE,
+            }),
+          CASCADE_MAX_RETRIES,
         );
         hasMore = result.deleted >= 1;
       }
