@@ -1,7 +1,7 @@
 import { paginationOptsValidator } from "convex/server";
 import { type Validator, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import type { DatabaseReader, MutationCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import {
   CommentAuthor,
@@ -560,26 +560,36 @@ export const retry = mutation({
   },
 });
 
+/**
+ * Count non-deleted issues for a project, grouped by status.
+ * Exported for reuse by other queries (e.g. projects.listWithStats).
+ */
+export async function countIssuesByStatus(
+  db: DatabaseReader,
+  projectId: Id<"projects">,
+): Promise<Record<string, number>> {
+  const statuses = Object.values(IssueStatus);
+  const buckets = await Promise.all(
+    statuses.map((status) =>
+      db
+        .query("issues")
+        .withIndex("by_project_deletedAt_status", (q) =>
+          q
+            .eq("projectId", projectId)
+            .eq("deletedAt", undefined)
+            .eq("status", status),
+        )
+        .collect(),
+    ),
+  );
+  return Object.fromEntries(
+    statuses.map((status, i) => [status, buckets[i]?.length ?? 0]),
+  );
+}
+
 export const counts = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const statuses = Object.values(IssueStatus);
-    const buckets = await Promise.all(
-      statuses.map((status) =>
-        ctx.db
-          .query("issues")
-          .withIndex("by_project_deletedAt_status", (q) =>
-            q
-              .eq("projectId", args.projectId)
-              .eq("deletedAt", undefined)
-              .eq("status", status),
-          )
-          .collect(),
-      ),
-    );
-    const counts: Record<string, number> = Object.fromEntries(
-      statuses.map((status, i) => [status, buckets[i]?.length ?? 0]),
-    );
-    return counts;
+    return countIssuesByStatus(ctx.db, args.projectId);
   },
 });

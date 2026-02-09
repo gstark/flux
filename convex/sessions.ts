@@ -1,6 +1,7 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { DatabaseReader } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import {
   dispositionValidator,
@@ -169,23 +170,34 @@ export const listPaginatedWithIssues = query({
 //   1. Counter table — increment/decrement on session create/status change
 //   2. This approach — acceptable while session volume is low (hundreds)
 // If session counts reach thousands per project, migrate to a counter table.
+
+/**
+ * Count sessions for a project, grouped by status.
+ * Exported for reuse by other queries (e.g. projects.listWithStats).
+ */
+export async function countSessionsByStatus(
+  db: DatabaseReader,
+  projectId: Id<"projects">,
+): Promise<Record<string, number>> {
+  const statuses = Object.values(SessionStatus);
+  const buckets = await Promise.all(
+    statuses.map((status) =>
+      db
+        .query("sessions")
+        .withIndex("by_project_status_startedAt", (q) =>
+          q.eq("projectId", projectId).eq("status", status),
+        )
+        .collect(),
+    ),
+  );
+  return Object.fromEntries(
+    statuses.map((status, i) => [status, buckets[i]?.length ?? 0]),
+  );
+}
+
 export const counts = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const statuses = Object.values(SessionStatus);
-    const buckets = await Promise.all(
-      statuses.map((status) =>
-        ctx.db
-          .query("sessions")
-          .withIndex("by_project_status_startedAt", (q) =>
-            q.eq("projectId", args.projectId).eq("status", status),
-          )
-          .collect(),
-      ),
-    );
-    const counts: Record<string, number> = Object.fromEntries(
-      statuses.map((status, i) => [status, buckets[i]?.length ?? 0]),
-    );
-    return counts;
+    return countSessionsByStatus(ctx.db, args.projectId);
   },
 });

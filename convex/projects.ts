@@ -7,7 +7,9 @@ import {
   mutation,
   query,
 } from "./_generated/server";
+import { countIssuesByStatus } from "./issues";
 import { IssueStatus, SessionStatus } from "./schema";
+import { countSessionsByStatus } from "./sessions";
 
 export const create = mutation({
   args: {
@@ -113,37 +115,17 @@ export const listWithStats = query({
 
     return await Promise.all(
       projects.map(async (project) => {
-        const openIssues = await ctx.db
-          .query("issues")
-          .withIndex("by_project_deletedAt_status", (q) =>
-            q
-              .eq("projectId", project._id)
-              .eq("deletedAt", undefined)
-              .eq("status", IssueStatus.Open),
-          )
-          .collect();
-
-        const inProgressIssues = await ctx.db
-          .query("issues")
-          .withIndex("by_project_deletedAt_status", (q) =>
-            q
-              .eq("projectId", project._id)
-              .eq("deletedAt", undefined)
-              .eq("status", IssueStatus.InProgress),
-          )
-          .collect();
-
-        const runningSessions = await ctx.db
-          .query("sessions")
-          .withIndex("by_project_status_startedAt", (q) =>
-            q.eq("projectId", project._id).eq("status", SessionStatus.Running),
-          )
-          .collect();
+        const [issueCounts, sessionCounts] = await Promise.all([
+          countIssuesByStatus(ctx.db, project._id),
+          countSessionsByStatus(ctx.db, project._id),
+        ]);
 
         return {
           ...project,
-          openIssueCount: openIssues.length + inProgressIssues.length,
-          activeSessionCount: runningSessions.length,
+          openIssueCount:
+            (issueCounts[IssueStatus.Open] ?? 0) +
+            (issueCounts[IssueStatus.InProgress] ?? 0),
+          activeSessionCount: sessionCounts[SessionStatus.Running] ?? 0,
         };
       }),
     );
