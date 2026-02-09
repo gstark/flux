@@ -3,37 +3,13 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "mcp__morph-mcp__edit_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/auto-mkdir.sh"
-          },
-          {
-            "type": "command",
-            "command": ".claude/hooks/verify-edit-pre.sh"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|mcp__morph-mcp__edit_file",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
             "command": ".claude/hooks/lint.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__morph-mcp__edit_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/verify-edit.sh"
           }
         ]
       }

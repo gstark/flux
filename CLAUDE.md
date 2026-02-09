@@ -250,20 +250,6 @@ Biome's `noLabelWithoutControl` requires labels to reference their input. Use Da
 
 ## MCP Tools
 
-### Morph
-
-**Fast Apply:** Use `edit_file` over `Edit`, `Update`, `Write`, and full file writes for **all** file edits and creation. It works with partial code snippets using `// ... existing code ...` markers — no need to read the full file first. This replaces the Read → Edit/Write workflow entirely.
-
-**Known risks — silent failures:** `edit_file` can fail silently in two ways:
-1. **Silent mutations:** It may alter code in `// ... existing code ...` regions — changing conditions, reordering logic, or dropping expressions you intended to leave untouched.
-2. **Silent non-application:** When markers can't uniquely locate the insertion point, `edit_file` may report success with 0 changes added/removed/modified. The agent believes the edit was made when it wasn't.
-
-**After every `edit_file` call, run `git diff` to verify the intended changes were applied.** A pre/post hook pair (`.claude/hooks/verify-edit-pre.sh` + `.claude/hooks/verify-edit.sh`) automatically blocks when `edit_file` produces no changes to an existing file, but you must still review the diff for silent mutations. Prefer small, targeted edits over full-file rewrites to minimize the blast radius.
-
-**New directories:** `edit_file` can create new files in new directories — a `PreToolUse` hook (`.claude/hooks/auto-mkdir.sh`) automatically runs `mkdir -p` on the parent directory before each call.
-
-**Warp Grep:** Use `warpgrep_codebase_search` for broad semantic searches at the start of codebase exploration. Best for: "Find the XYZ flow", "How does XYZ work?", "Where is XYZ handled?" Use regular `Grep` for pinpointing specific keywords or symbols.
-
 ### DaisyUI Blueprint
 
 Use for UI component development with Tailwind CSS + DaisyUI.
