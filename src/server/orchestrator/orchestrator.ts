@@ -48,10 +48,12 @@ class Orchestrator {
   }
 
   /**
-   * Sync ProjectRunner instances to match the current set of enabled projects.
+   * Sync ProjectRunner instances to match the current set of projects.
    *
-   * Creates runners for newly-enabled projects with valid paths.
-   * Destroys runners for disabled, deleted, or path-less projects.
+   * Creates runners for all projects with valid paths (regardless of `enabled`).
+   * Toggles auto-scheduling based on `enabled` — disabled projects still have
+   * fully functional runners for manual runs, status, MCP tools, etc.
+   * Destroys runners only when a project is deleted or loses its path.
    */
   private async syncRunners(
     projects: Array<{
@@ -64,22 +66,24 @@ class Orchestrator {
     const desiredIds = new Set<Id<"projects">>();
 
     for (const project of projects) {
-      const shouldRun = project.enabled === true && !!project.path;
-      if (shouldRun) {
+      const hasPath = !!project.path;
+      if (hasPath) {
         desiredIds.add(project._id);
       }
 
-      if (shouldRun && !this.runners.has(project._id)) {
+      if (hasPath && !this.runners.has(project._id)) {
         // Create a new runner for this project
         const path = project.path;
         if (!path) continue; // TypeScript narrowing
+        const autoSchedule = project.enabled === true;
         try {
           const runner = new ProjectRunner(project._id, path);
           this.runners.set(project._id, runner);
-          const stats = await runner.subscribe();
+          const stats = await runner.subscribe({ autoSchedule });
           logRecoveryStats(project.slug, stats);
           console.log(
-            `[Orchestrator] Started runner for "${project.slug}" (${project._id})`,
+            `[Orchestrator] Started runner for "${project.slug}" (${project._id})` +
+              (autoSchedule ? "" : " (auto-scheduling disabled)"),
           );
         } catch (err) {
           console.error(
@@ -89,10 +93,16 @@ class Orchestrator {
           // Remove from runners map so we retry on next sync
           this.runners.delete(project._id);
         }
+      } else if (hasPath && this.runners.has(project._id)) {
+        // Runner already exists — sync auto-scheduling with enabled state
+        const runner = this.runners.get(project._id);
+        if (runner) {
+          runner.setAutoSchedule(project.enabled === true);
+        }
       }
     }
 
-    // Destroy runners for projects no longer in the desired set
+    // Destroy runners for projects that lost their path or were deleted
     for (const [projectId, runner] of this.runners) {
       if (!desiredIds.has(projectId)) {
         console.log(`[Orchestrator] Stopping runner for project ${projectId}`);

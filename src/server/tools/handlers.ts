@@ -39,7 +39,8 @@ export type ToolContext = {
   convex: ConvexClient;
   projectId: Id<"projects">;
   projectSlug: string;
-  getRunner: () => ProjectRunner;
+  /** Returns the ProjectRunner if the project is enabled, undefined otherwise. */
+  getRunner: () => ProjectRunner | undefined;
 };
 
 export type ToolResult = {
@@ -93,12 +94,12 @@ function safeHandler(
 
 function buildMeta(ctx: ToolContext) {
   const runner = ctx.getRunner();
-  const status = runner.getStatus();
+  const status = runner?.getStatus();
   return {
     project: ctx.projectSlug,
     timestamp: Date.now(),
-    orchestrator_status: status.state,
-    active_session: status.activeSession?.sessionId ?? null,
+    orchestrator_status: status?.state ?? "disabled",
+    active_session: status?.activeSession?.sessionId ?? null,
   };
 }
 
@@ -208,8 +209,14 @@ const issues_ready = typedHandler(IssuesReadySchema, async ({ limit }, ctx) => {
 const orchestrator_run = typedHandler(
   OrchestratorRunSchema,
   async ({ issueId }, ctx) => {
-    const orchestrator = ctx.getRunner();
-    const result = await orchestrator.run(issueId as Id<"issues">);
+    const runner = ctx.getRunner();
+    if (!runner) {
+      return error(
+        ctx,
+        "No runner for this project. Does the project have a valid path?",
+      );
+    }
+    const result = await runner.run(issueId as Id<"issues">);
     return ok(ctx, {
       session: { sessionId: result.sessionId, pid: result.pid },
     });
@@ -217,14 +224,22 @@ const orchestrator_run = typedHandler(
 );
 
 const orchestrator_kill: ToolHandler = safeHandler(async (_args, ctx) => {
-  const orchestrator = ctx.getRunner();
-  await orchestrator.kill();
+  const runner = ctx.getRunner();
+  if (!runner) {
+    return ok(ctx, { message: "No runner active." });
+  }
+  await runner.kill();
   return ok(ctx, { message: "Session killed." });
 });
 
 const orchestrator_status: ToolHandler = safeHandler(async (_args, ctx) => {
-  const orchestrator = ctx.getRunner();
-  const status = orchestrator.getStatus();
+  const runner = ctx.getRunner();
+  if (!runner) {
+    return ok(ctx, {
+      status: { state: "disabled", readyCount: 0, activeSession: null },
+    });
+  }
+  const status = runner.getStatus();
   return ok(ctx, { status });
 });
 
@@ -261,13 +276,14 @@ const sessions_show = typedHandler(
     }> = [];
 
     // For the active running session, read from in-memory buffer
-    const orchestrator = ctx.getRunner();
-    const status = orchestrator.getStatus();
+    const runner = ctx.getRunner();
+    const status = runner?.getStatus();
     if (
+      runner &&
       session.status === SessionStatus.Running &&
-      status.activeSession?.sessionId === sessionId
+      status?.activeSession?.sessionId === sessionId
     ) {
-      const monitor = orchestrator.getActiveMonitor();
+      const monitor = runner.getActiveMonitor();
       if (monitor) {
         const now = Date.now();
         lines = monitor.buffer.getRecent(100).map((content, i) => ({

@@ -27,15 +27,7 @@ function createToolContext(project: Project): ToolContext {
     convex: getConvexClient(),
     projectId: project._id,
     projectSlug: project.slug,
-    getRunner: () => {
-      const runner = orchestrator.getRunner(project._id);
-      if (!runner) {
-        throw new Error(
-          `No runner for project ${project._id}. Is the project enabled with a valid path?`,
-        );
-      }
-      return runner;
-    },
+    getRunner: () => orchestrator.getRunner(project._id),
   };
 }
 
@@ -120,15 +112,16 @@ export async function startServer() {
 
     switch (subPath) {
       case "orchestrator": {
-        const handler = createOrchestratorApiHandler(() => {
-          const runner = orchestrator.getRunner(projectId as Id<"projects">);
-          if (!runner) {
-            throw new Error(
-              `No runner for project ${projectId}. Is the project enabled?`,
-            );
-          }
-          return runner;
-        });
+        const runner = orchestrator.getRunner(projectId as Id<"projects">);
+        if (!runner) {
+          return Response.json(
+            {
+              error: `No runner for project ${projectId}. Does the project have a valid path?`,
+            },
+            { status: 400 },
+          );
+        }
+        const handler = createOrchestratorApiHandler(() => runner);
         return handler(req);
       }
 

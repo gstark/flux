@@ -192,10 +192,16 @@ class ProjectRunner {
   }
 
   /**
-   * Subscribe to ready issues and begin auto-scheduling.
-   * Fetches config thresholds and recovers orphaned sessions.
+   * Initialize the runner: fetch config, recover orphans, and optionally
+   * subscribe to ready issues for auto-scheduling.
+   *
+   * @param options.autoSchedule — When true, subscribe to ready issues and
+   *   auto-pick up work. When false, the runner is fully functional for
+   *   manual runs, status, kill, etc. — just no auto-scheduling.
    */
-  async subscribe(): Promise<OrphanRecoveryStats> {
+  async subscribe(
+    options: { autoSchedule?: boolean } = {},
+  ): Promise<OrphanRecoveryStats> {
     const convex = getConvexClient();
 
     // Ensure config row exists (upsert)
@@ -216,8 +222,29 @@ class ProjectRunner {
     // Recover orphaned sessions before subscribing
     const stats = await this.recoverOrphanedSessions();
 
-    // Subscribe to ready issues
-    this.unsubscribeReady = convex.onUpdate(
+    if (options.autoSchedule !== false) {
+      this.startAutoSchedule();
+    }
+
+    return stats;
+  }
+
+  /**
+   * Enable or disable auto-scheduling of ready issues.
+   * Does not affect manual runs, status, kill, etc.
+   */
+  setAutoSchedule(enabled: boolean): void {
+    if (enabled) {
+      this.startAutoSchedule();
+    } else {
+      this.stopAutoSchedule();
+    }
+  }
+
+  private startAutoSchedule(): void {
+    if (this.unsubscribeReady) return; // Already subscribed
+
+    this.unsubscribeReady = getConvexClient().onUpdate(
       api.issues.ready,
       { projectId: this.projectId, maxFailures: this.maxFailures },
       (issues) => {
@@ -225,8 +252,14 @@ class ProjectRunner {
         this.scheduleNext();
       },
     );
+  }
 
-    return stats;
+  private stopAutoSchedule(): void {
+    if (this.unsubscribeReady) {
+      this.unsubscribeReady();
+      this.unsubscribeReady = null;
+    }
+    this.readyIssues = [];
   }
 
   /**
