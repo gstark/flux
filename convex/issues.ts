@@ -724,12 +724,11 @@ export const listFollowUps = query({
 export const listBySession = query({
   args: { sessionId: v.id("sessions") },
   handler: async (ctx, { sessionId }) => {
-    const issues = await ctx.db
+    return await ctx.db
       .query("issues")
       .withIndex("by_created_in_session", (q) =>
-        q.eq("createdInSessionId", sessionId),
+        q.eq("createdInSessionId", sessionId).eq("deletedAt", undefined),
       )
       .collect();
-    return issues.filter((i) => i.deletedAt === undefined);
   },
 });

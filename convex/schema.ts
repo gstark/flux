@@ -214,7 +214,7 @@ export default defineSchema({
     .index("by_epic", ["epicId"])
     .index("by_project_shortId", ["projectId", "shortId"])
     .index("by_source_issue", ["sourceIssueId", "deletedAt"])
-    .index("by_created_in_session", ["createdInSessionId"])
+    .index("by_created_in_session", ["createdInSessionId", "deletedAt"])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["projectId"],

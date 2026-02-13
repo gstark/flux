@@ -1137,19 +1137,10 @@ class ProjectRunner {
         ? await Promise.all(
             previousReviewSessions.map(async (session, idx) => {
               // Fetch issues created during this review session
-              // Use timestamp correlation: issues created between session start and end
-              // TODO FLUX-368: Replace with explicit session linking to avoid race conditions
-              const sessionEnd = session.endedAt;
-              const createdIssues =
-                sessionEnd !== undefined
-                  ? followUpIssues.filter((i) => {
-                      const issueCreatedAt = i._creationTime;
-                      return (
-                        issueCreatedAt >= session.startedAt &&
-                        issueCreatedAt <= sessionEnd
-                      );
-                    })
-                  : [];
+              const createdIssues = await convex.query(
+                api.issues.listBySession,
+                { sessionId: session._id },
+              );
 
               // Get commit log for this review iteration
               let reviewCommitLog: string | undefined;
