@@ -1112,15 +1112,11 @@ class ProjectRunner {
     // Fetch previous review sessions for this issue to stack context
     const allSessions = await convex.query(api.sessions.list, {
       projectId: this.projectId,
+      status: SessionStatus.Completed,
       limit: undefined,
     });
     const previousReviewSessions = allSessions
-      .filter(
-        (s) =>
-          s.issueId === issueId &&
-          s.type === SessionType.Review &&
-          s.status === SessionStatus.Completed,
-      )
+      .filter((s) => s.issueId === issueId && s.type === SessionType.Review)
       .sort((a, b) => a.startedAt - b.startedAt);
 
     // Build previousReviews context if we have prior review sessions

@@ -518,4 +518,35 @@ describe("buildReviewPrompt", () => {
       "- Commits: (Git commit refs not recorded for this session)",
     );
   });
+
+  test("shows '(none)' when no commits in review iteration", () => {
+    const prompt = buildReviewPrompt({
+      shortId: "FLUX-100",
+      title: "Test Issue",
+      diff: "diff content",
+      commitLog: "commit log",
+      relatedIssues: [],
+      reviewIteration: 2,
+      maxReviewIterations: 10,
+      previousReviews: [
+        {
+          iteration: 1,
+          disposition: "done",
+          note: "Review found no issues",
+          createdIssues: [],
+          commitLog: "",
+        },
+      ],
+    });
+
+    expect(prompt).toContain("## Previous Review Iterations");
+    expect(prompt).toContain("### Review 1");
+    expect(prompt).toContain("- Commits: (none)");
+    // Verify we don't have a commit block after "Review 1" by checking what comes after
+    const parts = prompt.split("### Review 1");
+    expect(parts.length).toBeGreaterThan(1);
+    const review1Section = parts[1]?.split("##")[0] ?? "";
+    expect(review1Section).toContain("- Commits: (none)");
+    expect(review1Section).not.toContain("```");
+  });
 });
