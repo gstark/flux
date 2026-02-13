@@ -1098,11 +1098,15 @@ class ProjectRunner {
       return;
     }
 
-    const relatedIssues: Array<{
-      shortId: string;
-      title: string;
-      status: string;
-    }> = [];
+    // Fetch follow-up issues created from this issue to avoid duplicates in review
+    const followUpIssues = await convex.query(api.issues.listFollowUps, {
+      issueId,
+    });
+    const relatedIssues = followUpIssues.map((i) => ({
+      shortId: i.shortId,
+      title: i.title,
+      status: i.status,
+    }));
 
     const reviewPrompt = this.provider.buildReviewPrompt({
       shortId: issue.shortId,

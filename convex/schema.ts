@@ -211,6 +211,7 @@ export default defineSchema({
     ])
     .index("by_epic", ["epicId"])
     .index("by_project_shortId", ["projectId", "shortId"])
+    .index("by_source_issue", ["sourceIssueId"])
     .searchIndex("search_title", {
       searchField: "title",
       filterFields: ["projectId"],

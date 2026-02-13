@@ -688,3 +688,22 @@ export const counts = query({
     return countIssuesByStatus(ctx.db, args.projectId);
   },
 });
+
+/**
+ * Fetch all follow-up issues created from a given issue.
+ * Returns issues that have `sourceIssueId` pointing to the given issue,
+ * excluding soft-deleted issues. Used by the review agent to avoid
+ * creating duplicate follow-up issues.
+ */
+export const listFollowUps = query({
+  args: { issueId: v.id("issues") },
+  handler: async (ctx, { issueId }) => {
+    const followUps = await ctx.db
+      .query("issues")
+      .withIndex("by_source_issue", (q) => q.eq("sourceIssueId", issueId))
+      .collect();
+
+    // Exclude soft-deleted issues
+    return followUps.filter((issue) => issue.deletedAt === undefined);
+  },
+});
