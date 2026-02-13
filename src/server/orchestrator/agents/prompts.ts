@@ -207,6 +207,8 @@ This is review iteration ${ctx.reviewIteration} of ${ctx.maxReviewIterations}.`)
         parts.push("```");
         parts.push(prevReview.commitLog);
         parts.push("```");
+      } else if (prevReview.commitLogError) {
+        parts.push(`- Commits: (${prevReview.commitLogError})`);
       }
       parts.push("");
     }

@@ -46,6 +46,7 @@ export interface ReviewPromptContext {
     note: string;
     createdIssues?: Array<{ shortId: string; title: string }>;
     commitLog?: string;
+    commitLogError?: string;
   }>;
 }
 

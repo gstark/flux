@@ -464,4 +464,31 @@ describe("buildReviewPrompt", () => {
     expect(prompt).not.toContain("Previous reviews");
     expect(prompt).not.toContain("## Previous Review Iterations");
   });
+
+  test("shows commit log error when retrieval fails", () => {
+    const prompt = buildReviewPrompt({
+      shortId: "FLUX-100",
+      title: "Test Issue",
+      diff: "diff content",
+      commitLog: "commit log",
+      relatedIssues: [],
+      reviewIteration: 2,
+      maxReviewIterations: 10,
+      previousReviews: [
+        {
+          iteration: 1,
+          disposition: "done",
+          note: "Fixed issue",
+          createdIssues: [],
+          commitLogError: "Failed to retrieve commit log: invalid revision",
+        },
+      ],
+    });
+
+    expect(prompt).toContain("## Previous Review Iterations");
+    expect(prompt).toContain("### Review 1");
+    expect(prompt).toContain(
+      "- Commits: (Failed to retrieve commit log: invalid revision)",
+    );
+  });
 });

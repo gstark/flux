@@ -1147,6 +1147,7 @@ class ProjectRunner {
 
               // Get commit log for this review iteration
               let reviewCommitLog: string | undefined;
+              let commitLogError: string | undefined;
               if (session.startHead && session.endHead) {
                 try {
                   reviewCommitLog = await getCommitLogBetween(
@@ -1155,6 +1156,7 @@ class ProjectRunner {
                     session.endHead,
                   );
                 } catch (err) {
+                  commitLogError = `Failed to retrieve commit log: ${err instanceof Error ? err.message : String(err)}`;
                   console.warn(
                     `[ProjectRunner] Failed to get commit log for review session ${session._id}:`,
                     err,
@@ -1171,6 +1173,7 @@ class ProjectRunner {
                   title: i.title,
                 })),
                 commitLog: reviewCommitLog,
+                commitLogError,
               };
             }),
           )
