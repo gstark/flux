@@ -698,12 +698,11 @@ export const counts = query({
 export const listFollowUps = query({
   args: { issueId: v.id("issues") },
   handler: async (ctx, { issueId }) => {
-    const followUps = await ctx.db
+    return await ctx.db
       .query("issues")
-      .withIndex("by_source_issue", (q) => q.eq("sourceIssueId", issueId))
+      .withIndex("by_source_issue", (q) =>
+        q.eq("sourceIssueId", issueId).eq("deletedAt", undefined),
+      )
       .collect();
-
-    // Exclude soft-deleted issues
-    return followUps.filter((issue) => issue.deletedAt === undefined);
   },
 });
