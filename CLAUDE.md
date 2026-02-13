@@ -154,6 +154,25 @@ git add src/foo.ts src/bar.ts   # ← orchestrator may auto-commit here
 git commit -m "FLUX-XX: ..."    # ← nothing left to commit
 ```
 
+### Agent Environment Isolation
+
+When spawning agent processes, strip daemon-specific environment variables to prevent inheritance pollution. The daemon runs with `CONVEX_URL` and `CONVEX_DEPLOYMENT` set for its own backend. If agents inherit these vars, they could accidentally connect to the wrong deployment when spawning Convex-aware subprocesses.
+
+**Pattern (see `src/server/orchestrator/agents/claude.ts`):**
+
+```typescript
+function agentEnv(sessionId?: string, agentName?: string): Record<string, string> {
+  const env = { ...process.env } as Record<string, string>;
+  delete env.CONVEX_URL;
+  delete env.CONVEX_DEPLOYMENT;
+  if (sessionId) env.FLUX_SESSION_ID = sessionId;
+  if (agentName) env.FLUX_AGENT_NAME = agentName;
+  return env;
+}
+```
+
+**When to apply:** Any `AgentProvider` implementation that spawns child processes should use this pattern. Prevents accidental cross-deployment mutations and keeps agent environments clean.
+
 ## UI Component Patterns (Biome A11y)
 
 Biome's recommended a11y rules are enabled. These patterns cause repeated lint failures when agents don't follow them upfront. Get them right on the first pass.

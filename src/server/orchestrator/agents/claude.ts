@@ -14,7 +14,13 @@ import type {
 } from "./types";
 
 /** Build a clean env for spawned agents, stripping Flux-specific vars
- *  so child processes don't inherit (and clobber) deployment config. */
+ *  so child processes don't inherit (and clobber) deployment config.
+ *
+ *  Background: The daemon runs with CONVEX_URL/CONVEX_DEPLOYMENT set
+ *  for its own backend. Spawned agents should use their own Convex
+ *  config (if any), not inherit ours. Prevents accidental cross-deployment
+ *  mutations if an agent spawns Convex-aware subprocesses.
+ */
 function agentEnv(
   sessionId?: string,
   agentName?: string,
