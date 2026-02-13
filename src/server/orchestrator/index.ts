@@ -1130,16 +1130,20 @@ class ProjectRunner {
             previousReviewSessions.map(async (session, idx) => {
               // Fetch issues created during this review session
               // Use timestamp correlation: issues created between session start and end
-              const createdIssues =
-                session.endedAt !== undefined
-                  ? followUpIssues.filter((i) => {
-                      const issueCreatedAt = i._creationTime;
-                      return (
-                        issueCreatedAt >= session.startedAt &&
-                        issueCreatedAt <= (session.endedAt ?? Date.now())
-                      );
-                    })
-                  : [];
+              // TODO FLUX-368: Replace with explicit session linking to avoid race conditions
+              const createdIssues: typeof followUpIssues = [];
+              if (session.endedAt !== undefined) {
+                const sessionEnd = session.endedAt;
+                createdIssues.push(
+                  ...followUpIssues.filter((i) => {
+                    const issueCreatedAt = i._creationTime;
+                    return (
+                      issueCreatedAt >= session.startedAt &&
+                      issueCreatedAt <= sessionEnd
+                    );
+                  }),
+                );
+              }
 
               // Get commit log for this review iteration
               let reviewCommitLog: string | undefined;
