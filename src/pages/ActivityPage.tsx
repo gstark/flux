@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from "react";
+import { Markdown } from "../components/Markdown";
 import { ToolCallCard } from "../components/ToolCallCard";
 import {
   type KeyedStreamEvent,
@@ -347,15 +348,15 @@ function ActivityTextNode({ text }: { text: string }) {
 
   if (isShort) {
     return (
-      <div className="whitespace-pre-wrap break-words rounded-lg bg-base-200 px-3 py-2 text-base-content/80 text-sm">
-        {text}
+      <div className="rounded-lg bg-base-200 px-3 py-2 text-base-content/80 text-sm">
+        <Markdown content={text} />
       </div>
     );
   }
 
   return (
-    <div className="whitespace-pre-wrap break-words rounded-lg bg-base-200 p-3 text-sm">
-      {text}
+    <div className="rounded-lg bg-base-200 p-3 text-sm">
+      <Markdown content={text} />
     </div>
   );
 }
