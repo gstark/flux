@@ -6,21 +6,20 @@ import type { SessionMonitor } from "./orchestrator/monitor";
 
 /** How often to send a keepalive comment to prevent proxy timeouts. */
 const HEARTBEAT_INTERVAL_MS = 30_000;
+/** How often to check whether the project's runner was replaced or appeared/disappeared. */
+const RUNNER_SYNC_INTERVAL_MS = 1_000;
 
 /**
  * Create an SSE handler for a project-scoped SSE activity endpoint.
  * Keeps connections open persistently — pushes session start/end events
  * and live agent output without requiring client reconnection.
  */
-export function createSSEHandler(getRunner: () => ProjectRunner) {
+export function createSSEHandler(getRunner: () => ProjectRunner | undefined) {
   return (req: Request): Response => {
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
       start(controller) {
-        const orch = getRunner();
-        const status = orch.getStatus();
-
         // ── Helper: safely enqueue (no-op if controller is closed) ──
         function send(data: string): boolean {
           try {
@@ -33,6 +32,10 @@ export function createSSEHandler(getRunner: () => ProjectRunner) {
 
         // ── Track the current monitor subscription so we can swap it ──
         let currentUnsub: (() => void) | null = null;
+        let currentRunner: ProjectRunner | undefined;
+        let unsubLifecycle: (() => void) | null = null;
+        let lastStatusKey: string | null = null;
+        let lastSessionKey: string | null = null;
 
         function subscribeToMonitor(monitor: SessionMonitor): void {
           // Unsubscribe from any previous monitor
@@ -53,64 +56,92 @@ export function createSSEHandler(getRunner: () => ProjectRunner) {
           });
         }
 
-        // ── Send initial state ──
-        if (status.activeSession) {
-          send(
-            formatSSE("session_start", {
-              sessionId: status.activeSession.sessionId,
-              issueId: status.activeSession.issueId,
-              pid: status.activeSession.pid,
-            }),
-          );
-
-          // Pipe current monitor if active
-          const monitor = orch.getActiveMonitor();
-          if (monitor) {
-            subscribeToMonitor(monitor);
-          }
-        } else {
+        function sendStatusOnce(state: string, message: string): void {
+          const key = `${state}:${message}`;
+          if (lastStatusKey === key) return;
+          lastStatusKey = key;
           send(
             formatSSE("status", {
-              state: status.state,
-              message: "No active session",
+              state,
+              message,
             }),
           );
         }
 
-        // ── Subscribe to orchestrator lifecycle events ──
-        const unsubLifecycle = orch.onLifecycle(
-          (event: ProjectRunnerLifecycleEvent) => {
-            if (event.type === "session_start") {
-              send(
-                formatSSE("session_start", {
-                  sessionId: event.sessionId,
-                  issueId: event.issueId,
-                  pid: event.pid,
-                }),
-              );
-              subscribeToMonitor(event.monitor);
-            } else if (event.type === "session_end") {
-              // Detach from the old monitor
-              currentUnsub?.();
-              currentUnsub = null;
-              send(
-                formatSSE("status", {
-                  state: event.state,
-                  message: "Session ended",
-                }),
-              );
-            } else if (event.type === "monitor_changed") {
-              subscribeToMonitor(event.monitor);
-            } else if (event.type === "state_change") {
-              send(
-                formatSSE("status", {
-                  state: event.state,
-                  message: "State changed",
-                }),
-              );
-            }
-          },
-        );
+        function sendSessionStartOnce(runner: ProjectRunner): void {
+          const status = runner.getStatus();
+          const activeSession = status.activeSession;
+          if (!activeSession) return;
+          const key = `${activeSession.sessionId}:${activeSession.pid}:${runner.getProviderName()}`;
+          if (lastSessionKey === key) return;
+          lastSessionKey = key;
+          lastStatusKey = null;
+          send(
+            formatSSE("session_start", {
+              sessionId: activeSession.sessionId,
+              issueId: activeSession.issueId,
+              pid: activeSession.pid,
+              agent: runner.getProviderName(),
+            }),
+          );
+        }
+
+        function detachRunner(): void {
+          currentUnsub?.();
+          currentUnsub = null;
+          unsubLifecycle?.();
+          unsubLifecycle = null;
+          currentRunner = undefined;
+          lastSessionKey = null;
+        }
+
+        function attachRunner(runner: ProjectRunner): void {
+          currentRunner = runner;
+          const status = runner.getStatus();
+          if (status.activeSession) {
+            sendSessionStartOnce(runner);
+            const monitor = runner.getActiveMonitor();
+            if (monitor) subscribeToMonitor(monitor);
+          } else {
+            sendStatusOnce(status.state, "No active session");
+          }
+
+          unsubLifecycle = runner.onLifecycle(
+            (event: ProjectRunnerLifecycleEvent) => {
+              if (event.type === "session_start") {
+                lastSessionKey = null;
+                sendSessionStartOnce(runner);
+                subscribeToMonitor(event.monitor);
+              } else if (event.type === "session_end") {
+                currentUnsub?.();
+                currentUnsub = null;
+                lastSessionKey = null;
+                sendStatusOnce(event.state, "Session ended");
+              } else if (event.type === "monitor_changed") {
+                subscribeToMonitor(event.monitor);
+              } else if (event.type === "state_change") {
+                sendStatusOnce(event.state, "State changed");
+              }
+            },
+          );
+        }
+
+        function syncRunnerBinding(): void {
+          const nextRunner = getRunner();
+          if (nextRunner === currentRunner) return;
+
+          detachRunner();
+
+          if (!nextRunner) {
+            sendStatusOnce("disabled", "Project is not enabled or has no runner.");
+            return;
+          }
+
+          attachRunner(nextRunner);
+        }
+
+        // ── Send initial state and follow runner replacement ──
+        syncRunnerBinding();
 
         // ── Heartbeat keepalive to prevent proxy timeouts ──
         const heartbeat = setInterval(() => {
@@ -119,12 +150,13 @@ export function createSSEHandler(getRunner: () => ProjectRunner) {
             clearInterval(heartbeat);
           }
         }, HEARTBEAT_INTERVAL_MS);
+        const runnerSync = setInterval(syncRunnerBinding, RUNNER_SYNC_INTERVAL_MS);
 
         // ── Clean up when client disconnects ──
         req.signal.addEventListener("abort", () => {
-          currentUnsub?.();
-          unsubLifecycle();
+          detachRunner();
           clearInterval(heartbeat);
+          clearInterval(runnerSync);
           try {
             controller.close();
           } catch {

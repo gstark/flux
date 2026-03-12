@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
+import { AgentKind, agentKindValidator } from "./schema";
 
 export const exists = query({
   args: { projectId: v.id("projects") },
@@ -35,7 +36,7 @@ export const ensureExists = mutation({
 
     return await ctx.db.insert("orchestratorConfig", {
       projectId,
-      agent: "claude",
+      agent: AgentKind.Claude,
       sessionTimeoutMs: 30 * 60 * 1000,
       maxFailures: 3,
       maxReviewIterations: 10,
@@ -46,6 +47,7 @@ export const ensureExists = mutation({
 export const update = mutation({
   args: {
     projectId: v.id("projects"),
+    agent: v.optional(agentKindValidator),
     maxReviewIterations: v.optional(v.number()),
     maxFailures: v.optional(v.number()),
     sessionTimeoutMs: v.optional(v.number()),
@@ -59,10 +61,15 @@ export const update = mutation({
     if (!config) {
       throw new Error(`No orchestrator config found for project ${projectId}`);
     }
-    // Validate numeric fields are positive integers
-    for (const [k, val] of Object.entries(patch)) {
+    const numericFields = [
+      "maxReviewIterations",
+      "maxFailures",
+      "sessionTimeoutMs",
+    ] as const;
+    for (const key of numericFields) {
+      const val = patch[key];
       if (val !== undefined && (!Number.isInteger(val) || val < 1)) {
-        throw new Error(`${k} must be a positive integer, got ${val}`);
+        throw new Error(`${key} must be a positive integer, got ${val}`);
       }
     }
     // Strip undefined values from numeric fields, then handle focusEpicId

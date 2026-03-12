@@ -2,17 +2,31 @@ import { summarizeToolInput, type ToolCallPair } from "../lib/parseStreamLine";
 import {
   FontAwesomeIcon,
   faCircleCheck,
+  faChevronRight,
   faScrewdriverWrench,
   faSpinner,
 } from "./Icon";
 
 /** A single collapsible card showing tool name + input summary, with result body. */
-export function ToolCallCard({ pair }: { pair: ToolCallPair }) {
+export function ToolCallCard({
+  pair,
+  expanded,
+}: {
+  pair: ToolCallPair;
+  expanded?: boolean;
+}) {
   const { toolUse, toolResult } = pair;
   const summary = summarizeToolInput(toolUse.toolName, toolUse.toolInput);
 
   const header = (
-    <div className="flex items-center gap-2 px-3 py-2">
+    <div className="flex min-w-0 items-center gap-2 px-3 py-2">
+      {toolResult && (
+        <FontAwesomeIcon
+          icon={faChevronRight}
+          aria-hidden="true"
+          className="shrink-0 text-[10px] text-neutral-content/50 transition-transform duration-150 group-open:rotate-90"
+        />
+      )}
       <FontAwesomeIcon
         icon={faScrewdriverWrench}
         aria-hidden="true"
@@ -20,7 +34,7 @@ export function ToolCallCard({ pair }: { pair: ToolCallPair }) {
       />
       <span className="font-medium text-info text-sm">{toolUse.toolName}</span>
       {summary && (
-        <span className="min-w-0 truncate font-mono text-neutral-content/70 text-xs">
+        <span className="min-w-0 flex-1 truncate font-mono text-neutral-content/70 text-xs">
           {summary}
         </span>
       )}
@@ -44,15 +58,20 @@ export function ToolCallCard({ pair }: { pair: ToolCallPair }) {
   // No result yet — render as a static card (no misleading disclosure triangle)
   if (!toolResult) {
     return (
-      <div className="rounded-lg bg-neutral text-neutral-content text-sm">
+      <div className="rounded-lg border border-neutral-content/10 bg-neutral text-neutral-content text-sm">
         {header}
       </div>
     );
   }
 
   return (
-    <details className="group rounded-lg bg-neutral text-neutral-content text-sm">
-      <summary className="cursor-pointer select-none">{header}</summary>
+    <details
+      open={expanded}
+      className="group rounded-lg border border-neutral-content/10 bg-neutral text-neutral-content text-sm"
+    >
+      <summary className="list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+        {header}
+      </summary>
       <div className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words border-neutral-content/10 border-t px-3 pt-2 pb-3 font-mono text-xs">
         {toolResult.content}
       </div>

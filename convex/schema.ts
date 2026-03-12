@@ -139,6 +139,20 @@ export const dispositionValidator = v.union(
   v.literal(Disposition.Fault),
 );
 
+export const AgentKind = {
+  Claude: "claude",
+  Codex: "codex",
+  OpenCode: "opencode",
+} as const;
+
+export type AgentKindValue = (typeof AgentKind)[keyof typeof AgentKind];
+
+export const agentKindValidator = v.union(
+  v.literal(AgentKind.Claude),
+  v.literal(AgentKind.Codex),
+  v.literal(AgentKind.OpenCode),
+);
+
 // ── Derived value types (single source of truth) ─────────────────────
 // SessionPhaseValue is defined inline above (near SessionPhase).
 export type IssueStatusValue = (typeof IssueStatus)[keyof typeof IssueStatus];
@@ -289,7 +303,7 @@ export default defineSchema({
 
   orchestratorConfig: defineTable({
     projectId: v.id("projects"),
-    agent: v.string(),
+    agent: agentKindValidator,
     focusEpicId: v.optional(v.id("epics")),
     sessionTimeoutMs: v.number(),
     maxFailures: v.number(),

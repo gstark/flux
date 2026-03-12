@@ -34,14 +34,14 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
   const displayableEvents = useMemo(
     () =>
       events.filter((event) =>
-        isDisplayableEvent(event.direction, event.content),
+        isDisplayableEvent(event.direction, event.content, session?.agent),
       ),
-    [events],
+    [events, session?.agent],
   );
 
   const transcriptNodes = useMemo(
-    () => groupTranscriptEvents(displayableEvents),
-    [displayableEvents],
+    () => groupTranscriptEvents(displayableEvents, session?.agent),
+    [displayableEvents, session?.agent],
   );
 
   const handleLoadMore = useCallback(() => loadMore(200), [loadMore]);

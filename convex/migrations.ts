@@ -11,6 +11,7 @@
  */
 import type { Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
+import type { AgentKindValue } from "./schema";
 import {
   CounterEntity,
   IssuePriority,
@@ -99,7 +100,7 @@ export const stripLegacyFields = internalMutation({
         config._id,
         rest as {
           projectId: Id<"projects">;
-          agent: string;
+          agent: AgentKindValue;
           sessionTimeoutMs: number;
           maxFailures: number;
           maxReviewIterations: number;
@@ -235,5 +236,73 @@ export const backfillStatusCounts = internalMutation({
     }
 
     return { countersWritten, projects: projects.length };
+  },
+});
+
+/**
+ * Shift all timestamps on issues, sessions, session events, and comments
+ * for a given project so they fall within the last 7 days.
+ *
+ * Adds a fixed offset (now - maxTimestamp) to every custom timestamp field.
+ * Does NOT touch `_creationTime` (system-managed).
+ *
+ * Usage: bunx convex run migrations:shiftTimestamps '{"projectSlug":"flux"}'
+ */
+export const shiftTimestamps = internalMutation({
+  handler: async (ctx) => {
+    // Get ALL issues and sessions across ALL projects
+    const issues = await ctx.db.query("issues").collect();
+    const sessions = await ctx.db.query("sessions").collect();
+
+    let maxTs = 0;
+    for (const issue of issues) {
+      if (issue.updatedAt && issue.updatedAt > maxTs) maxTs = issue.updatedAt;
+      if (issue.closedAt && issue.closedAt > maxTs) maxTs = issue.closedAt;
+    }
+    for (const session of sessions) {
+      if (session.startedAt > maxTs) maxTs = session.startedAt;
+      if (session.endedAt && session.endedAt > maxTs) maxTs = session.endedAt;
+    }
+
+    if (maxTs === 0) throw new Error("No timestamps found");
+
+    // Offset: shift so max timestamp → 1 hour ago
+    const offset = Date.now() - 3600_000 - maxTs;
+    // Skip if already shifted (offset < 1 day)
+    if (Math.abs(offset) < 86_400_000)
+      return { skipped: true, offsetDays: +(offset / 86_400_000).toFixed(2) };
+    const shift = (ts: number | undefined) =>
+      ts !== undefined ? ts + offset : undefined;
+
+    // Patch issues
+    let issuesPatched = 0;
+    for (const issue of issues) {
+      const patch: Record<string, number | undefined> = {};
+      if (issue.updatedAt) patch.updatedAt = shift(issue.updatedAt);
+      if (issue.closedAt) patch.closedAt = shift(issue.closedAt);
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(issue._id, patch);
+        issuesPatched++;
+      }
+    }
+
+    // Patch sessions
+    let sessionsPatched = 0;
+    for (const session of sessions) {
+      const patch: Record<string, number | undefined> = {};
+      patch.startedAt = shift(session.startedAt);
+      if (session.endedAt) patch.endedAt = shift(session.endedAt);
+      if (session.lastHeartbeat)
+        patch.lastHeartbeat = shift(session.lastHeartbeat);
+      await ctx.db.patch(session._id, patch);
+      sessionsPatched++;
+    }
+
+    return {
+      offsetMs: offset,
+      offsetDays: +(offset / 86_400_000).toFixed(2),
+      issuesPatched,
+      sessionsPatched,
+    };
   },
 });

@@ -98,11 +98,11 @@ import { IssueStatus, issueStatusValidator } from "./schema";
 ## Development Guidelines
 
 **Important**: `bun dev` starts three processes via `concurrently`:
-1. **Bun** (`:8042`) — API server (`/api/*`, `/mcp/projects/*`, `/sse/*`, `/health`)
+1. **Bun** (`:8042`) — API server + reverse proxy to Vite in dev, static file server in production
 2. **Convex** — backend sync
-3. **Vite** (`:5173`) — React SPA with HMR via `@tailwindcss/vite`
+3. **Vite** (`:8043`) — React SPA with HMR via `@tailwindcss/vite` (proxied through Bun)
 
-Open the app at `http://localhost:5173` during development. Vite proxies API requests to Bun automatically. Code changes to `src/` trigger a full process restart via `bun --watch` (reliable for transitive dependencies); changes to `convex/` are deployed by `convex dev`. If a restart gets stuck, see "Restarting the Daemon" below.
+Open the app at `http://localhost:8042` — this is the single entry point in both dev and production. In dev, Bun reverse-proxies frontend requests to Vite on 8043; in production, it serves static files from `dist/`. Code changes to `src/` trigger a full process restart via `bun --watch` (reliable for transitive dependencies); changes to `convex/` are deployed by `convex dev`. If a restart gets stuck, see "Restarting the Daemon" below.
 
 For production: `bun run build:frontend` builds to `dist/`, then `bun run start` serves the static files from Bun at `:8042`.
 
@@ -290,12 +290,12 @@ Available categories: `component-examples`, `components`, `layouts`, `templates`
 
 Headless browser automation for UI validation. Available to all agents via `.mcp.json`.
 
-**Use for**: Verifying UI behavior after building/modifying frontend components. Navigate to `http://localhost:5173` (dev) or `http://localhost:8042` (production), interact with elements, and confirm expected behavior.
+**Use for**: Verifying UI behavior after building/modifying frontend components. Navigate to `http://localhost:8042`, interact with elements, and confirm expected behavior.
 
 **Key tools**: `browser_navigate`, `browser_click`, `browser_snapshot` (accessibility tree), `browser_type`
 
 **Validation pattern**:
-1. `browser_navigate` to the relevant page (e.g., `http://localhost:5173/issues`)
+1. `browser_navigate` to the relevant page (e.g., `http://localhost:8042/issues`)
 2. `browser_snapshot` to get the accessibility tree
 3. Verify expected elements exist (buttons, text, badges, etc.)
 4. `browser_click` / `browser_type` to test interactions

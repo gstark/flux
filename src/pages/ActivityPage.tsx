@@ -59,6 +59,13 @@ function updateAccumulator(
   }
 
   const dirtyBlocks = new Set<number>();
+  let currentAgent = "claude";
+  for (let i = 0; i < acc.processed; i++) {
+    const previous = events[i];
+    if (previous?.type === "session_start") {
+      currentAgent = previous.agent;
+    }
+  }
 
   for (let i = acc.processed; i < events.length; i++) {
     const event = events[i];
@@ -69,11 +76,12 @@ function updateAccumulator(
       acc.blockToTool.clear();
       acc.blockJsonChunks.clear();
       acc.resolved.clear();
+      currentAgent = event.agent;
       continue;
     }
     if (event.type !== "activity") continue;
 
-    const items = parseStreamLine(event.content);
+    const items = parseStreamLine(event.content, currentAgent);
     for (const item of items) {
       if (item.kind === "tool_use" && item.blockIndex !== null) {
         acc.blockToTool.set(item.blockIndex, item.toolId);
@@ -160,6 +168,7 @@ function groupActivityNodes(
   toolInputMap: Map<string, Record<string, unknown>>,
 ): ActivityNode[] {
   const nodes: ActivityNode[] = [];
+  let currentAgent = "claude";
   // Pending tool_use items awaiting their results, indexed by toolId for dedup
   const pendingToolUses = new Map<
     string,
@@ -172,6 +181,7 @@ function groupActivityNodes(
     if (event.type === "session_start") {
       // Flush pending before new session
       flushPending(nodes, pendingToolUses, pendingOrder);
+      currentAgent = event.agent;
       nodes.push({ type: "session_start", key: event.id, event });
       continue;
     }
@@ -181,7 +191,7 @@ function groupActivityNodes(
     }
 
     // Activity event — parse and group
-    const items = parseStreamLine(event.content).filter(
+    const items = parseStreamLine(event.content, currentAgent).filter(
       isDisplayableParsedLine,
     );
 
@@ -270,8 +280,8 @@ function flushPending(
  * input has changed — the only fields that mutate for a given key.
  */
 function activityNodeEqual(
-  prev: { node: ActivityNode },
-  next: { node: ActivityNode },
+  prev: { node: ActivityNode; expandedToolCalls: ReadonlySet<string> },
+  next: { node: ActivityNode; expandedToolCalls: ReadonlySet<string> },
 ): boolean {
   if (prev.node.key !== next.node.key) return false;
   if (prev.node.type !== next.node.type) return false;
@@ -282,37 +292,47 @@ function activityNodeEqual(
     if (!prev.node.pair.toolResult !== !next.node.pair.toolResult) return false;
     if (!prev.node.pair.toolUse.toolInput !== !next.node.pair.toolUse.toolInput)
       return false;
+    if (
+      prev.expandedToolCalls.has(prev.node.key) !==
+      next.expandedToolCalls.has(next.node.key)
+    ) {
+      return false;
+    }
   }
   return true;
 }
 
 const ActivityNodeView = memo(function ActivityNodeView({
   node,
+  expandedToolCalls,
 }: {
   node: ActivityNode;
+  expandedToolCalls: ReadonlySet<string>;
 }) {
   switch (node.type) {
     case "session_start":
       return (
-        <div className="mb-1 border-base-content/20 border-b pb-1 text-info/60 text-xs">
+        <div className="rounded-lg border border-base-300 bg-base-200 px-3 py-2 text-base-content/60 text-xs">
           ── Session {node.event.sessionId.slice(0, 8)} │ Issue:{" "}
-          {node.event.issueId} │ PID: {node.event.pid} ──
+          {node.event.issueId} │ Agent: {node.event.agent} │ PID:{" "}
+          {node.event.pid} ──
         </div>
       );
     case "status":
       return (
-        <div className="text-warning italic">
+        <div className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning italic">
           [{node.event.state}] {node.event.message}
         </div>
       );
     case "text":
-      return (
-        <div className="whitespace-pre-wrap break-words">
-          {node.parsed.text}
-        </div>
-      );
+      return <ActivityTextNode text={node.parsed.text} />;
     case "tool_call":
-      return <ToolCallCard pair={node.pair} />;
+      return (
+        <ToolCallCard
+          pair={node.pair}
+          expanded={expandedToolCalls.has(node.key)}
+        />
+      );
     default: {
       const _exhaustive: never = node;
       throw new Error(
@@ -321,6 +341,26 @@ const ActivityNodeView = memo(function ActivityNodeView({
     }
   }
 }, activityNodeEqual);
+
+function ActivityTextNode({ text }: { text: string }) {
+  const isShort = text.split("\n").length <= 2 && text.length < 120;
+
+  if (isShort) {
+    return (
+      <div className="whitespace-pre-wrap break-words rounded-lg bg-base-200 px-3 py-2 text-base-content/80 text-sm">
+        {text}
+      </div>
+    );
+  }
+
+  return (
+    <div className="whitespace-pre-wrap break-words rounded-lg bg-base-200 p-3 text-sm">
+      {text}
+    </div>
+  );
+}
+
+const MAX_EXPANDED_TOOL_CALLS = 3;
 
 export function ActivityPage() {
   useDocumentTitle("Activity");
@@ -342,6 +382,15 @@ export function ActivityPage() {
     () => groupActivityNodes(events, toolInputMap),
     [events, toolInputMap],
   );
+  const expandedToolCalls = useMemo(() => {
+    const toolCallKeys = displayNodes
+      .filter(
+        (node): node is Extract<ActivityNode, { type: "tool_call" }> =>
+          node.type === "tool_call" && node.pair.toolResult !== null,
+      )
+      .map((node) => node.key);
+    return new Set(toolCallKeys.slice(-MAX_EXPANDED_TOOL_CALLS));
+  }, [displayNodes]);
 
   // Track whether user has scrolled away from the bottom
   function handleScroll() {
@@ -386,28 +435,35 @@ export function ActivityPage() {
 
       {/* Sticky session banner */}
       {currentSession && (
-        <div className="rounded-t-lg bg-neutral px-4 py-2 font-mono text-info text-sm">
+        <div className="rounded-lg border border-base-300 bg-base-200 px-3 py-2 text-base-content/60 text-xs">
           ── Session {currentSession.sessionId.slice(0, 8)} │ Issue:{" "}
-          {currentSession.issueId} │ PID: {currentSession.pid} ──
+          {currentSession.issueId} │ Agent: {currentSession.agent} │ PID:{" "}
+          {currentSession.pid} ──
         </div>
       )}
 
-      {/* Terminal-style output */}
+      {/* Live output */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className={`min-h-0 grow overflow-y-auto ${currentSession ? "rounded-b-lg" : "rounded-lg"} bg-neutral p-4 font-mono text-neutral-content text-sm leading-relaxed`}
+        className="min-h-0 grow overflow-y-auto p-1"
       >
         {events.length === 0 ? (
-          <div className="text-base-content/40 italic">
+          <div className="py-8 text-center text-base-content/40 italic">
             {connected
               ? "Waiting for activity..."
               : "Connecting to activity stream..."}
           </div>
         ) : (
-          displayNodes.map((node) => (
-            <ActivityNodeView key={node.key} node={node} />
-          ))
+          <div className="flex flex-col gap-2">
+            {displayNodes.map((node) => (
+              <ActivityNodeView
+                key={node.key}
+                node={node}
+                expandedToolCalls={expandedToolCalls}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

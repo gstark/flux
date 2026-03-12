@@ -1,9 +1,11 @@
+import type { AgentKindValue } from "$convex/schema";
+
 /**
- * Parse Claude `--output-format stream-json` NDJSON lines into
- * structured display data for the Activity page.
+ * Parse provider stdout lines into structured display data for the Activity page.
  *
- * Each line from stdout is a JSON envelope. We extract the meaningful
- * content and classify it so the UI can render it appropriately.
+ * Claude emits structured NDJSON that we can parse richly.
+ * Other providers currently fall back to raw text rendering until their
+ * adapters emit a richer, provider-normalized transcript shape.
  */
 
 export type ParsedLine =
@@ -114,25 +116,24 @@ function genericInputSummary(input: Record<string, unknown>): string | null {
   return null;
 }
 
+export function parseStreamLine(
+  line: string,
+  agent: AgentKindValue | string = "claude",
+): ParsedLine[] {
+  if (agent === "codex") {
+    return parseCodexStreamLine(line);
+  }
+  if (agent !== "claude") {
+    return parseGenericStreamLine(line);
+  }
+  return parseClaudeStreamLine(line);
+}
+
 /**
  * Parse a single NDJSON line from Claude's stream-json output.
  * Returns an array of structured representations for UI rendering.
- *
- * Most envelope types yield a single ParsedLine, but `assistant` messages
- * can contain multiple content blocks (text + parallel tool_use calls),
- * so we always return an array for correctness.
- *
- * Known envelope types:
- * - content_block_delta: streaming text or tool input chunks
- * - content_block_start: beginning of a content block (text or tool_use)
- * - content_block_stop: end of a content block (no useful data)
- * - assistant: full assistant message with content array
- * - result: final result with text blocks or usage stats
- * - message_start / message_delta / message_stop: message lifecycle events
- *
- * Lines that are not JSON or have no displayable content → empty array or [skip].
  */
-export function parseStreamLine(line: string): ParsedLine[] {
+function parseClaudeStreamLine(line: string): ParsedLine[] {
   let obj: Record<string, unknown>;
   try {
     obj = JSON.parse(line) as Record<string, unknown>;
@@ -299,6 +300,72 @@ export function parseStreamLine(line: string): ParsedLine[] {
   return [{ kind: "text", text: line }];
 }
 
+function parseGenericStreamLine(line: string): ParsedLine[] {
+  if (!line.trim()) return [{ kind: "skip" }];
+  return [{ kind: "text", text: line }];
+}
+
+function parseCodexStreamLine(line: string): ParsedLine[] {
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(line) as Record<string, unknown>;
+  } catch {
+    return line.trim() ? [{ kind: "text", text: line }] : [{ kind: "skip" }];
+  }
+
+  if (obj.type === "thread.started" || obj.type === "turn.started") {
+    return [{ kind: "skip" }];
+  }
+
+  if (obj.type === "turn.completed") {
+    return [{ kind: "skip" }];
+  }
+
+  if (obj.type === "item.started" || obj.type === "item.completed") {
+    const item = obj.item as Record<string, unknown> | undefined;
+    if (!item || typeof item.type !== "string") {
+      return [{ kind: "skip" }];
+    }
+
+    if (item.type === "agent_message" && typeof item.text === "string") {
+      return [{ kind: "text", text: item.text, source: "full" }];
+    }
+
+    if (
+      item.type === "command_execution" &&
+      typeof item.id === "string" &&
+      typeof item.command === "string"
+    ) {
+      if (obj.type === "item.started") {
+        return [
+          {
+            kind: "tool_use",
+            toolName: "Bash",
+            toolId: item.id,
+            toolInput: { command: item.command },
+            blockIndex: null,
+          },
+        ];
+      }
+
+      const output =
+        typeof item.aggregated_output === "string" ? item.aggregated_output : "";
+      const exitCode =
+        typeof item.exit_code === "number" ? `\n[exit ${item.exit_code}]` : "";
+      return [
+        {
+          kind: "tool_result",
+          toolUseId: item.id,
+          toolName: "Bash",
+          content: `${output}${exitCode}`.trim(),
+        },
+      ];
+    }
+  }
+
+  return [{ kind: "skip" }];
+}
+
 /**
  * Extract concatenated text content from a single NDJSON line.
  *
@@ -307,8 +374,16 @@ export function parseStreamLine(line: string): ParsedLine[] {
  *
  * Used server-side for disposition parsing where only the text matters.
  */
-export function extractTextFromLine(line: string): string | null {
-  const parsed = parseStreamLine(line);
+export function extractTextFromLine(
+  line: string,
+  agent: AgentKindValue | string = "claude",
+): string | null {
+  const parsed =
+    agent === "claude"
+      ? parseClaudeStreamLine(line)
+      : agent === "codex"
+        ? parseCodexStreamLine(line)
+        : parseGenericStreamLine(line);
   const texts: string[] = [];
   for (const p of parsed) {
     if (p.kind === "text") texts.push(p.text);

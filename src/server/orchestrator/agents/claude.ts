@@ -4,6 +4,7 @@ import {
   buildWorkPrompt,
 } from "./prompts";
 import type {
+  AgentOutputEvent,
   AgentProcess,
   AgentProvider,
   ResumeOptions,
@@ -90,6 +91,18 @@ export class ClaudeCodeProvider implements AgentProvider {
 
   buildReviewPrompt(ctx: ReviewPromptContext): string {
     return buildReviewPrompt(ctx);
+  }
+
+  parseOutputLine(line: string): AgentOutputEvent[] {
+    try {
+      const obj = JSON.parse(line) as Record<string, unknown>;
+      if (obj.type === "system" && typeof obj.session_id === "string") {
+        return [{ type: "session_id", sessionId: obj.session_id }];
+      }
+    } catch {
+      // Provider output is not guaranteed to be JSON on every line.
+    }
+    return [];
   }
 }
 

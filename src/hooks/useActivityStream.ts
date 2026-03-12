@@ -8,6 +8,7 @@ export interface SessionStartEvent {
   sessionId: string;
   issueId: string;
   pid: number;
+  agent: string;
 }
 
 export interface ActivityEvent {
@@ -121,6 +122,7 @@ export function useActivityStream(): ActivityStreamState & {
           sessionId: string;
           issueId: string;
           pid: number;
+          agent: string;
         }>(e, "session_start", bufferRef.current);
         if (!data) {
           scheduleFlush();
@@ -131,6 +133,7 @@ export function useActivityStream(): ActivityStreamState & {
           sessionId: data.sessionId,
           issueId: data.issueId,
           pid: data.pid,
+          agent: data.agent,
         };
         setCurrentSession(sessionEvent);
         enqueue(sessionEvent);

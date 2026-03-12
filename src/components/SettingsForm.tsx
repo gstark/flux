@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { AgentKind, type AgentKindValue } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
 import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { useTrackedAction } from "../hooks/useTrackedAction";
@@ -81,6 +82,7 @@ export function SettingsForm() {
 
   // ── Orchestrator config form state ───────────────────────────────
   const [focusEpicId, setFocusEpicId] = useState<string>("all");
+  const [agent, setAgent] = useState<AgentKindValue>(AgentKind.Claude);
   const [maxReviewIterations, setMaxReviewIterations] = useState("");
   const [maxFailures, setMaxFailures] = useState("");
   const [sessionTimeoutMin, setSessionTimeoutMin] = useState("");
@@ -94,12 +96,14 @@ export function SettingsForm() {
 
   const [saveConfig, savingConfig] = useTrackedAction(
     async (args: {
+      agent: AgentKindValue;
       reviewIter: number;
       failures: number;
       timeoutMin: number;
     }) => {
       await updateConfig({
         projectId,
+        agent: args.agent,
         maxReviewIterations: args.reviewIter,
         maxFailures: args.failures,
         sessionTimeoutMs: args.timeoutMin * 60_000,
@@ -115,6 +119,7 @@ export function SettingsForm() {
   // Sync config form state from server
   useEffect(() => {
     if (!config) return;
+    setAgent(config.agent);
     setFocusEpicId(config.focusEpicId ?? "all");
     setMaxReviewIterations(String(config.maxReviewIterations));
     setMaxFailures(String(config.maxFailures));
@@ -148,7 +153,7 @@ export function SettingsForm() {
       return;
     }
 
-    saveConfig({ reviewIter, failures, timeoutMin });
+    saveConfig({ agent, reviewIter, failures, timeoutMin });
   }
 
   // ── Project enabled toggle ──────────────────────────────────────
@@ -256,6 +261,22 @@ export function SettingsForm() {
             </fieldset>
 
             <fieldset className="fieldset sm:col-span-2">
+              <legend className="fieldset-legend">Project ID</legend>
+              <input
+                type="text"
+                className="input w-full font-mono text-sm"
+                value={projectId}
+                readOnly
+                title="Click to copy"
+                onClick={(e) => {
+                  const input = e.currentTarget;
+                  input.select();
+                  navigator.clipboard.writeText(projectId);
+                }}
+              />
+            </fieldset>
+
+            <fieldset className="fieldset sm:col-span-2">
               <legend className="fieldset-legend">Path</legend>
               <input
                 type="text"
@@ -304,6 +325,24 @@ export function SettingsForm() {
           <section className="rounded-lg border border-base-300 bg-base-200 p-4">
             <h2 className="mb-3 font-semibold text-lg">Orchestrator</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <fieldset className="fieldset">
+                <legend className="fieldset-legend">Agent Runner</legend>
+                <select
+                  className="select w-full"
+                  value={agent}
+                  onChange={(e) => {
+                    setAgent(e.target.value as AgentKindValue);
+                    markConfigDirty();
+                  }}
+                >
+                  <option value={AgentKind.Claude}>Claude Code</option>
+                  <option value={AgentKind.Codex}>Codex (coming soon)</option>
+                  <option value={AgentKind.OpenCode}>
+                    OpenCode (coming soon)
+                  </option>
+                </select>
+              </fieldset>
+
               <fieldset className="fieldset">
                 <legend className="fieldset-legend">Focus Epic</legend>
                 <select
@@ -390,6 +429,12 @@ export function SettingsForm() {
                 <span className="text-sm text-success">Saved</span>
               )}
             </div>
+            <p className="mt-3 text-base-content/60 text-sm">
+              Codex and OpenCode selection is wired through configuration and
+              runner lifecycle, but their process adapters are not implemented
+              yet. Selecting either will fail fast when a session tries to
+              start.
+            </p>
             <ErrorBanner error={configError} onDismiss={clearConfigError} />
           </section>
         </form>

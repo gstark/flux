@@ -352,7 +352,10 @@ const VALID_DISPOSITIONS = new Set<string>(Object.values(Disposition));
  *
  * Handles both raw text lines and Claude's stream-json envelope format.
  */
-export function parseDisposition(lines: string[]): DispositionResult {
+export function parseDisposition(
+  lines: string[],
+  agent: string = "claude",
+): DispositionResult {
   const scanStart = lines.length - 1;
   const scanEnd = Math.max(0, lines.length - 50);
 
@@ -360,7 +363,7 @@ export function parseDisposition(lines: string[]): DispositionResult {
     const line = lines[i] as string | undefined;
     if (!line) continue;
     // Try stream-json envelope extraction, fall back to raw line
-    const text = extractTextFromLine(line) ?? line;
+    const text = extractTextFromLine(line, agent) ?? line;
     const result = tryParseDisposition(text);
     if (result) return result;
   }

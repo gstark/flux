@@ -11,11 +11,10 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      "/api": "http://localhost:8042",
-      "/mcp": "http://localhost:8042",
-      "/sse": "http://localhost:8042",
-      "/health": "http://localhost:8042",
+    port: 8043,
+    strictPort: true,
+    hmr: {
+      port: 8043,
     },
   },
 });

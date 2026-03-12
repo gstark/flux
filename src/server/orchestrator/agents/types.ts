@@ -1,14 +1,18 @@
 // ── Disposition ──────────────────────────────────────────────────────
 // Single source of truth lives in convex/schema.ts — re-export here for convenience.
 
-import type { DispositionValue } from "$convex/schema";
-import { Disposition as _Disposition } from "$convex/schema";
+import type { AgentKindValue, DispositionValue } from "$convex/schema";
+import { AgentKind as _AgentKind, Disposition as _Disposition } from "$convex/schema";
+export { _AgentKind as AgentKind };
 export { _Disposition as Disposition };
 export type Disposition = DispositionValue;
+export type AgentKind = AgentKindValue;
 
 export type DispositionResult =
   | { success: true; disposition: Disposition; note: string }
   | { success: false; error: string };
+
+export type AgentOutputEvent = { type: "session_id"; sessionId: string };
 
 // ── Prompt context types ─────────────────────────────────────────────
 
@@ -94,4 +98,6 @@ export interface AgentProvider {
   buildRetroPrompt(ctx: RetroPromptContext): string;
   /** Build the prompt for a review session (stateless, new session) */
   buildReviewPrompt(ctx: ReviewPromptContext): string;
+  /** Parse a raw stdout line into provider-normalized events. */
+  parseOutputLine(line: string): AgentOutputEvent[];
 }

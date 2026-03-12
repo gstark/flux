@@ -1,9 +1,11 @@
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
+import { AgentKind } from "$convex/schema";
 import { IssueStatus, SessionStatus } from "$convex/schema";
 import { OrchestratorState } from "../../shared/orchestrator";
 import { getConvexClient } from "../convex";
 import { isProcessAlive } from "../process";
+import { createAgentProvider } from "./agents";
 import { type OrphanRecoveryStats, ProjectRunner } from "./index";
 
 /**
@@ -64,6 +66,7 @@ class Orchestrator {
     }>,
   ): Promise<void> {
     const desiredIds = new Set<Id<"projects">>();
+    const convex = getConvexClient();
 
     for (const project of projects) {
       const hasPath = !!project.path;
@@ -71,18 +74,29 @@ class Orchestrator {
         desiredIds.add(project._id);
       }
 
+      const config = hasPath
+        ? await convex.query(api.orchestratorConfig.get, {
+            projectId: project._id,
+          })
+        : null;
+      const desiredAgent = config?.agent ?? AgentKind.Claude;
+
       if (hasPath && !this.runners.has(project._id)) {
         // Create a new runner for this project
         const path = project.path;
         if (!path) continue; // TypeScript narrowing
         const autoSchedule = project.enabled === true;
         try {
-          const runner = new ProjectRunner(project._id, path);
+          const runner = new ProjectRunner(
+            project._id,
+            path,
+            createAgentProvider(desiredAgent),
+          );
           this.runners.set(project._id, runner);
           const stats = await runner.subscribe({ autoSchedule });
           logRecoveryStats(project.slug, stats);
           console.log(
-            `[Orchestrator] Started runner for "${project.slug}" (${project._id})` +
+            `[Orchestrator] Started runner for "${project.slug}" (${project._id}, agent=${desiredAgent})` +
               (autoSchedule ? "" : " (auto-scheduling disabled)"),
           );
         } catch (err) {
@@ -94,9 +108,41 @@ class Orchestrator {
           this.runners.delete(project._id);
         }
       } else if (hasPath && this.runners.has(project._id)) {
-        // Runner already exists — sync auto-scheduling with enabled state
+        // Runner already exists — sync auto-scheduling and recreate if path/provider changed
         const runner = this.runners.get(project._id);
         if (runner) {
+          const path = project.path;
+          if (!path) continue;
+          const runnerNeedsRestart =
+            runner.getProjectPath() !== path ||
+            runner.getProviderName() !== desiredAgent;
+
+          if (runnerNeedsRestart) {
+            console.log(
+              `[Orchestrator] Restarting runner for "${project.slug}" (${project._id}) to apply ${runner.getProjectPath() !== path ? "path" : "agent"} change`,
+            );
+            try {
+              await runner.destroy();
+              const replacement = new ProjectRunner(
+                project._id,
+                path,
+                createAgentProvider(desiredAgent),
+              );
+              this.runners.set(project._id, replacement);
+              const stats = await replacement.subscribe({
+                autoSchedule: project.enabled === true,
+              });
+              logRecoveryStats(project.slug, stats);
+            } catch (err) {
+              console.error(
+                `[Orchestrator] Failed to restart runner for "${project.slug}" (${project._id}):`,
+                err,
+              );
+              this.runners.delete(project._id);
+            }
+            continue;
+          }
+
           runner.setAutoSchedule(project.enabled === true);
         }
       }

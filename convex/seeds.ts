@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import { AgentKind } from "./schema";
 
 export const runAll = internalMutation({
   args: { projectId: v.id("projects") },
@@ -58,7 +59,7 @@ export const runAll = internalMutation({
     if (!existingConfig) {
       await ctx.db.insert("orchestratorConfig", {
         projectId,
-        agent: "claude",
+        agent: AgentKind.Claude,
         sessionTimeoutMs: 1800000, // 30 min
         maxFailures: 3,
         maxReviewIterations: 10,

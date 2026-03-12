@@ -160,22 +160,9 @@ export async function startServer() {
         return handleToolRequest(req, toolCtx as ToolContext);
 
       case "sse-activity": {
-        const runner = orchestrator.getRunner(projectId as Id<"projects">);
-        if (!runner) {
-          // Return a single SSE status event instead of throwing.
-          // The UI handles reconnection — this prevents error spam for disabled projects.
-          const body = `event: status\ndata: ${JSON.stringify({
-            state: "disabled",
-            message: "Project is not enabled or has no runner.",
-          })}\n\n`;
-          return new Response(body, {
-            headers: {
-              "Content-Type": "text/event-stream",
-              "Cache-Control": "no-cache",
-            },
-          });
-        }
-        const handler = createSSEHandler(() => runner);
+        const handler = createSSEHandler(() =>
+          orchestrator.getRunner(projectId as Id<"projects">),
+        );
         return handler(req);
       }
 
@@ -291,6 +278,26 @@ export async function startServer() {
       return new Response(Bun.file(join(distDir, "index.html")), {
         headers: { "Content-Type": "text/html" },
       });
+    };
+  } else {
+    // Dev mode: reverse-proxy to Vite for frontend assets and SPA routes
+    const VITE_ORIGIN = "http://localhost:8043";
+    routes["/*"] = async (req: Request) => {
+      const url = new URL(req.url);
+      const target = new URL(url.pathname + url.search, VITE_ORIGIN);
+      const headers = new Headers(req.headers);
+      headers.set("host", target.host);
+      try {
+        return await fetch(target, {
+          method: req.method,
+          headers,
+          body: req.body,
+        });
+      } catch {
+        return new Response("Vite dev server not reachable at " + VITE_ORIGIN, {
+          status: 502,
+        });
+      }
     };
   }
 

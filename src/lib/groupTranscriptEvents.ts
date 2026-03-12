@@ -1,3 +1,4 @@
+import type { AgentKindValue } from "$convex/schema";
 import { SessionEventDirection } from "$convex/schema";
 import {
   isDisplayableParsedLine,
@@ -25,7 +26,7 @@ export type TranscriptNode =
  * Walk the flat list of session events and produce interleaved transcript nodes.
  *
  * Output items (text + tool_use) are accumulated in chronological order.
- * When an input event arrives with tool_results, the pending output is flushed
+ * When a later event arrives with tool_results, the pending output is flushed
  * with tool_uses paired to their results — preserving the natural
  * think → act → result flow instead of batching all tool calls at the end.
  *
@@ -53,29 +54,28 @@ export function groupTranscriptEvents(
     content: string;
     sequence: number;
   }>,
+  agent: AgentKindValue | string = "claude",
 ): TranscriptNode[] {
   const nodes: TranscriptNode[] = [];
   // Pending output items (text + tool_use) in chronological order
   let pendingOutput: PendingOutputItem[] = [];
 
   for (const event of events) {
-    if (event.direction === SessionEventDirection.Input) {
-      const items = parseStreamLine(event.content).filter(
-        isDisplayableParsedLine,
-      );
+    const items = parseStreamLine(event.content, agent).filter(
+      isDisplayableParsedLine,
+    );
+    const toolResults = items.filter(
+      (p): p is Extract<ParsedLine, { kind: "tool_result" }> =>
+        p.kind === "tool_result",
+    );
 
-      // Check if this input event has tool_result items that match pending tool_uses
-      const toolResults = items.filter(
-        (p): p is Extract<ParsedLine, { kind: "tool_result" }> =>
-          p.kind === "tool_result",
-      );
-
+    if (toolResults.length > 0) {
       const pendingToolUses = pendingOutput.filter(
         (p): p is Extract<PendingOutputItem, { tag: "tool_use" }> =>
           p.tag === "tool_use",
       );
 
-      if (toolResults.length > 0 && pendingToolUses.length > 0) {
+      if (pendingToolUses.length > 0) {
         // Match tool_results to pending tool_uses by id
         const resultById = new Map<
           string,
@@ -147,46 +147,45 @@ export function groupTranscriptEvents(
             },
           });
         }
-        pendingOutput = [];
       } else {
-        // Flush any unmatched pending output before the input
+        // Flush any unmatched pending output before orphaned results.
         flushPendingInterleaved(nodes, pendingOutput, new Map());
-        pendingOutput = [];
 
-        // Non-tool input event — render as markdown (skip tool_result-only inputs that had no pending)
-        if (toolResults.length > 0) {
-          // Orphaned tool_results with no preceding tool_use — show them inline
-          for (const result of toolResults) {
-            nodes.push({
-              type: "tool_call",
-              key: `orphan_result:${event._id}:${result.toolUseId ?? nodes.length}`,
-              pair: {
-                toolUse: {
-                  kind: "tool_use",
-                  toolName: result.toolName ?? "unknown",
-                  toolId: result.toolUseId ?? "",
-                  toolInput: null,
-                  blockIndex: null,
-                },
-                toolResult: result,
-              },
-            });
-          }
-        } else {
+        for (const result of toolResults) {
           nodes.push({
-            type: "input",
-            key: `input:${event._id}`,
-            content: event.content,
+            type: "tool_call",
+            key: `orphan_result:${event._id}:${result.toolUseId ?? nodes.length}`,
+            pair: {
+              toolUse: {
+                kind: "tool_use",
+                toolName: result.toolName ?? "unknown",
+                toolId: result.toolUseId ?? "",
+                toolInput: null,
+                blockIndex: null,
+              },
+              toolResult: result,
+            },
           });
         }
       }
+
+      pendingOutput = [];
+      continue;
+    }
+
+    if (event.direction === SessionEventDirection.Input) {
+      // Flush any unmatched pending output before the next human/system input.
+      flushPendingInterleaved(nodes, pendingOutput, new Map());
+      pendingOutput = [];
+
+      nodes.push({
+        type: "input",
+        key: `input:${event._id}`,
+        content: event.content,
+      });
     } else {
       // Output event — accumulate text and tool_use items in chronological
       // order. They'll be emitted interleaved when results arrive or at end.
-      const items = parseStreamLine(event.content).filter(
-        isDisplayableParsedLine,
-      );
-
       for (const item of items) {
         if (item.kind === "tool_use") {
           // De-duplicate tool_use items by toolId — streaming events
@@ -272,7 +271,8 @@ function flushPendingInterleaved(
 export function isDisplayableEvent(
   direction: string,
   content: string,
+  agent: AgentKindValue | string = "claude",
 ): boolean {
   if (direction === SessionEventDirection.Input) return true;
-  return parseStreamLine(content).some(isDisplayableParsedLine);
+  return parseStreamLine(content, agent).some(isDisplayableParsedLine);
 }

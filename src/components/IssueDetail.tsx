@@ -17,6 +17,7 @@ import { IssueActionsToolbar } from "./IssueActionsToolbar";
 import { CLOSE_TYPE_LABELS } from "./IssueCloseForm";
 import { IssueDescriptionEditor } from "./IssueDescriptionEditor";
 import { IssueMetadata } from "./IssueMetadata";
+import { IssueSessionsList } from "./IssueSessionsList";
 import { IssueTitleEditor } from "./IssueTitleEditor";
 import { LabelBadge } from "./LabelBadge";
 import { LabelPicker } from "./LabelPicker";
@@ -279,6 +280,9 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           <Markdown content={currentIssue.closeReason} />
         </div>
       )}
+
+      {/* Sessions */}
+      <IssueSessionsList issueId={issueId} />
 
       {/* Metadata */}
       <IssueMetadata

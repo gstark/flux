@@ -40,3 +40,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Playwright MCP console logs
 .playwright-mcp/
 .octto/
+
+# Video pipeline generated files
+video/out/
+video/public/audio/
+video/public/memes/

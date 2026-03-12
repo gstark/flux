@@ -25,12 +25,7 @@ import {
 } from "../git";
 import { isProcessAlive } from "../process";
 import type { AgentProcess, AgentProvider, WorkPromptContext } from "./agents";
-import {
-  ClaudeCodeProvider,
-  Disposition,
-  parseDisposition,
-  StatusMessages,
-} from "./agents";
+import { Disposition, parseDisposition, StatusMessages } from "./agents";
 import { SessionMonitor } from "./monitor";
 
 /** Recovery stats returned by orphan recovery on startup. */
@@ -52,7 +47,7 @@ interface ActiveSession {
   timedOut: boolean;
   /** Git HEAD when the work session started */
   startHead: string;
-  /** Claude session UUID captured from stream-json output */
+  /** Provider-specific session ID captured from agent output */
   agentSessionId: string | null;
   /** True if persisting agentSessionId to Convex failed. A process restart would lose it. */
   agentSessionIdPersistFailed: boolean;
@@ -74,6 +69,7 @@ export type OrchestratorLifecycleEvent =
       sessionId: string;
       issueId: string;
       pid: number;
+      agent: string;
       monitor: SessionMonitor;
     }
   | {
@@ -123,7 +119,12 @@ class ProjectRunner {
   ) {
     this.projectId = projectId;
     this.projectPath = projectPath;
-    this.provider = provider ?? new ClaudeCodeProvider();
+    if (!provider) {
+      throw new Error(
+        "[ProjectRunner] provider is required. Runner construction must be explicit about agent selection.",
+      );
+    }
+    this.provider = provider;
   }
 
   /** Return the current filesystem path used as CWD for spawning agents. */
@@ -133,6 +134,10 @@ class ProjectRunner {
 
   getProjectId(): Id<"projects"> {
     return this.projectId;
+  }
+
+  getProviderName(): AgentProvider["name"] {
+    return this.provider.name;
   }
 
   /**
@@ -381,10 +386,17 @@ class ProjectRunner {
     }
 
     // 6. Build prompt and spawn agent with session context
+    const comments = await convex.query(api.comments.list, {
+      issueId,
+    });
     const issueCtx: WorkPromptContext = {
       shortId: issue.shortId,
       title: issue.title,
       description: issue.description,
+      comments:
+        comments.length > 0
+          ? comments.map((c) => ({ author: c.author, content: c.content }))
+          : undefined,
     };
     const prompt = this.provider.buildWorkPrompt(issueCtx);
     const agentProcess = this.provider.spawn({
@@ -428,11 +440,12 @@ class ProjectRunner {
       sessionId: session._id,
       issueId,
       pid: agentProcess.pid,
+      agent: this.provider.name,
       monitor,
     });
 
-    // 11. Wire up agentSessionId extraction from stream-json
-    this.wireAgentSessionIdExtraction(this.activeSession, monitor);
+    // 11. Wire up provider-specific output parsing (session IDs, etc.)
+    this.wireProviderOutput(this.activeSession, monitor);
 
     // 12. Handle agent exit in background (tracked so destroy() can await it)
     this.trackProcessExit(agentProcess);
@@ -497,9 +510,9 @@ class ProjectRunner {
     }
   }
 
-  // ── Agent session ID extraction ────────────────────────────────────
+  // ── Provider output parsing ────────────────────────────────────────
 
-  private wireAgentSessionIdExtraction(
+  private wireProviderOutput(
     active: ActiveSession,
     monitor: SessionMonitor,
   ): void {
@@ -507,15 +520,15 @@ class ProjectRunner {
     active.agentSessionIdPersistFailed = false;
 
     monitor.onLine((line) => {
-      if (active.agentSessionId) return;
-      try {
-        const obj = JSON.parse(line) as Record<string, unknown>;
-        if (obj.type === "system" && typeof obj.session_id === "string") {
-          active.agentSessionId = obj.session_id;
+      const events = this.provider.parseOutputLine(line);
+      for (const event of events) {
+        if (event.type === "session_id") {
+          if (active.agentSessionId) return;
+          active.agentSessionId = event.sessionId;
           getConvexClient()
             .mutation(api.sessions.update, {
               sessionId: active.sessionId,
-              agentSessionId: obj.session_id,
+              agentSessionId: event.sessionId,
             })
             .catch((err: unknown) => {
               active.agentSessionIdPersistFailed = true;
@@ -526,8 +539,6 @@ class ProjectRunner {
               );
             });
         }
-      } catch {
-        // Not JSON — ignore
       }
     });
   }
@@ -613,25 +624,32 @@ class ProjectRunner {
       const convex = getConvexClient();
       const { sessionId, issueId, timedOut, issue } = this.activeSession;
 
-      await convex.mutation(api.sessions.update, {
-        sessionId,
-        status: SessionStatus.Failed,
-        endedAt: Date.now(),
-        exitCode,
-        disposition: timedOut ? Disposition.Fault : undefined,
-        note: timedOut
-          ? `Session timed out after ${this.sessionTimeoutMs}ms (phase: ${this.activeSession.phase})`
-          : undefined,
-      });
-
-      if (timedOut) {
-        console.error(
-          `[ProjectRunner] Session timed out for ${issue.shortId} — incrementing failure count`,
-        );
-        await convex.mutation(api.issues.incrementFailure, {
-          issueId,
-          maxFailures: this.maxFailures,
+      try {
+        await convex.mutation(api.sessions.update, {
+          sessionId,
+          status: SessionStatus.Failed,
+          endedAt: Date.now(),
+          exitCode,
+          disposition: timedOut ? Disposition.Fault : undefined,
+          note: timedOut
+            ? `Session timed out after ${this.sessionTimeoutMs}ms (phase: ${this.activeSession.phase})`
+            : undefined,
         });
+
+        if (timedOut) {
+          console.error(
+            `[ProjectRunner] Session timed out for ${issue.shortId} — incrementing failure count`,
+          );
+          await convex.mutation(api.issues.incrementFailure, {
+            issueId,
+            maxFailures: this.maxFailures,
+          });
+        }
+      } catch (err) {
+        console.error(
+          `[ProjectRunner] Failed to update killed session ${sessionId}:`,
+          err,
+        );
       }
 
       this.finalize();
@@ -663,6 +681,25 @@ class ProjectRunner {
         "[ProjectRunner] Exit handler crashed — forcing finalize:",
         err,
       );
+      // Best-effort: mark the current session as Failed so it doesn't stay "running" forever.
+      // If this also fails (e.g. Convex still down), orphan recovery on next restart will catch it.
+      const crashedSessionId = this.activeSession?.sessionId;
+      if (crashedSessionId) {
+        try {
+          await getConvexClient().mutation(api.sessions.update, {
+            sessionId: crashedSessionId,
+            status: SessionStatus.Failed,
+            endedAt: Date.now(),
+            exitCode,
+          });
+        } catch (updateErr) {
+          console.error(
+            `[ProjectRunner] Failed to mark crashed session ${crashedSessionId} as Failed — ` +
+              "will require orphan recovery on next restart:",
+            updateErr,
+          );
+        }
+      }
       this.finalize();
     }
   }
@@ -684,7 +721,7 @@ class ProjectRunner {
     }
 
     const allLines = active.monitor.buffer.getAll();
-    const dispositionResult = parseDisposition(allLines);
+    const dispositionResult = parseDisposition(allLines, this.provider.name);
 
     if (active.agentSessionIdPersistFailed && active.agentSessionId) {
       console.warn(
@@ -793,7 +830,7 @@ class ProjectRunner {
         await convex.mutation(api.comments.create, {
           issueId,
           content:
-            "Retro skipped — no agent session ID captured from stream-json output.",
+            "Retro skipped — no provider session ID was captured from agent output.",
           author: CommentAuthor.Flux,
         });
       } catch (err) {
@@ -845,7 +882,7 @@ class ProjectRunner {
     }
 
     const allLines = active.monitor.buffer.getAll();
-    const retroResult = parseDisposition(allLines);
+    const retroResult = parseDisposition(allLines, this.provider.name);
     if (retroResult.success) {
       await convex.mutation(api.sessions.update, {
         sessionId,
@@ -880,7 +917,7 @@ class ProjectRunner {
     }
 
     const allLines = active.monitor.buffer.getAll();
-    const dispositionResult = parseDisposition(allLines);
+    const dispositionResult = parseDisposition(allLines, this.provider.name);
 
     if (active.agentSessionIdPersistFailed && active.agentSessionId) {
       console.warn(
@@ -1230,7 +1267,7 @@ class ProjectRunner {
     active.monitorDone = reviewMonitorDone;
     active.phase = SessionPhase.Review;
 
-    this.wireAgentSessionIdExtraction(active, reviewMonitor);
+    this.wireProviderOutput(active, reviewMonitor);
     this.emitLifecycle({ type: "monitor_changed", monitor: reviewMonitor });
 
     this.trackProcessExit(reviewProcess);
@@ -1273,6 +1310,7 @@ class ProjectRunner {
    * transitions to Idle, then schedules next work.
    */
   private finalize(): void {
+    this.clearSessionTimeout();
     this.clearPidWatchdog();
     this.activeSession = null;
     this.state = OrchestratorState.Idle;
@@ -1392,6 +1430,7 @@ class ProjectRunner {
       _id: Id<"sessions">;
       issueId: Id<"issues">;
       type: string;
+      agent: string;
       phase?: string;
       agentSessionId?: string;
       startHead?: string;
@@ -1474,6 +1513,7 @@ class ProjectRunner {
       sessionId: session._id,
       issueId: session.issueId,
       pid,
+      agent: session.agent,
       monitor: stubMonitor,
     });
 

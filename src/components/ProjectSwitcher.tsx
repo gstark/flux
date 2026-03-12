@@ -3,7 +3,7 @@ import {
   useMatches,
   useNavigate,
 } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useRef } from "react";
 import { api } from "$convex/_generated/api";
 import { useProjectSlug } from "../hooks/useProjectId";
@@ -80,6 +80,7 @@ export function ProjectSwitcher() {
   const matches = useMatches();
   const navigate = useNavigate();
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const updateProject = useMutation(api.projects.update);
 
   if (!projects) return null;
 
@@ -99,7 +100,23 @@ export function ProjectSwitcher() {
     <details ref={detailsRef} className="dropdown">
       <summary className="btn btn-ghost btn-sm gap-2 font-semibold">
         {current?.name ?? currentSlug}
-        {current && <ProjectStateBadge enabled={current.enabled} />}
+        {current && (
+          <button
+            type="button"
+            title={current.enabled ? "Click to disable" : "Click to enable"}
+            className="cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              updateProject({
+                projectId: current._id,
+                enabled: !current.enabled,
+              });
+            }}
+          >
+            <ProjectStateBadge enabled={current.enabled} />
+          </button>
+        )}
         <svg
           className="h-3 w-3 fill-current"
           xmlns="http://www.w3.org/2000/svg"

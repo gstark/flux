@@ -31,6 +31,7 @@ import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import { IssueStatus, SessionStatus } from "$convex/schema";
 import type {
+  AgentOutputEvent,
   AgentProcess,
   AgentProvider,
   ResumeOptions,
@@ -77,6 +78,10 @@ class MockAgentProvider implements AgentProvider {
 
   buildReviewPrompt(_ctx: ReviewPromptContext): string {
     return "mock review prompt";
+  }
+
+  parseOutputLine(_line: string): AgentOutputEvent[] {
+    return [];
   }
 
   spawn(opts: SpawnOptions): AgentProcess {
