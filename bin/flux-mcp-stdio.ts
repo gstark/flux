@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { callFluxTool } from "../src/server/fluxToolHttp";
 import { allTools } from "../src/server/tools/schema";
 
 const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
@@ -58,23 +59,13 @@ for (const tool of allTools) {
     if (sessionId) headers["X-Flux-Session-Id"] = sessionId;
     if (agentName) headers["X-Flux-Agent-Name"] = agentName;
 
-    const res = await fetch(toolsUrl, {
-      method: "POST",
+    return callFluxTool({
+      fluxUrl: FLUX_URL,
+      toolsUrl,
+      tool: tool.name,
+      payload: { tool: tool.name, args },
       headers,
-      body: JSON.stringify({ tool: tool.name, args }),
     });
-    if (!res.ok) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Flux server error: ${res.status} ${res.statusText}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    return res.json();
   });
 }
 
