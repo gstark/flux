@@ -103,7 +103,9 @@ export const IssuesListSchema = z.object({
 export const IssuesGetSchema = z.object({
   issueId: z
     .string()
-    .describe("The issue's document ID (from issues_list or issues_create)."),
+    .describe(
+      "The issue's document ID or short ID (e.g. LUCKYDO-42 or FLUX-42).",
+    ),
 });
 
 export const IssuesUpdateSchema = z.object({

@@ -203,13 +203,14 @@ const issues_list = typedHandler(
 );
 
 const issues_get = typedHandler(IssuesGetSchema, async ({ issueId }, ctx) => {
+  const resolvedIssueId = await resolveIssueId(ctx, issueId);
   const issue = await ctx.convex.query(api.issues.get, {
-    issueId: issueId as Id<"issues">,
+    issueId: resolvedIssueId,
   });
   if (!issue) {
     return error(
       ctx,
-      `Issue not found: ${issueId}. Use issues_list to find valid IDs.`,
+      `Issue not found: ${issueId}. Use issues_search to confirm the issue exists in this project.`,
     );
   }
   return ok(ctx, { issue });

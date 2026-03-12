@@ -15,16 +15,28 @@ function makeContext() {
       ];
     }
 
+    if (args.query === "LUCKYDO-999") {
+      return [];
+    }
+
     if (args.issueId === ("issues_doc_221" as Id<"issues">)) {
-      return [
-        {
-          _id: "comment_1",
-          issueId: "issues_doc_221",
-          content: "Resolved through short ID",
-          author: "agent",
-          createdAt: 1,
-        },
-      ];
+      if (args.limit === 50) {
+        return [
+          {
+            _id: "comment_1",
+            issueId: "issues_doc_221",
+            content: "Resolved through short ID",
+            author: "agent",
+            createdAt: 1,
+          },
+        ];
+      }
+
+      return {
+        _id: "issues_doc_221" as Id<"issues">,
+        shortId: "LUCKYDO-221",
+        title: "Issue 221",
+      };
     }
 
     throw new Error(`Unexpected query args: ${JSON.stringify(args)}`);
@@ -130,5 +142,75 @@ describe("comment tools short ID resolution", () => {
     };
     expect(payload.count).toBe(1);
     expect(payload.comments[0]?.content).toBe("Resolved through short ID");
+  });
+});
+
+describe("issues_get short ID resolution", () => {
+  test("issues_get resolves a short issue ID before query", async () => {
+    const { ctx, query, mutation } = makeContext();
+    const issuesGet = handlers.issues_get;
+    expect(issuesGet).toBeDefined();
+    if (!issuesGet) {
+      throw new Error("issues_get handler is not defined");
+    }
+
+    const result = await issuesGet(
+      {
+        issueId: "LUCKYDO-221",
+      },
+      ctx,
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(mutation).toHaveBeenCalledTimes(0);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({
+        projectId: "project_1",
+        query: "LUCKYDO-221",
+        limit: 10,
+      }),
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        issueId: "issues_doc_221",
+      }),
+    );
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as {
+      issue: { _id: string; shortId: string; title: string };
+    };
+    expect(payload.issue._id).toBe("issues_doc_221");
+    expect(payload.issue.shortId).toBe("LUCKYDO-221");
+    expect(payload.issue.title).toBe("Issue 221");
+  });
+
+  test("issues_get returns a guided lookup error for unknown short IDs", async () => {
+    const { ctx, query, mutation } = makeContext();
+    const issuesGet = handlers.issues_get;
+    expect(issuesGet).toBeDefined();
+    if (!issuesGet) {
+      throw new Error("issues_get handler is not defined");
+    }
+
+    const result = await issuesGet(
+      {
+        issueId: "LUCKYDO-999",
+      },
+      ctx,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(mutation).toHaveBeenCalledTimes(0);
+    const payload = JSON.parse(result.content[0]?.text ?? "{}") as {
+      error: string;
+    };
+    expect(payload.error).toBe(
+      "Issue not found for short ID LUCKYDO-999. Use issues_search to confirm the issue exists in this project.",
+    );
   });
 });
