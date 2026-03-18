@@ -314,6 +314,17 @@ export const PromptsSetReviewSchema = z.object({
 
 export const PromptsGetSchema = z.object({});
 
+export const PromptsGetDefaultsSchema = z.object({});
+
+export const PromptsResetSchema = z.object({
+  phase: z
+    .enum(["work", "retro", "review", "all"])
+    .optional()
+    .describe(
+      'Which prompt(s) to reset: "work", "retro", "review", or "all". Defaults to "all".',
+    ),
+});
+
 // ── ToolDef instances (derive .schema from Zod object .shape) ────────
 
 const issues_create: ToolDef = {
@@ -559,6 +570,20 @@ const prompts_get: ToolDef = {
   schema: PromptsGetSchema.shape,
 };
 
+const prompts_get_defaults: ToolDef = {
+  name: "prompts_get_defaults",
+  description:
+    "Get the default prompt templates for work, retro, and review phases. Returns the built-in prompt structure that Flux uses when no custom prompt is set. Useful for understanding what to build on when creating custom prompts.",
+  schema: PromptsGetDefaultsSchema.shape,
+};
+
+const prompts_reset: ToolDef = {
+  name: "prompts_reset",
+  description:
+    "Reset custom prompts to defaults (unset custom values). Can reset a specific phase or all phases at once.",
+  schema: PromptsResetSchema.shape,
+};
+
 // ── All tools ─────────────────────────────────────────────────────────
 
 export const allTools: ToolDef[] = [
@@ -615,6 +640,8 @@ export const allTools: ToolDef[] = [
   prompts_set_retro,
   prompts_set_review,
   prompts_get,
+  prompts_get_defaults,
+  prompts_reset,
 ];
 
 /** Lookup map for O(1) access by name. */

@@ -32,6 +32,7 @@ import {
   LabelsDeleteSchema,
   LabelsUpdateSchema,
   OrchestratorRunSchema,
+  PromptsResetSchema,
   PromptsSetRetroSchema,
   PromptsSetReviewSchema,
   PromptsSetWorkSchema,
@@ -710,6 +711,65 @@ const prompts_get: ToolHandler = safeHandler(async (_args, ctx) => {
   });
 });
 
+const prompts_get_defaults: ToolHandler = safeHandler(async (_args, ctx) => {
+  const { getDefaultPromptTemplates } = await import(
+    "../orchestrator/agents/prompts"
+  );
+  const defaults = getDefaultPromptTemplates();
+  return ok(ctx, {
+    message:
+      "Default prompt templates for reference. These show the core instructions used when no custom prompt is set.",
+    defaults,
+    placeholders: {
+      work: ["{{ISSUE}}"],
+      retro: ["{{SHORT_ID}}", "{{WORK_NOTE}}"],
+      review: [
+        "{{SHORT_ID}}",
+        "{{TITLE}}",
+        "{{DESCRIPTION}}",
+        "{{DIFF}}",
+        "{{COMMIT_LOG}}",
+        "{{REVIEW_ITERATION}}",
+        "{{MAX_REVIEW_ITERATIONS}}",
+        "{{RELATED_ISSUES}}",
+      ],
+    },
+    note: "Custom prompts automatically get the response format and safety instructions appended. Focus on project-specific guidance.",
+  });
+});
+
+const prompts_reset = typedHandler(
+  PromptsResetSchema,
+  async ({ phase = "all" }, ctx) => {
+    const updates: {
+      workPrompt?: string;
+      retroPrompt?: string;
+      reviewPrompt?: string;
+    } = {};
+
+    if (phase === "all" || phase === "work") {
+      updates.workPrompt = "";
+    }
+    if (phase === "all" || phase === "retro") {
+      updates.retroPrompt = "";
+    }
+    if (phase === "all" || phase === "review") {
+      updates.reviewPrompt = "";
+    }
+
+    await ctx.convex.mutation(api.projects.update, {
+      projectId: ctx.projectId,
+      ...updates,
+    });
+
+    const resetPhases = phase === "all" ? "all prompts" : `${phase} prompt`;
+    return ok(ctx, {
+      message: `Reset ${resetPhases} to default`,
+      reset: phase,
+    });
+  },
+);
+
 // ── Export all implemented handlers ───────────────────────────────────
 
 export const handlers: Record<string, ToolHandler> = {
@@ -749,4 +809,6 @@ export const handlers: Record<string, ToolHandler> = {
   prompts_set_retro,
   prompts_set_review,
   prompts_get,
+  prompts_get_defaults,
+  prompts_reset,
 };
