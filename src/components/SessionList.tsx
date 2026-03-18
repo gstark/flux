@@ -50,7 +50,7 @@ export function SessionList() {
       : Object.values(sessionCounts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 p-6">
       <h2 className="font-bold text-xl">Sessions</h2>
 
       <div role="tablist" className="tabs tabs-box">

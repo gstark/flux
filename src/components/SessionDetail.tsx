@@ -87,7 +87,7 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
   const isRunning = session.status === SessionStatus.Running;
 
   return (
-    <div ref={stickyRef} className="flex flex-col gap-6">
+    <div ref={stickyRef} className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Link
