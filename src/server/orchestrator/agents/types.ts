@@ -15,7 +15,9 @@ export type DispositionResult =
   | { success: true; disposition: Disposition; note: string }
   | { success: false; error: string };
 
-export type AgentOutputEvent = { type: "session_id"; sessionId: string };
+export type AgentOutputEvent =
+  | { type: "session_id"; sessionId: string }
+  | { type: "result" };
 
 // ── Prompt context types ─────────────────────────────────────────────
 

@@ -108,6 +108,9 @@ export class ClaudeCodeProvider implements AgentProvider {
       if (obj.type === "system" && typeof obj.session_id === "string") {
         return [{ type: "session_id", sessionId: obj.session_id }];
       }
+      if (obj.type === "result") {
+        return [{ type: "result" }];
+      }
     } catch {
       // Provider output is not guaranteed to be JSON on every line.
     }
@@ -135,10 +138,21 @@ function sendInitialPrompt(agent: AgentProcess, prompt: string): void {
 }
 
 function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
+  const rawStdin = proc.stdin as
+    | (AgentStdin & { end?: () => void })
+    | undefined;
+  const stdin: AgentStdin | null = rawStdin
+    ? {
+        write: (chunk) => rawStdin.write(chunk),
+        flush: () => rawStdin.flush(),
+        end: () => rawStdin.end?.(),
+      }
+    : null;
+
   return {
     pid: proc.pid,
     stdout: proc.stdout as ReadableStream<Uint8Array>,
-    stdin: (proc.stdin as AgentStdin | undefined) ?? null,
+    stdin,
     kill: () => proc.kill(),
     wait: async () => {
       const exitCode = await proc.exited;

@@ -553,6 +553,11 @@ class ProjectRunner {
                 err,
               );
             });
+        } else if (event.type === "result") {
+          // Close stdin so the agent sees EOF and exits.
+          // With --input-format stream-json, the process stays alive
+          // waiting for the next stdin message unless we signal completion.
+          active.process.stdin?.end();
         }
       }
     });
