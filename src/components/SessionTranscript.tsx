@@ -94,7 +94,7 @@ function TextNode({
 }: {
   node: Extract<TranscriptNode, { type: "text" }>;
 }) {
-  const text = node.parsed.text;
+  const text = node.parsed.text.trim();
   const isShort = text.split("\n").length <= 2 && text.length < 120;
 
   if (isShort) {
