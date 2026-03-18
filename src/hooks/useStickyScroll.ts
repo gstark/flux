@@ -1,4 +1,10 @@
-import { type RefObject, useEffect, useRef } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 /** Walk up the DOM to find the nearest ancestor with overflow scroll/auto. */
 function findScrollParent(el: HTMLElement): HTMLElement | null {
@@ -9,24 +15,6 @@ function findScrollParent(el: HTMLElement): HTMLElement | null {
     node = node.parentElement;
   }
   return null;
-}
-
-/**
- * Returns a ref that resolves to the nearest scrollable ancestor of `anchorRef`.
- * Useful when the component doesn't own its scroll container (e.g. page content
- * inside a layout's `<main overflow-auto>`).
- */
-export function useScrollParent(
-  anchorRef: RefObject<HTMLElement | null>,
-): RefObject<HTMLElement | null> {
-  const scrollParentRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const anchor = anchorRef.current;
-    scrollParentRef.current = anchor ? findScrollParent(anchor) : null;
-  }, [anchorRef]);
-
-  return scrollParentRef;
 }
 
 /**
@@ -70,4 +58,46 @@ export function useStickyScroll(
       el.scrollTop = el.scrollHeight;
     }
   }, [trigger]);
+}
+
+/**
+ * Sticky auto-scroll that finds and uses the nearest scrollable ancestor.
+ *
+ * Returns a callback ref to attach to any element inside the scroll container.
+ * When the element mounts, the hook finds the nearest scrollable ancestor and
+ * binds the sticky scroll behavior to it.
+ *
+ * @param trigger  - Value that changes when new content arrives.
+ * @param threshold - Pixel tolerance for "at bottom" detection. Default 40.
+ */
+export function useStickyScrollParent(trigger: unknown, threshold = 40) {
+  const isSticky = useRef(true);
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+
+  const callbackRef = useCallback((node: HTMLElement | null) => {
+    setScrollParent(node ? findScrollParent(node) : null);
+  }, []);
+
+  useEffect(() => {
+    if (!scrollParent) return;
+
+    function handleScroll() {
+      const el = scrollParent as HTMLElement;
+      const atBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      isSticky.current = atBottom;
+    }
+
+    scrollParent.addEventListener("scroll", handleScroll, { passive: true });
+    return () => scrollParent.removeEventListener("scroll", handleScroll);
+  }, [scrollParent, threshold]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: trigger is the intentional dependency for scrolling on new content
+  useEffect(() => {
+    if (isSticky.current && scrollParent) {
+      scrollParent.scrollTop = scrollParent.scrollHeight;
+    }
+  }, [trigger]);
+
+  return callbackRef;
 }
