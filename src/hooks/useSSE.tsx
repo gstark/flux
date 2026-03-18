@@ -11,10 +11,10 @@ import {
 /**
  * Subscribable event types on the shared SSE connection.
  *
- * - "session_start" / "activity" / "status" — SSE named events from the server
+ * - "session_start" / "status" — SSE named events from the server
  * - "open" — fired on every (re)connect so consumers can refetch stale data
  */
-type SSEEventType = "session_start" | "activity" | "status" | "open";
+type SSEEventType = "session_start" | "status" | "open";
 
 type SSEListener = (event: MessageEvent) => void;
 
@@ -29,7 +29,7 @@ const SSEContext = createContext<SSEContextValue | null>(null);
 
 /**
  * Provider that manages a single EventSource connection to /sse/projects/:projectId/activity.
- * All consumers share this connection — no duplicate subscriptions.
+ * Streams session_start and status events. All consumers share this connection.
  *
  * Reconnects automatically with exponential backoff (1s → 30s max).
  */
@@ -101,9 +101,8 @@ export function SSEProvider({
       });
 
       // Wire server-sent event types to the listener map.
-      const serverTypes: Array<"session_start" | "activity" | "status"> = [
+      const serverTypes: Array<"session_start" | "status"> = [
         "session_start",
-        "activity",
         "status",
       ];
       for (const type of serverTypes) {

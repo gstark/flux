@@ -2,7 +2,6 @@ import type {
   ProjectRunner,
   ProjectRunnerLifecycleEvent,
 } from "./orchestrator";
-import type { SessionMonitor } from "./orchestrator/monitor";
 
 /** How often to send a keepalive comment to prevent proxy timeouts. */
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -10,9 +9,9 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 const RUNNER_SYNC_INTERVAL_MS = 1_000;
 
 /**
- * Create an SSE handler for a project-scoped SSE activity endpoint.
- * Keeps connections open persistently — pushes session start/end events
- * and live agent output without requiring client reconnection.
+ * Create an SSE handler for a project-scoped SSE endpoint.
+ * Keeps connections open persistently — pushes session start/end
+ * and status events without requiring client reconnection.
  */
 export function createSSEHandler(getRunner: () => ProjectRunner | undefined) {
   return (req: Request): Response => {
@@ -30,31 +29,10 @@ export function createSSEHandler(getRunner: () => ProjectRunner | undefined) {
           }
         }
 
-        // ── Track the current monitor subscription so we can swap it ──
-        let currentUnsub: (() => void) | null = null;
         let currentRunner: ProjectRunner | undefined;
         let unsubLifecycle: (() => void) | null = null;
         let lastStatusKey: string | null = null;
         let lastSessionKey: string | null = null;
-
-        function subscribeToMonitor(monitor: SessionMonitor): void {
-          // Unsubscribe from any previous monitor
-          currentUnsub?.();
-
-          // Send buffered history from the new monitor
-          for (const line of monitor.buffer.getAll()) {
-            if (!send(formatSSE("activity", { type: "line", content: line })))
-              return;
-          }
-
-          // Stream new lines as they arrive
-          currentUnsub = monitor.onLine((line) => {
-            if (!send(formatSSE("activity", { type: "line", content: line }))) {
-              currentUnsub?.();
-              currentUnsub = null;
-            }
-          });
-        }
 
         function sendStatusOnce(state: string, message: string): void {
           const key = `${state}:${message}`;
@@ -87,8 +65,6 @@ export function createSSEHandler(getRunner: () => ProjectRunner | undefined) {
         }
 
         function detachRunner(): void {
-          currentUnsub?.();
-          currentUnsub = null;
           unsubLifecycle?.();
           unsubLifecycle = null;
           currentRunner = undefined;
@@ -100,8 +76,6 @@ export function createSSEHandler(getRunner: () => ProjectRunner | undefined) {
           const status = runner.getStatus();
           if (status.activeSession) {
             sendSessionStartOnce(runner);
-            const monitor = runner.getActiveMonitor();
-            if (monitor) subscribeToMonitor(monitor);
           } else {
             sendStatusOnce(status.state, "No active session");
           }
@@ -111,14 +85,9 @@ export function createSSEHandler(getRunner: () => ProjectRunner | undefined) {
               if (event.type === "session_start") {
                 lastSessionKey = null;
                 sendSessionStartOnce(runner);
-                subscribeToMonitor(event.monitor);
               } else if (event.type === "session_end") {
-                currentUnsub?.();
-                currentUnsub = null;
                 lastSessionKey = null;
                 sendStatusOnce(event.state, "Session ended");
-              } else if (event.type === "monitor_changed") {
-                subscribeToMonitor(event.monitor);
               } else if (event.type === "state_change") {
                 sendStatusOnce(event.state, "State changed");
               }
