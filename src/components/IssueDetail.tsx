@@ -149,7 +149,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
     .filter((l): l is NonNullable<typeof l> => l !== undefined);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-6">
       {/* Mutation error banner */}
       <ErrorBanner error={mutationError} onDismiss={clearError} />
 
