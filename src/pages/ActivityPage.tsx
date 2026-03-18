@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef } from "react";
 import { Markdown } from "../components/Markdown";
+import { NudgeInput } from "../components/NudgeInput";
 import { Timestamp } from "../components/Timestamp";
 import { ToolCallCard } from "../components/ToolCallCard";
 import {
@@ -513,6 +514,13 @@ export function ActivityPage() {
           </div>
         )}
       </div>
+
+      {/* Nudge input — only when a session is active */}
+      {currentSession && (
+        <div className="border-base-300 border-t px-1 py-3">
+          <NudgeInput />
+        </div>
+      )}
     </div>
   );
 }

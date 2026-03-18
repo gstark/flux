@@ -7,6 +7,31 @@ import {
   type ToolCallPair,
 } from "./parseStreamLine";
 
+/**
+ * Extract the human-readable message from a stream-json input event payload.
+ *
+ * Nudge messages are recorded as the raw JSON envelope sent to the agent's stdin:
+ *   {"type":"user","message":{"role":"user","content":"the actual message"}}
+ *
+ * This extracts the inner `content` string so the transcript shows the user's
+ * message rather than raw JSON. Returns the original string for non-JSON or
+ * non-matching payloads (e.g. initial prompts, system messages).
+ */
+function extractInputContent(raw: string): string {
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    if (obj.type === "user") {
+      const message = obj.message as Record<string, unknown> | undefined;
+      if (message && typeof message.content === "string") {
+        return message.content;
+      }
+    }
+  } catch {
+    // Not JSON — return as-is
+  }
+  return raw;
+}
+
 // -- Transcript grouping types ------------------------------------------------
 
 /**
@@ -225,7 +250,7 @@ export function groupTranscriptEvents(
         type: "input",
         key: `input:${event._id}`,
         timestamp: event.timestamp,
-        content: event.content,
+        content: extractInputContent(event.content),
       });
     } else {
       // Output event — accumulate text and tool_use items in chronological

@@ -269,43 +269,49 @@ function parseClaudeStreamLine(line: string): ParsedLine[] {
     return [{ kind: "skip" }];
   }
 
-  // ── user: tool results ───────────────────────────────────────────
+  // ── user: tool results or nudge messages ────────────────────────
   if (obj.type === "user") {
     const message = obj.message as Record<string, unknown> | undefined;
-    if (message && Array.isArray(message.content)) {
-      const blocks = message.content as Array<Record<string, unknown>>;
-      const toolResults = blocks.filter((b) => b.type === "tool_result");
-      if (toolResults.length > 0) {
-        const results: ParsedLine[] = [];
-        for (const toolResult of toolResults) {
-          let content = "";
-          if (typeof toolResult.content === "string") {
-            content = toolResult.content;
-          } else if (Array.isArray(toolResult.content)) {
-            const textParts = (
-              toolResult.content as Array<Record<string, unknown>>
-            )
-              .filter((b) => b.type === "text" && typeof b.text === "string")
-              .map((b) => b.text as string);
-            content = textParts.join("");
+    if (message) {
+      // Nudge: plain text content (not tool_result blocks)
+      if (typeof message.content === "string") {
+        return [{ kind: "text", text: message.content, source: "full" }];
+      }
+      if (Array.isArray(message.content)) {
+        const blocks = message.content as Array<Record<string, unknown>>;
+        const toolResults = blocks.filter((b) => b.type === "tool_result");
+        if (toolResults.length > 0) {
+          const results: ParsedLine[] = [];
+          for (const toolResult of toolResults) {
+            let content = "";
+            if (typeof toolResult.content === "string") {
+              content = toolResult.content;
+            } else if (Array.isArray(toolResult.content)) {
+              const textParts = (
+                toolResult.content as Array<Record<string, unknown>>
+              )
+                .filter((b) => b.type === "text" && typeof b.text === "string")
+                .map((b) => b.text as string);
+              content = textParts.join("");
+            }
+            // Truncate long tool results for the activity stream
+            const maxLen = 500;
+            const truncated =
+              content.length > maxLen
+                ? `${content.slice(0, maxLen)}… (${content.length} chars)`
+                : content;
+            results.push({
+              kind: "tool_result",
+              toolUseId:
+                typeof toolResult.tool_use_id === "string"
+                  ? toolResult.tool_use_id
+                  : null,
+              toolName: null,
+              content: truncated,
+            });
           }
-          // Truncate long tool results for the activity stream
-          const maxLen = 500;
-          const truncated =
-            content.length > maxLen
-              ? `${content.slice(0, maxLen)}… (${content.length} chars)`
-              : content;
-          results.push({
-            kind: "tool_result",
-            toolUseId:
-              typeof toolResult.tool_use_id === "string"
-                ? toolResult.tool_use_id
-                : null,
-            toolName: null,
-            content: truncated,
-          });
+          return results;
         }
-        return results;
       }
     }
     return [{ kind: "skip" }];
