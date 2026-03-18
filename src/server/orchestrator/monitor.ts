@@ -146,7 +146,7 @@ export class SessionMonitor {
     });
     this.sequence++;
 
-    // 4. Notify SSE listeners
+    // 4. Notify line listeners (used by wireProviderOutput for structured event parsing)
     const broken: ((line: string) => void)[] = [];
     for (const listener of this.lineListeners) {
       try {
@@ -162,7 +162,7 @@ export class SessionMonitor {
     for (const b of broken) this.lineListeners.delete(b);
   }
 
-  /** Register an SSE listener. Returns an unsubscribe function. */
+  /** Register a line listener. Returns an unsubscribe function. */
   onLine(callback: (line: string) => void): () => void {
     this.lineListeners.add(callback);
     return () => this.lineListeners.delete(callback);
