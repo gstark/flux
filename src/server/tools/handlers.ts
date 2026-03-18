@@ -32,6 +32,9 @@ import {
   LabelsDeleteSchema,
   LabelsUpdateSchema,
   OrchestratorRunSchema,
+  PromptsSetRetroSchema,
+  PromptsSetReviewSchema,
+  PromptsSetWorkSchema,
   SessionsListSchema,
   SessionsShowSchema,
 } from "./schema";
@@ -638,6 +641,75 @@ const labels_delete = typedHandler(
   },
 );
 
+// ── Prompts ──────────────────────────────────────────────────────────
+
+const prompts_set_work = typedHandler(
+  PromptsSetWorkSchema,
+  async ({ prompt }, ctx) => {
+    // Always pass the prompt value - empty string effectively clears it
+    await ctx.convex.mutation(api.projects.update, {
+      projectId: ctx.projectId,
+      workPrompt: prompt,
+    });
+    return ok(ctx, {
+      message: prompt
+        ? "Work prompt updated"
+        : "Work prompt cleared (using default)",
+      prompt: prompt || null,
+    });
+  },
+);
+
+const prompts_set_retro = typedHandler(
+  PromptsSetRetroSchema,
+  async ({ prompt }, ctx) => {
+    // Always pass the prompt value - empty string effectively clears it
+    await ctx.convex.mutation(api.projects.update, {
+      projectId: ctx.projectId,
+      retroPrompt: prompt,
+    });
+    return ok(ctx, {
+      message: prompt
+        ? "Retro prompt updated"
+        : "Retro prompt cleared (using default)",
+      prompt: prompt || null,
+    });
+  },
+);
+
+const prompts_set_review = typedHandler(
+  PromptsSetReviewSchema,
+  async ({ prompt }, ctx) => {
+    // Always pass the prompt value - empty string effectively clears it
+    await ctx.convex.mutation(api.projects.update, {
+      projectId: ctx.projectId,
+      reviewPrompt: prompt,
+    });
+    return ok(ctx, {
+      message: prompt
+        ? "Review prompt updated"
+        : "Review prompt cleared (using default)",
+      prompt: prompt || null,
+    });
+  },
+);
+
+const prompts_get: ToolHandler = safeHandler(async (_args, ctx) => {
+  const project = await ctx.convex.query(api.projects.getById, {
+    projectId: ctx.projectId,
+  });
+  if (!project) {
+    return error(ctx, "Project not found");
+  }
+  return ok(ctx, {
+    prompts: {
+      work: project.workPrompt ?? null,
+      retro: project.retroPrompt ?? null,
+      review: project.reviewPrompt ?? null,
+    },
+  });
+});
+
 // ── Export all implemented handlers ───────────────────────────────────
 
 export const handlers: Record<string, ToolHandler> = {
@@ -673,4 +745,8 @@ export const handlers: Record<string, ToolHandler> = {
   orchestrator_status,
   sessions_list,
   sessions_show,
+  prompts_set_work,
+  prompts_set_retro,
+  prompts_set_review,
+  prompts_get,
 };

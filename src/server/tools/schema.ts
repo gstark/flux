@@ -288,6 +288,32 @@ export const OrchestratorKillSchema = z.object({});
 
 export const OrchestratorStatusSchema = z.object({});
 
+export const PromptsSetWorkSchema = z.object({
+  prompt: z
+    .string()
+    .describe(
+      "Custom prompt text for the work phase. Pass empty string to clear.",
+    ),
+});
+
+export const PromptsSetRetroSchema = z.object({
+  prompt: z
+    .string()
+    .describe(
+      "Custom prompt text for the retro phase. Pass empty string to clear.",
+    ),
+});
+
+export const PromptsSetReviewSchema = z.object({
+  prompt: z
+    .string()
+    .describe(
+      "Custom prompt text for the review phase. Pass empty string to clear.",
+    ),
+});
+
+export const PromptsGetSchema = z.object({});
+
 // ── ToolDef instances (derive .schema from Zod object .shape) ────────
 
 const issues_create: ToolDef = {
@@ -505,6 +531,34 @@ const orchestrator_status: ToolDef = {
   schema: OrchestratorStatusSchema.shape,
 };
 
+const prompts_set_work: ToolDef = {
+  name: "prompts_set_work",
+  description:
+    "Set or clear the custom work phase prompt for the active project. The work phase prompt is appended to the agent's system message during issue work sessions.",
+  schema: PromptsSetWorkSchema.shape,
+};
+
+const prompts_set_retro: ToolDef = {
+  name: "prompts_set_retro",
+  description:
+    "Set or clear the custom retro phase prompt for the active project. The retro phase prompt is appended to the agent's system message during retrospective sessions.",
+  schema: PromptsSetRetroSchema.shape,
+};
+
+const prompts_set_review: ToolDef = {
+  name: "prompts_set_review",
+  description:
+    "Set or clear the custom review phase prompt for the active project. The review phase prompt is appended to the agent's system message during review sessions.",
+  schema: PromptsSetReviewSchema.shape,
+};
+
+const prompts_get: ToolDef = {
+  name: "prompts_get",
+  description:
+    "Get all custom prompts (work, retro, review) for the active project. Returns null for any prompt that has not been set.",
+  schema: PromptsGetSchema.shape,
+};
+
 // ── All tools ─────────────────────────────────────────────────────────
 
 export const allTools: ToolDef[] = [
@@ -555,6 +609,12 @@ export const allTools: ToolDef[] = [
   orchestrator_run,
   orchestrator_kill,
   orchestrator_status,
+
+  // Prompts
+  prompts_set_work,
+  prompts_set_retro,
+  prompts_set_review,
+  prompts_get,
 ];
 
 /** Lookup map for O(1) access by name. */
