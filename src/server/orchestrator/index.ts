@@ -965,15 +965,23 @@ class ProjectRunner {
       );
     }
 
+    // Mark the work session Completed now that retro is done — startRetro
+    // re-opened it as Running so the UI could show NudgeInput during retro.
+    let endHead: string | undefined;
     try {
-      const endHead = await getCurrentHead(cwd);
-      await convex.mutation(api.sessions.update, {
-        sessionId,
-        endHead,
-      });
+      endHead = await getCurrentHead(cwd);
     } catch (err) {
-      console.error("[ProjectRunner] Post-retro endHead update failed:", err);
+      console.warn(
+        `[ProjectRunner] Failed to capture endHead after retro for ${issue.shortId}:`,
+        err,
+      );
     }
+    await convex.mutation(api.sessions.update, {
+      sessionId,
+      status: SessionStatus.Completed,
+      endedAt: Date.now(),
+      ...(endHead !== undefined && { endHead }),
+    });
 
     const retroResult = this.resolveDisposition(active);
     if (retroResult.success) {
