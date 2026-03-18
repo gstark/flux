@@ -78,7 +78,7 @@ export function IssueList() {
       : Object.values(issueCounts).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 p-6">
       <h2 className="font-bold text-xl">Issues</h2>
 
       <div role="tablist" className="tabs tabs-box">

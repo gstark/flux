@@ -270,7 +270,7 @@ export function SettingsForm() {
   const isEnabled = project.enabled ?? false;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
       <h1 className="font-bold text-xl">Settings</h1>
 
       {/* ── Project Identity ─────────────────────────────────────── */}
