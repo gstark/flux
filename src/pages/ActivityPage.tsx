@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import { Markdown } from "../components/Markdown";
 import { NudgeInput } from "../components/NudgeInput";
 import { Timestamp } from "../components/Timestamp";
@@ -8,6 +8,7 @@ import {
   useActivityStream,
 } from "../hooks/useActivityStream";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { useStickyScroll } from "../hooks/useStickyScroll";
 import {
   isDisplayableParsedLine,
   type ParsedLine,
@@ -414,7 +415,6 @@ export function ActivityPage() {
   useDocumentTitle("Activity");
   const { events, connected, clear, currentSession } = useActivityStream();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const autoScroll = useRef(true);
 
   // Incrementally accumulate streaming tool input from input_json_delta chunks.
   // The ref holds mutable accumulator state; useMemo triggers re-resolution
@@ -440,26 +440,12 @@ export function ActivityPage() {
     return new Set(toolCallKeys.slice(-MAX_EXPANDED_TOOL_CALLS));
   }, [displayNodes]);
 
-  // Track whether user has scrolled away from the bottom
-  function handleScroll() {
-    const el = scrollRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    autoScroll.current = atBottom;
-  }
-
-  // Auto-scroll to bottom when new events arrive.
-  // Use last event id (not events.length) so this fires even when the array
-  // is capped at MAX_EVENTS and length stops changing.
+  // Sticky auto-scroll: stays pinned to bottom when new events arrive,
+  // but disengages when the user scrolls up. Use last event id (not
+  // events.length) so this fires even when the array is capped at MAX_EVENTS.
   const lastEvent = events[events.length - 1];
   const lastEventId = lastEvent !== undefined ? lastEvent.id : -1;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: lastEventId is the stable trigger for new events
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (autoScroll.current && el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [lastEventId]);
+  useStickyScroll(scrollRef, lastEventId);
 
   return (
     <div className="flex h-full flex-col">
@@ -491,11 +477,7 @@ export function ActivityPage() {
       )}
 
       {/* Live output */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="min-h-0 grow overflow-y-auto p-1"
-      >
+      <div ref={scrollRef} className="min-h-0 grow overflow-y-auto p-1">
         {events.length === 0 ? (
           <div className="py-8 text-center text-base-content/40 italic">
             {connected

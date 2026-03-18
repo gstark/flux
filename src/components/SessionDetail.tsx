@@ -1,12 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { usePaginatedQuery, useQuery } from "convex/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
 import type { DispositionValue } from "$convex/schema";
 import { SessionStatus } from "$convex/schema";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useProjectSlug } from "../hooks/useProjectId";
+import { useScrollParent, useStickyScroll } from "../hooks/useStickyScroll";
 import { typeLabel } from "../lib/format";
 import {
   groupTranscriptEvents,
@@ -47,6 +48,12 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
 
   const handleLoadMore = useCallback(() => loadMore(200), [loadMore]);
 
+  // Sticky auto-scroll for running sessions: pin the parent <main> scroll
+  // container to the bottom as new transcript events arrive.
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const scrollParentRef = useScrollParent(anchorRef);
+  useStickyScroll(scrollParentRef, events.length);
+
   useDocumentTitle(
     session
       ? session.issueShortId
@@ -81,7 +88,7 @@ export function SessionDetail({ sessionId }: { sessionId: Id<"sessions"> }) {
   const isRunning = session.status === SessionStatus.Running;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={anchorRef} className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center gap-2">
         <Link
