@@ -39,7 +39,7 @@ export function buildWorkPrompt(ctx: WorkPromptContext): string {
   if (ctx.customPrompt) {
     parts.push(injectIssueContext(ctx.customPrompt, ctx));
     parts.push(SUBAGENT_SAFETY_SECTION);
-    parts.push(RESPONSE_FORMAT_WORK);
+    parts.push(DISPOSITION_SECTION);
     return parts.join("\n");
   }
 
@@ -103,7 +103,7 @@ You have access to the \`flux\` MCP server. Use it to:
 - Add comments to this issue: \`comments_create\`
 - Check system health via \`_meta\` in any response
 
-**Do NOT close, update status, or modify the assigned issue.** The orchestrator manages the full issue lifecycle (work → retro → review → close) based on your disposition. Report your outcome via the disposition JSON and let the orchestrator handle the rest.`);
+**Do NOT close, update status, or modify the assigned issue.** The orchestrator manages the full issue lifecycle (work → retro → review → close) based on your disposition.`);
 
   parts.push(SUBAGENT_SAFETY_SECTION);
 
@@ -133,7 +133,7 @@ You have access to the \`flux\` MCP server. Use it to:
   }
 
   // Response format
-  parts.push(RESPONSE_FORMAT_WORK);
+  parts.push(DISPOSITION_SECTION);
 
   return parts.join("\n");
 }
@@ -156,7 +156,7 @@ export function buildRetroPrompt(ctx: RetroPromptContext): string {
   // If custom prompt is provided, use it with placeholder injection
   if (ctx.customPrompt) {
     parts.push(injectRetroContext(ctx.customPrompt, ctx));
-    parts.push(RESPONSE_FORMAT_RETRO);
+    parts.push(DISPOSITION_SECTION);
     return parts.join("\n");
   }
 
@@ -200,7 +200,7 @@ Priority guidance:
 If you have no findings, that is fine — not every session produces retro items.`);
 
   // Response format
-  parts.push(RESPONSE_FORMAT_RETRO);
+  parts.push(DISPOSITION_SECTION);
 
   return parts.join("\n");
 }
@@ -241,7 +241,7 @@ export function buildReviewPrompt(ctx: ReviewPromptContext): string {
   // If custom prompt is provided, use it with placeholder injection
   if (ctx.customPrompt) {
     parts.push(injectReviewContext(ctx.customPrompt, ctx));
-    parts.push(RESPONSE_FORMAT_REVIEW);
+    parts.push(DISPOSITION_SECTION);
     return parts.join("\n");
   }
 
@@ -381,12 +381,12 @@ Use the \`flux\` MCP server to:
 - Add review comments: \`comments_create\``);
 
   // Response format
-  parts.push(RESPONSE_FORMAT_REVIEW);
+  parts.push(DISPOSITION_SECTION);
 
   return parts.join("\n");
 }
 
-// ── Response format fragments ────────────────────────────────────────
+// ── Shared prompt sections ───────────────────────────────────────────
 
 const SUBAGENT_SAFETY_SECTION = `
 ## Subagent Safety
@@ -395,52 +395,13 @@ Flux sessions run in the shared project checkout. Do NOT spawn read-only/explore
 
 Perform read-only exploration yourself with the local search/read tools. If you truly need delegation, only spawn a write-capable worker for a bounded file set you intend to inspect and keep. Run \`git status --short\` immediately after that worker returns and treat any unexpected file change as a failure that must be fixed before you continue.`;
 
-const RESPONSE_FORMAT_WORK = `
-## Response Format
+// The StructuredOutput tool (injected by --json-schema) has full descriptions
+// for each disposition value and the note field. The prompt only needs to tell
+// the agent to call it — the schema carries the semantics.
+const DISPOSITION_SECTION = `
+## Disposition
 
-When you are finished, output this JSON as the VERY LAST thing you write:
-
-\`\`\`json
-{"disposition": "<done|noop|fault>", "note": "<what you did or why>"}
-\`\`\`
-
-Disposition meanings:
-- "done": You completed the task successfully. Work was performed and committed.
-- "noop": You determined no work was needed (already fixed, duplicate, not applicable). Explain why.
-- "fault": You could NOT complete the task due to an operational problem (missing access, unclear requirements, tooling failure). This does NOT mean the code is bad — it means the task itself could not run. Explain the blocker.
-
-This JSON MUST be the last thing you output. Nothing after it.`;
-
-const RESPONSE_FORMAT_RETRO = `
-## Response Format
-
-When you are finished, output this JSON as the VERY LAST thing you write:
-
-\`\`\`json
-{"disposition": "<done|noop|fault>", "note": "<summary of findings>"}
-\`\`\`
-
-- "done": You created follow-up issues from your findings.
-- "noop": You reflected and found nothing actionable.
-- "fault": You could not complete the retro due to an operational problem.
-
-This JSON MUST be the last thing you output. Nothing after it.`;
-
-const RESPONSE_FORMAT_REVIEW = `
-## Response Format
-
-When you are finished, output this JSON as the VERY LAST thing you write:
-
-\`\`\`json
-{"disposition": "<done|noop|fault>", "note": "<summary of review>"}
-\`\`\`
-
-For reviews:
-- "done": Review completed. You either fixed things inline, created follow-up issues, or both.
-- "noop": Review completed. The code is clean — no issues found.
-- "fault": You could NOT complete the review due to an operational problem (not a code quality judgment).
-
-This JSON MUST be the last thing you output. Nothing after it.`;
+When you are finished, use the StructuredOutput tool to report your disposition.`;
 
 // ── Disposition Parser ───────────────────────────────────────────────
 
@@ -647,7 +608,7 @@ You have access to the \`flux\` MCP server. Use it to:
 - Add comments to this issue: \`comments_create\`
 - Check system health via \`_meta\` in any response
 
-**Do NOT close, update status, or modify the assigned issue.** The orchestrator manages the full issue lifecycle (work → retro → review → close) based on your disposition. Report your outcome via the disposition JSON and let the orchestrator handle the rest.
+**Do NOT close, update status, or modify the assigned issue.** The orchestrator manages the full issue lifecycle (work → retro → review → close) based on your disposition.
 
 ## Subagent Safety
 
@@ -659,20 +620,9 @@ Perform read-only exploration yourself with the local search/read tools. If you 
 
 Use the {{ISSUE}} placeholder in your custom prompt to inject the full issue text (title, description, comments).
 
-## Response Format
+## Disposition
 
-When you are finished, output this JSON as the VERY LAST thing you write:
-
-\`\`\`json
-{"disposition": "<done|noop|fault>", "note": "<what you did or why>"}
-\`\`\`
-
-Disposition meanings:
-- "done": You completed the task successfully. Work was performed and committed.
-- "noop": You determined no work was needed (already fixed, duplicate, not applicable). Explain why.
-- "fault": You could NOT complete the task due to an operational problem (missing access, unclear requirements, tooling failure). This does NOT mean the code is bad — it means the task itself could not run. Explain the blocker.
-
-This JSON MUST be the last thing you output. Nothing after it.`;
+When you are finished, use the StructuredOutput tool to report your disposition.`;
 
   const retro = `## Retrospective: {{SHORT_ID}}
 
@@ -706,19 +656,9 @@ Priority guidance:
 
 If you have no findings, that is fine — not every session produces retro items.
 
-## Response Format
+## Disposition
 
-When you are finished, output this JSON as the VERY LAST thing you write:
-
-\`\`\`json
-{"disposition": "<done|noop|fault>", "note": "<summary of findings>"}
-\`\`\`
-
-- "done": You created follow-up issues from your findings.
-- "noop": You reflected and found nothing actionable.
-- "fault": You could not complete the retro due to an operational problem.
-
-This JSON MUST be the last thing you output. Nothing after it.`;
+When you are finished, use the StructuredOutput tool to report your disposition.`;
 
   const review = `You are a Flux code review agent. You are reviewing changes made for an issue.
 
@@ -788,20 +728,9 @@ Use the \`flux\` MCP server to:
 - Search for duplicates before filing: \`issues_search\`
 - Add review comments: \`comments_create\`
 
-## Response Format
+## Disposition
 
-When you are finished, output this JSON as the VERY LAST thing you write:
-
-\`\`\`json
-{"disposition": "<done|noop|fault>", "note": "<summary of review>"}
-\`\`\`
-
-For reviews:
-- "done": Review completed. You either fixed things inline, created follow-up issues, or both.
-- "noop": Review completed. The code is clean — no issues found.
-- "fault": You could NOT complete the review due to an operational problem (not a code quality judgment).
-
-This JSON MUST be the last thing you output. Nothing after it.`;
+When you are finished, use the StructuredOutput tool to report your disposition.`;
 
   return { work, retro, review };
 }

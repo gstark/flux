@@ -24,7 +24,12 @@ import {
   hasNewCommits,
 } from "../git";
 import { isProcessAlive } from "../process";
-import type { AgentProcess, AgentProvider, WorkPromptContext } from "./agents";
+import type {
+  AgentProcess,
+  AgentProvider,
+  DispositionResult,
+  WorkPromptContext,
+} from "./agents";
 import { Disposition, parseDisposition, StatusMessages } from "./agents";
 import { SessionMonitor } from "./monitor";
 
@@ -57,6 +62,8 @@ interface ActiveSession {
   phase: SessionPhaseValue;
   /** Handle for the session timeout timer (cleared on normal exit) */
   timeoutTimer: ReturnType<typeof setTimeout> | null;
+  /** Structured disposition from --json-schema (Claude provider only) */
+  structuredOutput: DispositionResult | null;
 }
 
 /**
@@ -417,6 +424,7 @@ class ProjectRunner {
     const agentProcess = this.provider.spawn({
       cwd,
       prompt,
+      phase: SessionPhase.Work,
       fluxSessionId: session._id,
       agentName: `${this.provider.name}-work`,
     });
@@ -433,7 +441,7 @@ class ProjectRunner {
     const monitorDone = monitor.consume(agentProcess.stdout);
 
     // 9. Track active session
-    this.activeSession = {
+    const active: ActiveSession = {
       sessionId: session._id,
       issueId,
       process: agentProcess,
@@ -447,7 +455,9 @@ class ProjectRunner {
       issue: issueCtx,
       phase: SessionPhase.Work,
       timeoutTimer: null,
+      structuredOutput: null,
     };
+    this.activeSession = active;
 
     // 10. Notify SSE clients of the new session
     this.emitLifecycle({
@@ -460,7 +470,7 @@ class ProjectRunner {
     });
 
     // 11. Wire up provider-specific output parsing (session IDs, etc.)
-    this.wireProviderOutput(this.activeSession, monitor);
+    this.wireProviderOutput(active, monitor);
 
     // 12. Handle agent exit in background (tracked so destroy() can await it)
     this.trackProcessExit(agentProcess);
@@ -533,6 +543,7 @@ class ProjectRunner {
   ): void {
     active.agentSessionId = null;
     active.agentSessionIdPersistFailed = false;
+    active.structuredOutput = null;
 
     monitor.onLine((line) => {
       const events = this.provider.parseOutputLine(line);
@@ -554,6 +565,10 @@ class ProjectRunner {
               );
             });
         } else if (event.type === "result") {
+          // Capture structured disposition from --json-schema if present.
+          if (event.structuredOutput) {
+            active.structuredOutput = event.structuredOutput;
+          }
           // Close stdin so the agent sees EOF and exits.
           // With --input-format stream-json, the process stays alive
           // waiting for the next stdin message unless we signal completion.
@@ -561,6 +576,23 @@ class ProjectRunner {
         }
       }
     });
+  }
+
+  // ── Disposition resolution ─────────────────────────────────────────
+
+  /**
+   * Resolve the agent's disposition, preferring structured output from
+   * --json-schema over text-scanning fallback. Structured output is
+   * schema-validated by Claude Code itself, so when present it's more
+   * reliable than scraping the last 50 lines of stdout.
+   */
+  private resolveDisposition(active: ActiveSession): DispositionResult {
+    if (active.structuredOutput) {
+      return active.structuredOutput;
+    }
+    // Fallback: scan agent output lines (non-Claude providers, edge cases)
+    const allLines = active.monitor.buffer.getAll();
+    return parseDisposition(allLines, this.provider.name);
   }
 
   // ── PID watchdog ────────────────────────────────────────────────────
@@ -775,8 +807,7 @@ class ProjectRunner {
       );
     }
 
-    const allLines = active.monitor.buffer.getAll();
-    const dispositionResult = parseDisposition(allLines, this.provider.name);
+    const dispositionResult = this.resolveDisposition(active);
 
     if (active.agentSessionIdPersistFailed && active.agentSessionId) {
       console.warn(
@@ -936,8 +967,7 @@ class ProjectRunner {
       console.error("[ProjectRunner] Post-retro endHead update failed:", err);
     }
 
-    const allLines = active.monitor.buffer.getAll();
-    const retroResult = parseDisposition(allLines, this.provider.name);
+    const retroResult = this.resolveDisposition(active);
     if (retroResult.success) {
       await convex.mutation(api.sessions.update, {
         sessionId,
@@ -971,8 +1001,7 @@ class ProjectRunner {
       );
     }
 
-    const allLines = active.monitor.buffer.getAll();
-    const dispositionResult = parseDisposition(allLines, this.provider.name);
+    const dispositionResult = this.resolveDisposition(active);
 
     if (active.agentSessionIdPersistFailed && active.agentSessionId) {
       console.warn(
@@ -1128,6 +1157,7 @@ class ProjectRunner {
       cwd,
       prompt: retroPrompt,
       sessionId: active.agentSessionId,
+      phase: SessionPhase.Retro,
       fluxSessionId: active.sessionId,
       agentName: `${this.provider.name}-retro`,
     });
@@ -1306,6 +1336,7 @@ class ProjectRunner {
     const reviewProcess = this.provider.spawn({
       cwd,
       prompt: reviewPrompt,
+      phase: SessionPhase.Review,
       fluxSessionId: reviewSession._id,
       agentName: `${this.provider.name}-review`,
     });
@@ -1522,6 +1553,85 @@ class ProjectRunner {
           : SessionPhase.Work;
     }
 
+    // With --input-format stream-json, adopted processes can never exit cleanly
+    // because we lost the stdin pipe on restart. Kill the old process and resume
+    // the Claude session with a fresh process — preserves conversation context.
+    if (this.provider.name === "claude" && session.agentSessionId) {
+      console.log(
+        `[ProjectRunner] Killing orphaned stdin-piped process (PID ${pid}) for ${issue.shortId} — resuming Claude session ${session.agentSessionId}`,
+      );
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+        // Already dead
+      }
+      await autoCommitDirtyTree(this.projectPath, issue.shortId, "pre-session");
+
+      const resumePrompt =
+        "The orchestrator restarted and reconnected to your session. " +
+        "Continue where you left off.";
+
+      const resumedProcess = this.provider.resume({
+        cwd: this.projectPath,
+        prompt: resumePrompt,
+        sessionId: session.agentSessionId,
+        phase,
+        fluxSessionId: session._id,
+        agentName: `${this.provider.name}-${phase}`,
+      });
+
+      await convex.mutation(api.sessions.update, {
+        sessionId: session._id,
+        pid: resumedProcess.pid,
+      });
+
+      const monitor = new SessionMonitor(
+        session._id,
+        /* startSequence: continue from existing events */ undefined,
+      );
+      monitor.recordInput(resumePrompt);
+      const monitorDone = monitor.consume(resumedProcess.stdout);
+
+      this.state = OrchestratorState.Busy;
+      const active: ActiveSession = {
+        sessionId: session._id,
+        issueId: session.issueId,
+        process: resumedProcess,
+        monitor,
+        monitorDone,
+        killed: false,
+        timedOut: false,
+        startHead: session.startHead ?? "",
+        agentSessionId: session.agentSessionId,
+        agentSessionIdPersistFailed: false,
+        issue: {
+          shortId: issue.shortId,
+          title: issue.title,
+          description: issue.description,
+        },
+        phase,
+        timeoutTimer: null,
+        structuredOutput: null,
+      };
+      this.activeSession = active;
+
+      this.emitLifecycle({
+        type: "session_start",
+        sessionId: session._id,
+        issueId: session.issueId,
+        pid: resumedProcess.pid,
+        agent: session.agent,
+        monitor,
+      });
+
+      this.wireProviderOutput(active, monitor);
+      this.trackProcessExit(resumedProcess);
+      this.startSessionTimeout();
+      this.startPidWatchdog();
+
+      return true;
+    }
+
     console.log(
       `[ProjectRunner] Re-adopting orphaned session ${session._id} (PID ${pid}, phase: ${phase}) for ${issue.shortId}`,
     );
@@ -1565,6 +1675,7 @@ class ProjectRunner {
       },
       phase,
       timeoutTimer: null,
+      structuredOutput: null,
     };
 
     this.emitLifecycle({

@@ -8,12 +8,73 @@ import type {
   AgentProcess,
   AgentProvider,
   AgentStdin,
+  DispositionResult,
   ResumeOptions,
   RetroPromptContext,
   ReviewPromptContext,
+  SessionPhase,
   SpawnOptions,
   WorkPromptContext,
 } from "./types";
+import { Disposition, SessionPhase as Phase } from "./types";
+
+// ── Phase-specific JSON Schemas ──────────────────────────────────────
+//
+// Passed to Claude Code via --json-schema. Claude injects a
+// StructuredOutput tool whose parameter descriptions come from
+// these schemas — the richer the descriptions, the less the prompt
+// needs to explain.
+
+function buildDispositionSchema(descriptions: {
+  done: string;
+  noop: string;
+  fault: string;
+  note: string;
+}): string {
+  return JSON.stringify({
+    type: "object",
+    properties: {
+      disposition: {
+        type: "string",
+        enum: ["done", "noop", "fault"],
+        description: [
+          `"done": ${descriptions.done}`,
+          `"noop": ${descriptions.noop}`,
+          `"fault": ${descriptions.fault}`,
+        ].join(". "),
+      },
+      note: {
+        type: "string",
+        description: descriptions.note,
+      },
+    },
+    required: ["disposition", "note"],
+    additionalProperties: false,
+  });
+}
+
+const DISPOSITION_SCHEMAS: Record<SessionPhase, string> = {
+  [Phase.Work]: buildDispositionSchema({
+    done: "Task completed successfully — work was performed and committed",
+    noop: "No work needed — already fixed, duplicate, or not applicable",
+    fault:
+      "Could NOT complete the task due to an operational problem (missing access, unclear requirements, tooling failure) — not a code quality judgment",
+    note: "What you did (for done), why no work was needed (for noop), or what blocked you (for fault)",
+  }),
+  [Phase.Retro]: buildDispositionSchema({
+    done: "Created follow-up issues from findings",
+    noop: "Reflected and found nothing actionable",
+    fault: "Could not complete the retro due to an operational problem",
+    note: "Summary of findings or why the retro could not complete",
+  }),
+  [Phase.Review]: buildDispositionSchema({
+    done: "Review completed — fixed things inline, created follow-up issues, or both",
+    noop: "Review completed — code is clean, no issues found",
+    fault:
+      "Could NOT complete the review due to an operational problem (not a code quality judgment)",
+    note: "Summary of review findings and actions taken, or what blocked you",
+  }),
+};
 
 /** Build a clean env for spawned agents, stripping Flux-specific vars
  *  so child processes don't inherit (and clobber) deployment config.
@@ -46,6 +107,8 @@ export class ClaudeCodeProvider implements AgentProvider {
         "stream-json",
         "--input-format",
         "stream-json",
+        "--json-schema",
+        DISPOSITION_SCHEMAS[opts.phase],
         "--dangerously-skip-permissions",
         "-p",
       ],
@@ -71,6 +134,8 @@ export class ClaudeCodeProvider implements AgentProvider {
         "stream-json",
         "--input-format",
         "stream-json",
+        "--json-schema",
+        DISPOSITION_SCHEMAS[opts.phase],
         "--dangerously-skip-permissions",
         "--resume",
         opts.sessionId,
@@ -109,7 +174,9 @@ export class ClaudeCodeProvider implements AgentProvider {
         return [{ type: "session_id", sessionId: obj.session_id }];
       }
       if (obj.type === "result") {
-        return [{ type: "result" }];
+        return [
+          { type: "result", structuredOutput: parseStructuredOutput(obj) },
+        ];
       }
     } catch {
       // Provider output is not guaranteed to be JSON on every line.
@@ -135,6 +202,45 @@ function sendInitialPrompt(agent: AgentProcess, prompt: string): void {
   });
   agent.stdin.write(`${payload}\n`);
   agent.stdin.flush();
+}
+
+const VALID_DISPOSITIONS = new Set<string>(Object.values(Disposition));
+
+/**
+ * Extract and validate structured_output from a result event.
+ *
+ * Claude Code's --json-schema flag puts the validated output in
+ * `result.structured_output`. We validate the shape here defensively
+ * since the outer JSON is untyped stream output.
+ */
+function parseStructuredOutput(
+  resultEvent: Record<string, unknown>,
+): DispositionResult | undefined {
+  const raw = resultEvent.structured_output;
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const output = raw as Record<string, unknown>;
+  const disposition = output.disposition;
+  const note = output.note;
+
+  if (
+    typeof disposition === "string" &&
+    VALID_DISPOSITIONS.has(disposition) &&
+    typeof note === "string"
+  ) {
+    return {
+      success: true,
+      disposition: disposition as Disposition,
+      note,
+    };
+  }
+
+  // Schema validation passed on Claude's side but our stricter check failed.
+  // This shouldn't happen, but fail visibly rather than silently dropping.
+  return {
+    success: false,
+    error: `Structured output had unexpected shape: ${JSON.stringify(raw)}`,
+  };
 }
 
 function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {

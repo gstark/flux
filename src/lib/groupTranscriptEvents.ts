@@ -48,7 +48,13 @@ export type TranscriptNode =
       timestamp: number;
       parsed: Extract<ParsedLine, { kind: "text" }>;
     }
-  | { type: "tool_call"; key: string; timestamp: number; pair: ToolCallPair };
+  | { type: "tool_call"; key: string; timestamp: number; pair: ToolCallPair }
+  | {
+      type: "system";
+      key: string;
+      timestamp: number;
+      raw: Record<string, unknown>;
+    };
 
 // -- Grouping logic -----------------------------------------------------------
 
@@ -256,6 +262,15 @@ export function groupTranscriptEvents(
       // Output event — accumulate text and tool_use items in chronological
       // order. They'll be emitted interleaved when results arrive or at end.
       for (const item of items) {
+        if (item.kind === "system_init") {
+          nodes.push({
+            type: "system",
+            key: `system:${event._id}`,
+            timestamp: event.timestamp,
+            raw: item.raw,
+          });
+          continue;
+        }
         if (item.kind === "tool_use") {
           // De-duplicate tool_use items by toolId — streaming events
           // (content_block_start) and the full assistant message both emit the

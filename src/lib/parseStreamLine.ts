@@ -30,6 +30,7 @@ export type ParsedLine =
       blockIndex: number;
       jsonDelta: string;
     }
+  | { kind: "system_init"; raw: Record<string, unknown> }
   | { kind: "skip" };
 
 /** A tool_use paired with its optional tool_result. */
@@ -315,6 +316,11 @@ function parseClaudeStreamLine(line: string): ParsedLine[] {
       }
     }
     return [{ kind: "skip" }];
+  }
+
+  // ── system: init / config events ─────────────────────────────────
+  if (obj.type === "system") {
+    return [{ kind: "system_init", raw: obj }];
   }
 
   // ── message lifecycle events — no displayable content ────────────

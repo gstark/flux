@@ -54,6 +54,40 @@ function InputNode({
   );
 }
 
+/** Summarize a system init event for the disclosure summary line. */
+function systemSummary(raw: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (typeof raw.model === "string") parts.push(raw.model);
+  if (typeof raw.claude_code_version === "string")
+    parts.push(`v${raw.claude_code_version}`);
+  if (typeof raw.permissionMode === "string") parts.push(raw.permissionMode);
+  if (Array.isArray(raw.mcp_servers)) {
+    const connected = (
+      raw.mcp_servers as Array<Record<string, unknown>>
+    ).filter((s) => s.status === "connected").length;
+    parts.push(`${connected} MCP`);
+  }
+  return parts.length > 0 ? parts.join(" / ") : "System init";
+}
+
+/** Render a system init event — collapsed by default, pretty-printed JSON. */
+function SystemNode({
+  node,
+}: {
+  node: Extract<TranscriptNode, { type: "system" }>;
+}) {
+  return (
+    <details className="rounded-lg border border-base-content/10 bg-base-200/50 text-sm">
+      <summary className="cursor-pointer select-none px-3 py-2 text-base-content/50">
+        <span className="font-mono text-xs">{systemSummary(node.raw)}</span>
+      </summary>
+      <pre className="overflow-x-auto border-base-content/10 border-t p-3 font-mono text-base-content/60 text-xs">
+        {JSON.stringify(node.raw, null, 2)}
+      </pre>
+    </details>
+  );
+}
+
 /** Render an assistant text node — use markdown for rich formatting. */
 function TextNode({
   node,
@@ -132,6 +166,15 @@ export function SessionTranscript({
                   <div key={node.key} className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <ToolCallCard pair={node.pair} />
+                    </div>
+                    <Timestamp ts={node.timestamp} />
+                  </div>
+                );
+              case "system":
+                return (
+                  <div key={node.key} className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <SystemNode node={node} />
                     </div>
                     <Timestamp ts={node.timestamp} />
                   </div>

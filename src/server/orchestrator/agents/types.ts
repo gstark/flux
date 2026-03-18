@@ -1,15 +1,22 @@
 // ── Disposition ──────────────────────────────────────────────────────
 // Single source of truth lives in convex/schema.ts — re-export here for convenience.
 
-import type { AgentKindValue, DispositionValue } from "$convex/schema";
+import type {
+  AgentKindValue,
+  DispositionValue,
+  SessionPhaseValue,
+} from "$convex/schema";
 import {
   AgentKind as _AgentKind,
   Disposition as _Disposition,
+  SessionPhase as _SessionPhase,
 } from "$convex/schema";
 export { _AgentKind as AgentKind };
 export { _Disposition as Disposition };
+export { _SessionPhase as SessionPhase };
 export type Disposition = DispositionValue;
 export type AgentKind = AgentKindValue;
+export type SessionPhase = SessionPhaseValue;
 
 export type DispositionResult =
   | { success: true; disposition: Disposition; note: string }
@@ -17,7 +24,7 @@ export type DispositionResult =
 
 export type AgentOutputEvent =
   | { type: "session_id"; sessionId: string }
-  | { type: "result" };
+  | { type: "result"; structuredOutput?: DispositionResult };
 
 // ── Prompt context types ─────────────────────────────────────────────
 
@@ -70,6 +77,8 @@ export interface ReviewPromptContext {
 export interface SpawnOptions {
   cwd: string;
   prompt: string;
+  /** Session phase — drives phase-specific structured output schemas. */
+  phase: SessionPhase;
   /** Flux session ID for tracking issue creation */
   fluxSessionId?: string;
   /** Agent name (e.g., "claude-work", "claude-review") */
@@ -81,6 +90,8 @@ export interface ResumeOptions {
   prompt: string;
   /** Provider-specific session ID (e.g., Claude CLI session UUID) */
   sessionId: string;
+  /** Session phase — drives phase-specific structured output schemas. */
+  phase: SessionPhase;
   /** Flux session ID for tracking issue creation */
   fluxSessionId?: string;
   /** Agent name (e.g., "claude-work", "claude-review") */
