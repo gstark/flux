@@ -68,7 +68,7 @@ export function formatRelativeTime(ts: number): string {
   return `${days}d ago`;
 }
 
-/** Format a timestamp as HH:MM:SS for compact display. */
+/** Format a timestamp as a locale-appropriate time string (e.g. "12:34:56 PM") for compact display. */
 export function formatTimeShort(ts: number): string {
   return new Date(ts).toLocaleTimeString();
 }

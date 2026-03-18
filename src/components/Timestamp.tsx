@@ -1,7 +1,7 @@
 import { formatTime, formatTimeShort } from "../lib/format";
 
 /**
- * Compact timestamp display showing HH:MM:SS with full datetime in a tooltip.
+ * Compact timestamp display showing locale time with full datetime in a tooltip.
  * Designed for activity feeds — small, unobtrusive, and informative on hover.
  */
 export function Timestamp({ ts }: { ts: number }) {
