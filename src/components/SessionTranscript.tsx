@@ -34,7 +34,7 @@ function InputNode({
   if (isLong) {
     return (
       <details className="group rounded-lg border border-primary/20 bg-primary/5 text-sm">
-        <summary className="cursor-pointer select-none p-3 text-base-content/60">
+        <summary className="cursor-pointer p-3 text-base-content/60">
           <span className="font-medium">{inputSummary(node.content)}</span>
           <span className="ml-2 text-base-content/40 text-xs">
             ({lineCount} lines — click to expand)
@@ -78,7 +78,7 @@ function SystemNode({
 }) {
   return (
     <details className="rounded-lg border border-base-content/10 bg-base-200/50 text-sm">
-      <summary className="cursor-pointer select-none px-3 py-2 text-base-content/50">
+      <summary className="cursor-pointer px-3 py-2 text-base-content/50">
         <span className="font-mono text-xs">{systemSummary(node.raw)}</span>
       </summary>
       <pre className="overflow-x-auto border-base-content/10 border-t p-3 font-mono text-base-content/60 text-xs">
