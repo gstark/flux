@@ -856,33 +856,37 @@ class ProjectRunner {
         issueId,
         maxFailures: this.maxFailures,
       });
-      this.finalize();
-      return false;
-    }
+      // Fault sessions still run retro to capture friction and tooling
+      // issues. incrementFailure already set the issue to Open/Stuck, so
+      // handleRetroExit will finalize without review or close.
+      // If no agentSessionId, retro can't run — finalize directly.
+      active.workDisposition = Disposition.Fault;
+      active.hasCommits = false; // irrelevant for Fault — review is always skipped
+    } else {
+      // Check for commits since startHead — determines whether we need
+      // code review after retro. Retro always runs (even without commits)
+      // so we capture friction and tooling issues from research tasks.
+      let hasCommits: boolean;
+      try {
+        hasCommits = await hasNewCommits(cwd, startHead);
+      } catch (err) {
+        console.error(
+          `[ProjectRunner] Git error checking commits for ${issue.shortId}:`,
+          err,
+        );
+        await convex.mutation(api.issues.incrementFailure, {
+          issueId,
+          maxFailures: this.maxFailures,
+        });
+        this.finalize();
+        return false;
+      }
 
-    // Check for commits since startHead — determines whether we need
-    // code review after retro. Retro always runs (even without commits)
-    // so we capture friction and tooling issues from research tasks.
-    let hasCommits: boolean;
-    try {
-      hasCommits = await hasNewCommits(cwd, startHead);
-    } catch (err) {
-      console.error(
-        `[ProjectRunner] Git error checking commits for ${issue.shortId}:`,
-        err,
-      );
-      await convex.mutation(api.issues.incrementFailure, {
-        issueId,
-        maxFailures: this.maxFailures,
-      });
-      this.finalize();
-      return false;
+      // Carry forward commit status and disposition so handleRetroExit
+      // can decide whether to proceed to review or close directly.
+      active.hasCommits = hasCommits;
+      active.workDisposition = disposition;
     }
-
-    // Carry forward commit status and disposition so handleRetroExit
-    // can decide whether to proceed to review or close directly.
-    active.hasCommits = hasCommits;
-    active.workDisposition = disposition;
 
     try {
       await autoCommitDirtyTree(
@@ -925,7 +929,11 @@ class ProjectRunner {
         // Non-fatal
       }
 
-      if (!hasCommits) {
+      if (disposition === Disposition.Fault) {
+        // Fault without agentSessionId — can't resume for retro.
+        // incrementFailure already set issue to Open/Stuck, just finalize.
+        this.finalize();
+      } else if (!active.hasCommits) {
         // No agentSessionId (can't resume for retro) and no commits —
         // close directly since there's nothing to review.
         const closeType =
@@ -1001,6 +1009,14 @@ class ProjectRunner {
       await active.monitor.cleanupTmpFile();
     } catch {
       // Non-fatal
+    }
+
+    // Fault sessions: retro ran to capture friction/tooling insights, but
+    // incrementFailure already set the issue to Open/Stuck. Skip review
+    // and close — just finalize.
+    if (active.workDisposition === Disposition.Fault) {
+      this.finalize();
+      return true;
     }
 
     // Determine whether commits exist. Normally carried forward from
