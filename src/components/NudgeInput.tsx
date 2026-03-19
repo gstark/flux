@@ -20,10 +20,6 @@ export function NudgeInput() {
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
   // Auto-clear feedback after 3 seconds
   useEffect(() => {
     if (!feedback) return;
