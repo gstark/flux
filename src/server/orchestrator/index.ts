@@ -1003,9 +1003,26 @@ class ProjectRunner {
       // Non-fatal
     }
 
+    // Determine whether commits exist. Normally carried forward from
+    // handleWorkExit, but recovered sessions (adoptOrphanedSession) start
+    // with hasCommits=null — compute from git in that case.
+    let hasCommits = active.hasCommits;
+    if (hasCommits === null) {
+      try {
+        hasCommits = await hasNewCommits(cwd, active.startHead);
+      } catch (err) {
+        console.error(
+          `[ProjectRunner] Git error checking commits for ${issue.shortId} in handleRetroExit:`,
+          err,
+        );
+        // Can't determine commit state — fall through to review to be safe
+        hasCommits = true;
+      }
+    }
+
     // No commits → skip code review and close the issue directly.
     // Retro still ran (above) to capture friction/tooling insights.
-    if (!active.hasCommits) {
+    if (!hasCommits) {
       const closeType =
         active.workDisposition === Disposition.Noop
           ? CloseType.Noop
