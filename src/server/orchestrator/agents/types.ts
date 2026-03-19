@@ -81,6 +81,8 @@ export interface SpawnOptions {
   phase: SessionPhase;
   /** Flux session ID for tracking issue creation */
   fluxSessionId?: string;
+  /** Flux issue ID — propagated to MCP so created issues get sourceIssueId */
+  fluxIssueId?: string;
   /** Agent name (e.g., "claude-work", "claude-review") */
   agentName?: string;
 }
@@ -94,6 +96,8 @@ export interface ResumeOptions {
   phase: SessionPhase;
   /** Flux session ID for tracking issue creation */
   fluxSessionId?: string;
+  /** Flux issue ID — propagated to MCP so created issues get sourceIssueId */
+  fluxIssueId?: string;
   /** Agent name (e.g., "claude-work", "claude-review") */
   agentName?: string;
 }

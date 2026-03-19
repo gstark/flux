@@ -25,6 +25,7 @@ function createToolContext(project: Project, req?: Request): ToolContext {
   const orchestrator = getOrCreateOrchestrator();
   const sessionId = req?.headers.get("X-Flux-Session-Id") ?? undefined;
   const agentName = req?.headers.get("X-Flux-Agent-Name") ?? undefined;
+  const issueId = req?.headers.get("X-Flux-Issue-Id") ?? undefined;
   return {
     convex: getConvexClient(),
     projectId: project._id,
@@ -32,6 +33,7 @@ function createToolContext(project: Project, req?: Request): ToolContext {
     getRunner: () => orchestrator.getRunner(project._id),
     ...(sessionId && { sessionId: sessionId as Id<"sessions"> }),
     ...(agentName && { agentName }),
+    ...(issueId && { issueId: issueId as Id<"issues"> }),
   };
 }
 

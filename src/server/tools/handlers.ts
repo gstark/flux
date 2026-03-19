@@ -50,6 +50,9 @@ export type ToolContext = {
   sessionId?: Id<"sessions">;
   /** Agent name if called from within an agent session, undefined otherwise. */
   agentName?: string;
+  /** Current issue ID if called from within an agent session, undefined otherwise.
+   *  Used to auto-set sourceIssueId on newly created follow-up issues. */
+  issueId?: Id<"issues">;
 };
 
 export type ToolResult = {
@@ -182,6 +185,7 @@ const issues_create = typedHandler(
       priority,
       ...(ctx.sessionId && { createdInSessionId: ctx.sessionId }),
       ...(ctx.agentName && { createdByAgent: ctx.agentName }),
+      ...(ctx.issueId && { sourceIssueId: ctx.issueId }),
     });
     const issue = await ctx.convex.query(api.issues.get, {
       issueId: issueId as Id<"issues">,
@@ -448,9 +452,13 @@ const comments_create = typedHandler(
 const issues_bulk_create = typedHandler(
   IssuesBulkCreateSchema,
   async ({ issues }, ctx) => {
+    // Auto-set sourceIssueId on each issue when called from within an agent session
+    const issuesWithSource = ctx.issueId
+      ? issues.map((i) => ({ ...i, sourceIssueId: ctx.issueId }))
+      : issues;
     const created = await ctx.convex.mutation(api.issues.bulkCreate, {
       projectId: ctx.projectId,
-      issues,
+      issues: issuesWithSource,
       ...(ctx.sessionId && { createdInSessionId: ctx.sessionId }),
       ...(ctx.agentName && { createdByAgent: ctx.agentName }),
     });

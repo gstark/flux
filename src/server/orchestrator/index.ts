@@ -430,6 +430,7 @@ class ProjectRunner {
       prompt,
       phase: SessionPhase.Work,
       fluxSessionId: session._id,
+      fluxIssueId: issueId,
       agentName: `${this.provider.name}-work`,
     });
 
@@ -1233,6 +1234,7 @@ class ProjectRunner {
       sessionId: active.agentSessionId,
       phase: SessionPhase.Retro,
       fluxSessionId: active.sessionId,
+      fluxIssueId: active.issueId,
       agentName: `${this.provider.name}-retro`,
     });
 
@@ -1420,6 +1422,7 @@ class ProjectRunner {
       prompt: reviewPrompt,
       phase: SessionPhase.Review,
       fluxSessionId: reviewSession._id,
+      fluxIssueId: issueId,
       agentName: `${this.provider.name}-review`,
     });
 

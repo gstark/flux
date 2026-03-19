@@ -87,12 +87,14 @@ const DISPOSITION_SCHEMAS: Record<SessionPhase, string> = {
 function agentEnv(
   sessionId?: string,
   agentName?: string,
+  issueId?: string,
 ): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
   delete env.CONVEX_URL;
   delete env.CONVEX_DEPLOYMENT;
   if (sessionId) env.FLUX_SESSION_ID = sessionId;
   if (agentName) env.FLUX_AGENT_NAME = agentName;
+  if (issueId) env.FLUX_ISSUE_ID = issueId;
   return env;
 }
 
@@ -114,7 +116,7 @@ export class ClaudeCodeProvider implements AgentProvider {
       ],
       {
         cwd: opts.cwd,
-        env: agentEnv(opts.fluxSessionId, opts.agentName),
+        env: agentEnv(opts.fluxSessionId, opts.agentName, opts.fluxIssueId),
         stdout: "pipe",
         stdin: "pipe",
         stderr: "ignore",
@@ -143,7 +145,7 @@ export class ClaudeCodeProvider implements AgentProvider {
       ],
       {
         cwd: opts.cwd,
-        env: agentEnv(opts.fluxSessionId, opts.agentName),
+        env: agentEnv(opts.fluxSessionId, opts.agentName, opts.fluxIssueId),
         stdout: "pipe",
         stdin: "pipe",
         stderr: "ignore",

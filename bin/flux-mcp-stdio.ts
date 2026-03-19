@@ -47,6 +47,7 @@ const toolsUrl = `${FLUX_URL}/api/projects/${projectId}/tools`;
 // Session context from environment (set by orchestrator when spawning agents)
 const sessionId = process.env.FLUX_SESSION_ID;
 const agentName = process.env.FLUX_AGENT_NAME;
+const issueId = process.env.FLUX_ISSUE_ID;
 
 const mcp = new McpServer({ name: "flux", version: "0.1.0" });
 
@@ -58,6 +59,7 @@ for (const tool of allTools) {
     // Include session context in headers if available
     if (sessionId) headers["X-Flux-Session-Id"] = sessionId;
     if (agentName) headers["X-Flux-Agent-Name"] = agentName;
+    if (issueId) headers["X-Flux-Issue-Id"] = issueId;
 
     return callFluxTool({
       fluxUrl: FLUX_URL,

@@ -17,12 +17,14 @@ import type {
 function agentEnv(
   sessionId?: string,
   agentName?: string,
+  issueId?: string,
 ): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
   delete env.CONVEX_URL;
   delete env.CONVEX_DEPLOYMENT;
   if (sessionId) env.FLUX_SESSION_ID = sessionId;
   if (agentName) env.FLUX_AGENT_NAME = agentName;
+  if (issueId) env.FLUX_ISSUE_ID = issueId;
   // OpenCode controls approvals/sandboxing through config permissions rather
   // than a single CLI bypass flag. We set an explicit permissive runtime config
   // instead of relying on tool-default behavior.
@@ -41,7 +43,7 @@ export class OpenCodeProvider implements AgentProvider {
       ["opencode", "run", "--format", "json", "--dir", opts.cwd, opts.prompt],
       {
         cwd: opts.cwd,
-        env: agentEnv(opts.fluxSessionId, opts.agentName),
+        env: agentEnv(opts.fluxSessionId, opts.agentName, opts.fluxIssueId),
         stdout: "pipe",
         stderr: "ignore",
       },
@@ -64,7 +66,7 @@ export class OpenCodeProvider implements AgentProvider {
       ],
       {
         cwd: opts.cwd,
-        env: agentEnv(opts.fluxSessionId, opts.agentName),
+        env: agentEnv(opts.fluxSessionId, opts.agentName, opts.fluxIssueId),
         stdout: "pipe",
         stderr: "ignore",
       },
