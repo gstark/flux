@@ -34,7 +34,10 @@ export function ToolCallCard({
       />
       <span className="font-medium text-info text-sm">{toolUse.toolName}</span>
       {summary && (
-        <span className="min-w-0 flex-1 truncate font-mono text-neutral-content/70 text-xs">
+        <span
+          className="min-w-0 flex-1 truncate font-mono text-neutral-content/70 text-xs"
+          title={summary}
+        >
           {summary}
         </span>
       )}
@@ -72,6 +75,9 @@ export function ToolCallCard({
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         {header}
       </summary>
+      <div className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words border-neutral-content/10 border-t px-3 pt-2 pb-3 font-mono text-xs">
+        {summary}
+      </div>
       <div className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words border-neutral-content/10 border-t px-3 pt-2 pb-3 font-mono text-xs">
         {toolResult.content}
       </div>

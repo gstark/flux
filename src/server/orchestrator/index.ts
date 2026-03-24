@@ -1422,10 +1422,12 @@ class ProjectRunner {
     // Source (1) requires env var propagation through the MCP stdio bridge, which
     // is unreliable — Claude Code's MCP client may not inherit FLUX_ISSUE_ID.
     // Source (2) is the reliable path since createdInSessionId is set server-side.
-    const [followUpBySource, workRetroSessions] = await Promise.all([
-      convex.query(api.issues.listFollowUps, { issueId }),
-      convex.query(api.sessions.listByIssue, { issueId }),
-    ]);
+    const [followUpBySource, workRetroSessions, reviewComments] =
+      await Promise.all([
+        convex.query(api.issues.listFollowUps, { issueId }),
+        convex.query(api.sessions.listByIssue, { issueId }),
+        convex.query(api.comments.list, { issueId }),
+      ]);
 
     // Fetch issues created during each work/retro session
     const sessionIssues = (
@@ -1515,6 +1517,13 @@ class ProjectRunner {
       shortId: issue.shortId,
       title: issue.title,
       description: issue.description,
+      comments:
+        reviewComments.length > 0
+          ? reviewComments.map((c) => ({
+              author: c.author,
+              content: c.content,
+            }))
+          : undefined,
       diff,
       commitLog,
       relatedIssues,

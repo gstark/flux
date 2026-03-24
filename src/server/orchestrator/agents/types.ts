@@ -59,6 +59,7 @@ export interface ReviewPromptContext {
   shortId: string;
   title: string;
   description?: string;
+  comments?: Array<{ author: string; content: string }>;
   /** Output of git diff startHead..HEAD */
   diff: string;
   /** Output of git log startHead..HEAD --oneline */

@@ -339,6 +339,36 @@ Backend-as-a-service for real-time data. Functions live in `convex/` directory.
 3. Use `functionSpec` to see available functions
 4. Use `run` to execute functions for testing/debugging
 
+## Flux CLI
+
+The `flux` command is available globally (via `~/.zprofile` PATH). It calls the Flux daemon's HTTP API to manage issues, sessions, and the orchestrator.
+
+```
+flux <group> <action> [--arg value ...]
+
+Groups: issues, comments, epics, labels, deps, sessions, orchestrator, prompts, daemon
+```
+
+**Project resolution:** The CLI identifies which Flux project to target via:
+1. `FLUX_PROJECT_ID` env var (explicit wins)
+2. `.flux` file at the git repo root (plain text, contains the Convex document ID)
+3. Auto-discover from API (single project → use it automatically)
+4. Interactive picker (TTY only — prompts to select or create a project, then writes `.flux`)
+
+**Positional shorthand:** The first positional arg maps to the command's "primary" field:
+```bash
+flux issues get FLUX-42           # equivalent to --issueId FLUX-42
+flux issues search "login bug"    # equivalent to --query "login bug"
+flux orchestrator run FLUX-42     # equivalent to --issueId FLUX-42
+```
+
+**Arg parsing:** `--key value`, `--key=value`, `--flag` (boolean), numbers auto-coerced, `--key null` passes null.
+
+**Entry points:**
+- `flux` — shell command (via `bin/flux` on PATH)
+- `bun run flux` — package.json script (via `src/cli.ts`)
+- Both are equivalent; `bin/flux` is a thin wrapper around `src/cli.ts`
+
 ## Testing Strategy (MVP Phase)
 
 **No automated tests until post-MVP.** During initial development:

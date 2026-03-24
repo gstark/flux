@@ -13,6 +13,12 @@ interface PendingEvent {
   timestamp: number;
 }
 
+/** Rough byte-size estimate for a PendingEvent when JSON-serialized.
+ *  Conservative: 2x content length for UTF-16/escaping overhead + fixed field overhead. */
+function estimateEventSize(event: PendingEvent): number {
+  return event.content.length * 2 + 100;
+}
+
 /**
  * SessionMonitor consumes agent stdout, maintains a rolling buffer,
  * writes to a tmp file for crash recovery, and batches events to Convex.
@@ -34,6 +40,16 @@ export class SessionMonitor {
   private static readonly MAX_CONVEX_FAILURES = 5;
   private static readonly FLUSH_INTERVAL_MS = 5_000;
   private static readonly HEARTBEAT_INTERVAL_MS = 30_000;
+  /** ~800KB — well under Convex's 1 MiB mutation arg limit. */
+  private static readonly MAX_BATCH_BYTES = 800_000;
+  /** Events larger than this are dropped from the Convex pipeline (already in tmp file). */
+  private static readonly MAX_SINGLE_EVENT_BYTES = 750_000;
+
+  /** True when consecutive Convex flush failures exceed the threshold.
+   *  Resets when a flush succeeds. Observable by ProjectRunner if needed. */
+  get convexDegraded(): boolean {
+    return this.convexFailures >= SessionMonitor.MAX_CONVEX_FAILURES;
+  }
 
   constructor(sessionId: Id<"sessions">, initialSequence = 0) {
     this.sessionId = sessionId;
@@ -58,18 +74,13 @@ export class SessionMonitor {
     // Create abort controller so shutdown() can cancel the reader
     this.abortController = new AbortController();
 
-    // Start periodic flush and heartbeat timers
-    this.flushTimer = setInterval(async () => {
-      try {
-        await this.flushToConvex();
-      } catch (err) {
-        console.error(
-          "[SessionMonitor] Fatal: Convex flush failed permanently, shutting down monitor:",
-          err,
-        );
-        await this.shutdown();
-      }
-    }, SessionMonitor.FLUSH_INTERVAL_MS);
+    // Start periodic flush and heartbeat timers.
+    // flushToConvex() never throws — it handles errors internally and sets convexDegraded.
+    // This ensures a Convex outage can never kill the stdout reader loop.
+    this.flushTimer = setInterval(
+      () => this.flushToConvex(),
+      SessionMonitor.FLUSH_INTERVAL_MS,
+    );
     this.heartbeatTimer = setInterval(
       () => this.updateHeartbeat(),
       SessionMonitor.HEARTBEAT_INTERVAL_MS,
@@ -182,30 +193,74 @@ export class SessionMonitor {
     this.sequence++;
   }
 
-  /** Flush pending events to Convex sessionEvents table. */
+  /** Flush pending events to Convex sessionEvents table.
+   *  Never throws — sets convexDegraded on repeated failures.
+   *  Filters oversized events and chunks batches to stay under Convex's 1 MiB limit. */
   private async flushToConvex(): Promise<void> {
     if (this.pendingEvents.length === 0) return;
 
     const batch = this.pendingEvents.splice(0);
-    try {
-      const convex = getConvexClient();
-      await convex.mutation(api.sessionEvents.batchInsert, {
-        sessionId: this.sessionId,
-        events: batch,
-      });
-      this.convexFailures = 0; // Reset on success
-    } catch (err) {
-      this.convexFailures++;
-      // Restore events before any potential throw so shutdown() can retry
-      this.pendingEvents.unshift(...batch);
-      console.error(
-        `[SessionMonitor] Convex write failed (${this.convexFailures}/${SessionMonitor.MAX_CONVEX_FAILURES}):`,
-        err,
-      );
-      if (this.convexFailures >= SessionMonitor.MAX_CONVEX_FAILURES) {
-        throw new Error(
-          `[SessionMonitor] Convex write failed ${SessionMonitor.MAX_CONVEX_FAILURES} times consecutively. Aborting monitor.`,
+
+    // Filter poison-pill events that exceed Convex's single-arg limit.
+    // These are already persisted in the tmp file, so no data is lost.
+    const viable: PendingEvent[] = [];
+    for (const event of batch) {
+      if (estimateEventSize(event) > SessionMonitor.MAX_SINGLE_EVENT_BYTES) {
+        console.warn(
+          `[SessionMonitor] Dropping oversized event (${estimateEventSize(event)} bytes est.) from Convex pipeline — already in tmp file`,
         );
+      } else {
+        viable.push(event);
+      }
+    }
+
+    if (viable.length === 0) return;
+
+    // Chunk into sub-batches that fit under MAX_BATCH_BYTES
+    const chunks: PendingEvent[][] = [];
+    let currentChunk: PendingEvent[] = [];
+    let currentBytes = 0;
+    for (const event of viable) {
+      const size = estimateEventSize(event);
+      if (
+        currentChunk.length > 0 &&
+        currentBytes + size > SessionMonitor.MAX_BATCH_BYTES
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentBytes = 0;
+      }
+      currentChunk.push(event);
+      currentBytes += size;
+    }
+    if (currentChunk.length > 0) chunks.push(currentChunk);
+
+    // Send chunks sequentially. On failure, re-queue only unsent chunks.
+    const convex = getConvexClient();
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (!chunk) continue; // Satisfy TS — index is always in bounds
+      try {
+        await convex.mutation(api.sessionEvents.batchInsert, {
+          sessionId: this.sessionId,
+          events: chunk,
+        });
+        this.convexFailures = 0;
+      } catch (err) {
+        this.convexFailures++;
+        // Re-queue this chunk and all remaining unsent chunks
+        const unsent = chunks.slice(i).flat();
+        this.pendingEvents.unshift(...unsent);
+        console.error(
+          `[SessionMonitor] Convex write failed (${this.convexFailures}/${SessionMonitor.MAX_CONVEX_FAILURES}):`,
+          err,
+        );
+        if (this.convexFailures >= SessionMonitor.MAX_CONVEX_FAILURES) {
+          console.error(
+            `[SessionMonitor] Convex degraded — flush failures exceeded threshold. Stdout reader continues; will retry next interval.`,
+          );
+        }
+        return; // Stop sending remaining chunks, retry next interval
       }
     }
   }
@@ -246,15 +301,8 @@ export class SessionMonitor {
       this.heartbeatTimer = null;
     }
 
-    // Final flush — best effort; don't let a Convex failure prevent cleanup
-    try {
-      await this.flushToConvex();
-    } catch (err) {
-      console.error(
-        "[SessionMonitor] Final flush failed during shutdown, events lost:",
-        err,
-      );
-    }
+    // Final flush — flushToConvex() handles errors internally, won't throw
+    await this.flushToConvex();
 
     // Close tmp file writer
     if (this.tmpWriter) {

@@ -59,30 +59,32 @@ export function summarizeToolInput(
         : null;
     case "Bash":
       return typeof input.command === "string"
-        ? truncate(input.command, 80)
+        ? truncate(input.command, 1024)
         : null;
     case "Grep":
       return typeof input.pattern === "string"
-        ? `/${truncate(input.pattern, 40)}/`
+        ? `/${truncate(input.pattern, 1024)}/`
         : null;
     case "Glob":
       return typeof input.pattern === "string"
-        ? truncate(input.pattern, 60)
+        ? truncate(input.pattern, 1024)
         : null;
     case "WebFetch":
-      return typeof input.url === "string" ? truncate(input.url, 80) : null;
+      return typeof input.url === "string" ? truncate(input.url, 1024) : null;
     case "WebSearch":
-      return typeof input.query === "string" ? truncate(input.query, 80) : null;
+      return typeof input.query === "string"
+        ? truncate(input.query, 1024)
+        : null;
     case "Task":
       return typeof input.description === "string"
-        ? truncate(input.description, 60)
+        ? truncate(input.description, 1024)
         : null;
     case "TodoWrite":
       return null; // Too noisy, not useful
     default: {
       // Generic: show first string-valued key that looks meaningful
       const summary = genericInputSummary(input);
-      return summary ? truncate(summary, 80) : null;
+      return summary ? truncate(summary, 1024) : null;
     }
   }
 }

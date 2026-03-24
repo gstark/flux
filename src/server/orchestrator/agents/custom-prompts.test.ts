@@ -130,6 +130,46 @@ describe("Custom prompt injection", () => {
       expect(result).not.toContain("{{DIFF}}");
     });
 
+    test("injects comments via {{COMMENTS}} placeholder", () => {
+      const ctx: ReviewPromptContext = {
+        shortId: "FLUX-123",
+        title: "Test issue",
+        diff: "diff",
+        commitLog: "log",
+        relatedIssues: [],
+        comments: [
+          { author: "user", content: "Please check edge cases" },
+          { author: "agent", content: "Will do" },
+        ],
+        reviewIteration: 1,
+        maxReviewIterations: 3,
+        customPrompt: "Review {{SHORT_ID}}\n\nComments:\n{{COMMENTS}}",
+      };
+
+      const result = buildReviewPrompt(ctx);
+
+      expect(result).toContain("[user]: Please check edge cases");
+      expect(result).toContain("[agent]: Will do");
+      expect(result).not.toContain("{{COMMENTS}}");
+    });
+
+    test("handles empty comments in custom prompt", () => {
+      const ctx: ReviewPromptContext = {
+        shortId: "FLUX-123",
+        title: "Test issue",
+        diff: "diff",
+        commitLog: "log",
+        relatedIssues: [],
+        reviewIteration: 1,
+        maxReviewIterations: 3,
+        customPrompt: "Comments: {{COMMENTS}}",
+      };
+
+      const result = buildReviewPrompt(ctx);
+
+      expect(result).toContain("Comments: (none)");
+    });
+
     test("handles empty related issues", () => {
       const ctx: ReviewPromptContext = {
         shortId: "FLUX-123",
@@ -145,6 +185,42 @@ describe("Custom prompt injection", () => {
       const result = buildReviewPrompt(ctx);
 
       expect(result).toContain("Related: (none)");
+    });
+
+    test("includes comments in default prompt", () => {
+      const ctx: ReviewPromptContext = {
+        shortId: "FLUX-123",
+        title: "Test issue",
+        diff: "diff",
+        commitLog: "log",
+        relatedIssues: [],
+        comments: [
+          { author: "user", content: "Important context" },
+        ],
+        reviewIteration: 1,
+        maxReviewIterations: 3,
+      };
+
+      const result = buildReviewPrompt(ctx);
+
+      expect(result).toContain("## Issue Comments");
+      expect(result).toContain("[user]: Important context");
+    });
+
+    test("omits comments section in default prompt when no comments", () => {
+      const ctx: ReviewPromptContext = {
+        shortId: "FLUX-123",
+        title: "Test issue",
+        diff: "diff",
+        commitLog: "log",
+        relatedIssues: [],
+        reviewIteration: 1,
+        maxReviewIterations: 3,
+      };
+
+      const result = buildReviewPrompt(ctx);
+
+      expect(result).not.toContain("## Issue Comments");
     });
 
     test("uses default prompt when custom prompt not provided", () => {

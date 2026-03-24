@@ -115,7 +115,11 @@ export const IssuesGetSchema = z.object({
 });
 
 export const IssuesUpdateSchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
   title: z.string().optional().describe("New title."),
   description: z
     .string()
@@ -132,7 +136,11 @@ export const IssuesUpdateSchema = z.object({
 });
 
 export const IssuesCloseSchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
   closeType: closeTypeEnum.describe("How the issue was resolved."),
   reason: z
     .string()
@@ -145,17 +153,29 @@ export const IssuesReadySchema = z.object({
 });
 
 export const IssuesDeferSchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
   note: z.string().describe("Why this issue is being deferred."),
 });
 
 export const IssuesUndeferSchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
   note: z.string().describe("Why this issue is being undeferred."),
 });
 
 export const IssuesRetrySchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
 });
 
 export const IssuesSearchSchema = z.object({
@@ -237,17 +257,33 @@ export const LabelsDeleteSchema = z.object({
 });
 
 export const DepsAddSchema = z.object({
-  blockerId: z.string().describe("The issue that must complete first."),
-  blockedId: z.string().describe("The issue that is blocked."),
+  blockerId: z
+    .string()
+    .describe(
+      "The blocker issue's document ID or short ID (e.g. FLUX-42). Must complete first.",
+    ),
+  blockedId: z
+    .string()
+    .describe(
+      "The blocked issue's document ID or short ID (e.g. FLUX-43). Depends on the blocker.",
+    ),
 });
 
 export const DepsRemoveSchema = z.object({
-  blockerId: z.string().describe("The blocker issue's document ID."),
-  blockedId: z.string().describe("The blocked issue's document ID."),
+  blockerId: z
+    .string()
+    .describe("The blocker issue's document ID or short ID (e.g. FLUX-42)."),
+  blockedId: z
+    .string()
+    .describe("The blocked issue's document ID or short ID (e.g. FLUX-43)."),
 });
 
 export const DepsListForIssueSchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
 });
 
 export const IssuesBulkCreateSchema = z.object({
@@ -283,7 +319,11 @@ export const SessionsListSchema = z.object({
 });
 
 export const SessionsListByIssueSchema = z.object({
-  issueId: z.string().describe("The issue's document ID."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
   type: sessionTypeEnum
     .optional()
     .describe("Filter by session type (work, review). Omit for all."),
@@ -297,7 +337,11 @@ export const SessionsShowSchema = z.object({
 });
 
 export const OrchestratorRunSchema = z.object({
-  issueId: z.string().describe("The issue document ID to work on."),
+  issueId: z
+    .string()
+    .describe(
+      "The issue's document ID or short ID (e.g. FLUX-42).",
+    ),
 });
 
 export const OrchestratorKillSchema = z.object({});

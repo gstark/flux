@@ -228,8 +228,9 @@ const issues_get = typedHandler(IssuesGetSchema, async ({ issueId }, ctx) => {
 const issues_update = typedHandler(
   IssuesUpdateSchema,
   async ({ issueId, ...updates }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const updated = await ctx.convex.mutation(api.issues.update, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
       ...updates,
     });
     return ok(ctx, { issue: updated });
@@ -263,7 +264,8 @@ const orchestrator_run = typedHandler(
         "No runner for this project. Does the project have a valid path?",
       );
     }
-    const result = await runner.run(issueId as Id<"issues">);
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
+    const result = await runner.run(resolvedIssueId);
     return ok(ctx, {
       session: { sessionId: result.sessionId, pid: result.pid },
     });
@@ -305,8 +307,9 @@ const sessions_list = typedHandler(
 const sessions_list_by_issue = typedHandler(
   SessionsListByIssueSchema,
   async ({ issueId, type, status }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const sessions = await ctx.convex.query(api.sessions.listByIssue, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
       type,
       status,
     });
@@ -380,8 +383,9 @@ const sessions_show = typedHandler(
 const issues_close = typedHandler(
   IssuesCloseSchema,
   async ({ issueId, closeType, reason }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const updated = await ctx.convex.mutation(api.issues.close, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
       closeType,
       closeReason: reason,
     });
@@ -392,8 +396,9 @@ const issues_close = typedHandler(
 const issues_retry = typedHandler(
   IssuesRetrySchema,
   async ({ issueId }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const updated = await ctx.convex.mutation(api.issues.retry, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
     });
     return ok(ctx, { issue: updated });
   },
@@ -402,8 +407,9 @@ const issues_retry = typedHandler(
 const issues_defer = typedHandler(
   IssuesDeferSchema,
   async ({ issueId, note }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const updated = await ctx.convex.mutation(api.issues.defer, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
       note,
     });
     return ok(ctx, { issue: updated });
@@ -413,8 +419,9 @@ const issues_defer = typedHandler(
 const issues_undefer = typedHandler(
   IssuesUndeferSchema,
   async ({ issueId, note }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const updated = await ctx.convex.mutation(api.issues.undefer, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
       note,
     });
     return ok(ctx, { issue: updated });
@@ -482,13 +489,15 @@ const issues_bulk_create = typedHandler(
 const issues_bulk_update = typedHandler(
   IssuesBulkUpdateSchema,
   async ({ updates }, ctx) => {
-    const issues = await ctx.convex.mutation(api.issues.bulkUpdate, {
-      updates: updates.map(({ issueId, ...fields }) => ({
-        issueId: issueId as Id<"issues">,
+    const resolved = await Promise.all(
+      updates.map(async ({ issueId, ...fields }) => ({
+        issueId: await resolveIssueId(ctx, issueId),
         ...fields,
       })),
+    );
+    const issues = await ctx.convex.mutation(api.issues.bulkUpdate, {
+      updates: resolved,
     });
-
     return ok(ctx, { issues, count: issues.length });
   },
 );
@@ -572,24 +581,21 @@ const epics_close = typedHandler(
 const deps_add = typedHandler(
   DepsAddSchema,
   async ({ blockerId, blockedId }, ctx) => {
+    const resolvedBlockerId = await resolveIssueId(ctx, blockerId);
+    const resolvedBlockedId = await resolveIssueId(ctx, blockedId);
     const depId = await ctx.convex.mutation(api.deps.add, {
-      blockerId: blockerId as Id<"issues">,
-      blockedId: blockedId as Id<"issues">,
+      blockerId: resolvedBlockerId,
+      blockedId: resolvedBlockedId,
     });
-    // Fetch both issues for a useful response
     const [blocker, blocked] = await Promise.all([
-      ctx.convex.query(api.issues.get, {
-        issueId: blockerId as Id<"issues">,
-      }),
-      ctx.convex.query(api.issues.get, {
-        issueId: blockedId as Id<"issues">,
-      }),
+      ctx.convex.query(api.issues.get, { issueId: resolvedBlockerId }),
+      ctx.convex.query(api.issues.get, { issueId: resolvedBlockedId }),
     ]);
     return ok(ctx, {
       dependency: {
         depId,
-        blocker: { issueId: blockerId, shortId: blocker?.shortId },
-        blocked: { issueId: blockedId, shortId: blocked?.shortId },
+        blocker: { issueId: resolvedBlockerId, shortId: blocker?.shortId },
+        blocked: { issueId: resolvedBlockedId, shortId: blocked?.shortId },
       },
     });
   },
@@ -598,9 +604,11 @@ const deps_add = typedHandler(
 const deps_remove = typedHandler(
   DepsRemoveSchema,
   async ({ blockerId, blockedId }, ctx) => {
+    const resolvedBlockerId = await resolveIssueId(ctx, blockerId);
+    const resolvedBlockedId = await resolveIssueId(ctx, blockedId);
     const result = await ctx.convex.mutation(api.deps.remove, {
-      blockerId: blockerId as Id<"issues">,
-      blockedId: blockedId as Id<"issues">,
+      blockerId: resolvedBlockerId,
+      blockedId: resolvedBlockedId,
     });
     return ok(ctx, { removed: result.deleted });
   },
@@ -609,8 +617,9 @@ const deps_remove = typedHandler(
 const deps_listForIssue = typedHandler(
   DepsListForIssueSchema,
   async ({ issueId }, ctx) => {
+    const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const result = await ctx.convex.query(api.deps.listForIssue, {
-      issueId: issueId as Id<"issues">,
+      issueId: resolvedIssueId,
     });
     return ok(ctx, {
       blockers: result.blockers,
