@@ -259,6 +259,7 @@ function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
     pid: proc.pid,
     stdout: proc.stdout as ReadableStream<Uint8Array>,
     stdin,
+    httpNudge: null,
     kill: () => proc.kill(),
     wait: async () => {
       const exitCode = await proc.exited;

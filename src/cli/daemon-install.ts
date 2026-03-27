@@ -4,9 +4,11 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   plistPath as getPlistPath,
+  IS_LINUX,
   isDaemonLoaded,
   LABEL,
 } from "./daemon-common";
+import { daemonInstallLinux } from "./daemon-linux";
 
 /** Escape XML special characters for safe interpolation into plist values. */
 function escapeXml(s: string): string {
@@ -28,7 +30,7 @@ function resolveEnvVars(): { CONVEX_URL: string; FLUX_PORT: string } {
     if (existsSync(envPath)) {
       const contents = readFileSync(envPath, "utf-8");
       for (const line of contents.split("\n")) {
-        const match = line.match(/^CONVEX_URL\s*=\s*(.+)/);
+        const match = line.match(/^(?:VITE_)?CONVEX_URL\s*=\s*(.+)/);
         const raw = match?.[1]?.trim();
         if (raw) {
           // Quoted values preserve literal content; unquoted values strip inline comments
@@ -142,6 +144,8 @@ function generatePlist(opts: {
 }
 
 export async function daemonInstall(): Promise<void> {
+  if (IS_LINUX) return daemonInstallLinux();
+
   const root = projectRoot();
   const home = homedir();
   const plist = getPlistPath();

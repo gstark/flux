@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec bun run /home/levi/Documents/flux/src/cli.ts "$@"

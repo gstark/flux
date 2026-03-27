@@ -2,11 +2,15 @@ import { execSync } from "node:child_process";
 import { existsSync, unlinkSync } from "node:fs";
 import {
   plistPath as getPlistPath,
+  IS_LINUX,
   isDaemonLoaded,
   LABEL,
 } from "./daemon-common";
+import { daemonUninstallLinux } from "./daemon-linux";
 
 export async function daemonUninstall(): Promise<void> {
+  if (IS_LINUX) return daemonUninstallLinux();
+
   const plist = getPlistPath();
 
   if (!existsSync(plist)) {

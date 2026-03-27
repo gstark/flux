@@ -1,7 +1,10 @@
 import { execSync } from "node:child_process";
-import { isDaemonLoaded, LABEL } from "./daemon-common";
+import { IS_LINUX, isDaemonLoaded, LABEL } from "./daemon-common";
+import { daemonStartLinux } from "./daemon-linux";
 
 export async function daemonStart(): Promise<void> {
+  if (IS_LINUX) return daemonStartLinux();
+
   // Verify the daemon is loaded before attempting to start
   if (!isDaemonLoaded()) {
     console.error(

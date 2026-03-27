@@ -1,7 +1,10 @@
 import { execSync } from "node:child_process";
-import { isDaemonLoaded, LABEL } from "./daemon-common";
+import { IS_LINUX, isDaemonLoaded, LABEL } from "./daemon-common";
+import { daemonStopLinux } from "./daemon-linux";
 
 export async function daemonStop(): Promise<void> {
+  if (IS_LINUX) return daemonStopLinux();
+
   // Verify the daemon is loaded before attempting to stop
   if (!isDaemonLoaded()) {
     console.error(`${LABEL} is not loaded in launchd. Nothing to stop.`);

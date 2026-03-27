@@ -26,6 +26,8 @@ function agentEnv(
   // OpenCode controls approvals/sandboxing through config permissions rather
   // than a single CLI bypass flag. We set an explicit permissive runtime config
   // instead of relying on tool-default behavior.
+  // NOTE: OPENCODE_CONFIG_CONTENT is merged on top of the project's opencode.json,
+  // so MCP servers defined there are preserved.
   env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
     $schema: "https://opencode.ai/config.json",
     permission: "allow",
@@ -33,12 +35,28 @@ function agentEnv(
   return env;
 }
 
+/** Pick a random port in the ephemeral range unlikely to conflict. */
+function randomPort(): number {
+  return 40000 + Math.floor(Math.random() * 10000);
+}
+
 export class OpenCodeProvider implements AgentProvider {
   name = "opencode" as const;
 
   spawn(opts: SpawnOptions): AgentProcess {
+    const port = randomPort();
     const proc = Bun.spawn(
-      ["opencode", "run", "--format", "json", "--dir", opts.cwd, opts.prompt],
+      [
+        "opencode",
+        "run",
+        "--format",
+        "json",
+        "--port",
+        String(port),
+        "--dir",
+        opts.cwd,
+        opts.prompt,
+      ],
       {
         cwd: opts.cwd,
         env: agentEnv(opts.fluxSessionId, opts.agentName),
@@ -46,16 +64,19 @@ export class OpenCodeProvider implements AgentProvider {
         stderr: "ignore",
       },
     );
-    return wrapProcess(proc);
+    return wrapProcess(proc, port);
   }
 
   resume(opts: ResumeOptions): AgentProcess {
+    const port = randomPort();
     const proc = Bun.spawn(
       [
         "opencode",
         "run",
         "--format",
         "json",
+        "--port",
+        String(port),
         "--dir",
         opts.cwd,
         "--session",
@@ -69,19 +90,19 @@ export class OpenCodeProvider implements AgentProvider {
         stderr: "ignore",
       },
     );
-    return wrapProcess(proc);
+    return wrapProcess(proc, port);
   }
 
   buildWorkPrompt(ctx: WorkPromptContext): string {
-    return buildWorkPrompt(ctx);
+    return buildWorkPrompt(ctx, "opencode");
   }
 
   buildRetroPrompt(ctx: RetroPromptContext): string {
-    return buildRetroPrompt(ctx);
+    return buildRetroPrompt(ctx, "opencode");
   }
 
   buildReviewPrompt(ctx: ReviewPromptContext): string {
-    return buildReviewPrompt(ctx);
+    return buildReviewPrompt(ctx, "opencode");
   }
 
   parseOutputLine(line: string): AgentOutputEvent[] {
@@ -97,11 +118,31 @@ export class OpenCodeProvider implements AgentProvider {
   }
 }
 
-function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
+function wrapProcess(
+  proc: ReturnType<typeof Bun.spawn>,
+  port: number,
+): AgentProcess {
   return {
     pid: proc.pid,
     stdout: proc.stdout as ReadableStream<Uint8Array>,
     stdin: null,
+    httpNudge: async (sessionId: string, message: string): Promise<void> => {
+      const url = `http://127.0.0.1:${port}/session/${sessionId}/prompt_async`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parts: [{ type: "text", text: message }],
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (resp.status !== 204) {
+        const body = await resp.text().catch(() => "(no body)");
+        throw new Error(
+          `OpenCode prompt_async failed: HTTP ${resp.status} — ${body}`,
+        );
+      }
+    },
     kill: () => proc.kill(),
     wait: async () => {
       const exitCode = await proc.exited;

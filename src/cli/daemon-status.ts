@@ -2,7 +2,8 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { plistPath as getPlistPath, LABEL } from "./daemon-common";
+import { plistPath as getPlistPath, IS_LINUX, LABEL } from "./daemon-common";
+import { daemonStatusLinux } from "./daemon-linux";
 
 /** Parse the output of `launchctl list <label>` into a key-value map. */
 function parseLaunchctlList(output: string): Record<string, string> {
@@ -84,6 +85,8 @@ async function fetchHealth(port: string): Promise<{
 }
 
 export async function daemonStatus(): Promise<void> {
+  if (IS_LINUX) return daemonStatusLinux();
+
   const home = homedir();
   const plist = getPlistPath();
   const logDir = join(home, ".flux/logs");

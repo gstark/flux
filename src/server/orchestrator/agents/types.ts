@@ -112,6 +112,12 @@ export interface AgentProcess {
   stdout: ReadableStream<Uint8Array>;
   /** Writable stdin pipe for sending messages to the agent (e.g. nudges). */
   stdin: AgentStdin | null;
+  /**
+   * Send a nudge message via HTTP to a running agent server (e.g. OpenCode).
+   * Present only when the agent exposes an HTTP API for mid-session messaging.
+   * Takes the OpenCode session ID and message text, posts to prompt_async.
+   */
+  httpNudge: ((sessionId: string, message: string) => Promise<void>) | null;
   kill(): void;
   wait(): Promise<{ exitCode: number }>;
 }
