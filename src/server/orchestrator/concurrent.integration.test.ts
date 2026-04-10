@@ -80,6 +80,10 @@ class MockAgentProvider implements AgentProvider {
     return "mock review prompt";
   }
 
+  buildPlannerPrompt(): string {
+    return "mock planner prompt";
+  }
+
   parseOutputLine(_line: string): AgentOutputEvent[] {
     return [];
   }

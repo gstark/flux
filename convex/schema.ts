@@ -31,17 +31,20 @@ export const sessionStatusValidator = v.union(
 export const SessionType = {
   Work: "work",
   Review: "review",
+  Planner: "planner",
 } as const;
 
 export const sessionTypeValidator = v.union(
   v.literal(SessionType.Work),
   v.literal(SessionType.Review),
+  v.literal(SessionType.Planner),
 );
 
 export const SessionPhase = {
   Work: "work",
   Retro: "retro",
   Review: "review",
+  Planner: "planner",
 } as const;
 
 export type SessionPhaseValue =
@@ -51,6 +54,7 @@ export const sessionPhaseValidator = v.union(
   v.literal(SessionPhase.Work),
   v.literal(SessionPhase.Retro),
   v.literal(SessionPhase.Review),
+  v.literal(SessionPhase.Planner),
 );
 
 export const SessionEventDirection = {
@@ -195,6 +199,7 @@ export default defineSchema({
     workPrompt: v.optional(v.string()),
     retroPrompt: v.optional(v.string()),
     reviewPrompt: v.optional(v.string()),
+    plannerPrompt: v.optional(v.string()),
   }).index("by_slug", ["slug"]),
 
   issues: defineTable({
@@ -271,7 +276,7 @@ export default defineSchema({
 
   sessions: defineTable({
     projectId: v.id("projects"),
-    issueId: v.id("issues"),
+    issueId: v.optional(v.id("issues")),
     type: sessionTypeValidator,
     agent: v.string(),
     status: sessionStatusValidator,

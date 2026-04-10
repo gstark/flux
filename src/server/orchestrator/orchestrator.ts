@@ -217,15 +217,18 @@ class Orchestrator {
           endedAt: Date.now(),
           exitCode: -1,
         });
-        const issue = await convex.query(api.issues.get, {
-          issueId: session.issueId,
-        });
-        if (issue && issue.status !== IssueStatus.Closed) {
-          await convex.mutation(api.issues.update, {
+        // Planner sessions have no issue — skip issue recovery
+        if (session.issueId) {
+          const issue = await convex.query(api.issues.get, {
             issueId: session.issueId,
-            status: IssueStatus.Open,
-            assignee: null,
           });
+          if (issue && issue.status !== IssueStatus.Closed) {
+            await convex.mutation(api.issues.update, {
+              issueId: session.issueId,
+              status: IssueStatus.Open,
+              assignee: null,
+            });
+          }
         }
       }
     }

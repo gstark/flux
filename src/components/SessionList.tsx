@@ -212,7 +212,7 @@ export function SessionList() {
                     </Link>
                   </td>
                   <td>
-                    {session.issueShortId ? (
+                    {session.issueShortId && session.issueId ? (
                       <Link
                         to="/p/$projectSlug/issues/$issueId"
                         params={{ projectSlug, issueId: session.issueId }}

@@ -1,5 +1,6 @@
 // CLI tool-call dispatch — maps `flux <group> <action>` to HTTP API calls.
 
+import { readFluxConfig } from "../server/fluxConfig";
 import { toolsByName } from "../server/tools/schema";
 
 const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
@@ -167,6 +168,16 @@ const TOOL_MAP: Record<string, ToolEntry> = {
     tool: "prompts_reset",
     desc: "Reset prompts to defaults",
   },
+
+  // Planner
+  "planner status": {
+    tool: "planner_status",
+    desc: "Show planner status and last run",
+  },
+  "planner run": {
+    tool: "planner_run",
+    desc: "Trigger immediate planner run",
+  },
 };
 
 const GROUPS: Record<string, string> = {
@@ -178,6 +189,7 @@ const GROUPS: Record<string, string> = {
   sessions: "View sessions",
   orchestrator: "Control the orchestrator",
   prompts: "Configure agent prompts",
+  planner: "Manage the project planner",
 };
 
 // ── Project ID Resolution ─────────────────────────────────────────────
@@ -300,15 +312,11 @@ async function resolveProjectId(): Promise<string> {
   const explicit = process.env.FLUX_PROJECT_ID;
   if (explicit) return explicit;
 
-  // 2. Read .flux file from git repo root
+  // 2. Read .flux file from git repo root (supports bare ID and TOML)
   const repoRoot = await gitRepoRoot();
   if (repoRoot) {
-    const fluxFile = `${repoRoot}/.flux`;
-    const file = Bun.file(fluxFile);
-    if (await file.exists()) {
-      const content = (await file.text()).trim();
-      if (content) return content;
-    }
+    const config = await readFluxConfig(repoRoot);
+    if (config) return config.projectId;
   }
 
   // 3. Auto-discover or interactive pick
@@ -436,12 +444,14 @@ function printGroupHelp(group: string): void {
     console.log(`  ${usage.padEnd(28)}${entry.desc}`);
   }
 
-  console.log(
-    `\nRun 'flux ${group} <command> --help' for detailed options.`,
-  );
+  console.log(`\nRun 'flux ${group} <command> --help' for detailed options.`);
 }
 
-function printCommandHelp(group: string, action: string, entry: ToolEntry): void {
+function printCommandHelp(
+  group: string,
+  action: string,
+  entry: ToolEntry,
+): void {
   const toolDef = toolsByName.get(entry.tool);
   const primaryHint = entry.primary ? ` <${entry.primary}>` : "";
 

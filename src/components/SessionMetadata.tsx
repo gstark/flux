@@ -19,7 +19,7 @@ interface SessionMetadataProps {
   phase?: SessionPhaseValue;
   status: SessionStatusValue;
   agent: string;
-  issueId: Id<"issues">;
+  issueId?: Id<"issues">;
   issueShortId: string | null;
   issueTitle?: string | null;
   startedAt: number;
@@ -80,7 +80,7 @@ export function SessionMetadata({
 
         <dt className="text-base-content/60">Issue</dt>
         <dd>
-          {issueShortId ? (
+          {issueShortId && issueId ? (
             <Link
               to="/p/$projectSlug/issues/$issueId"
               params={{ projectSlug, issueId }}

@@ -117,9 +117,7 @@ export const IssuesGetSchema = z.object({
 export const IssuesUpdateSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
   title: z.string().optional().describe("New title."),
   description: z
     .string()
@@ -138,9 +136,7 @@ export const IssuesUpdateSchema = z.object({
 export const IssuesCloseSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
   closeType: closeTypeEnum.describe("How the issue was resolved."),
   reason: z
     .string()
@@ -155,27 +151,21 @@ export const IssuesReadySchema = z.object({
 export const IssuesDeferSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
   note: z.string().describe("Why this issue is being deferred."),
 });
 
 export const IssuesUndeferSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
   note: z.string().describe("Why this issue is being undeferred."),
 });
 
 export const IssuesRetrySchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
 });
 
 export const IssuesSearchSchema = z.object({
@@ -281,9 +271,7 @@ export const DepsRemoveSchema = z.object({
 export const DepsListForIssueSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
 });
 
 export const IssuesBulkCreateSchema = z.object({
@@ -321,9 +309,7 @@ export const SessionsListSchema = z.object({
 export const SessionsListByIssueSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
   type: sessionTypeEnum
     .optional()
     .describe("Filter by session type (work, review). Omit for all."),
@@ -339,9 +325,7 @@ export const SessionsShowSchema = z.object({
 export const OrchestratorRunSchema = z.object({
   issueId: z
     .string()
-    .describe(
-      "The issue's document ID or short ID (e.g. FLUX-42).",
-    ),
+    .describe("The issue's document ID or short ID (e.g. FLUX-42)."),
 });
 
 export const OrchestratorKillSchema = z.object({});
@@ -651,6 +635,24 @@ const prompts_reset: ToolDef = {
   schema: PromptsResetSchema.shape,
 };
 
+export const PlannerStatusSchema = z.object({});
+
+export const PlannerRunSchema = z.object({});
+
+const planner_status: ToolDef = {
+  name: "planner_status",
+  description:
+    "Show planner status: last run time, disposition, agenda preview, and next scheduled fire.",
+  schema: PlannerStatusSchema.shape,
+};
+
+const planner_run: ToolDef = {
+  name: "planner_run",
+  description:
+    "Trigger an immediate planner run. The planner surveys the backlog and makes adjustments based on the agenda in .flux.",
+  schema: PlannerRunSchema.shape,
+};
+
 // ── All tools ─────────────────────────────────────────────────────────
 
 export const allTools: ToolDef[] = [
@@ -710,6 +712,10 @@ export const allTools: ToolDef[] = [
   prompts_get,
   prompts_get_defaults,
   prompts_reset,
+
+  // Planner
+  planner_status,
+  planner_run,
 ];
 
 /** Lookup map for O(1) access by name. */

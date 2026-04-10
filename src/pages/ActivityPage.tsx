@@ -54,7 +54,7 @@ function DashboardHeader({ session }: { session: ActiveSession }) {
     <div className="rounded-lg border border-base-300 bg-base-200 p-4">
       {/* Issue row */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {session.issueShortId && (
+        {session.issueShortId && session.issueId && (
           <Link
             to="/p/$projectSlug/issues/$issueId"
             params={{ projectSlug, issueId: session.issueId }}

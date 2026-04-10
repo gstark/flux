@@ -2,6 +2,7 @@ import { extractTextFromLine } from "../../../lib/parseStreamLine";
 import {
   Disposition,
   type DispositionResult,
+  type PlannerPromptContext,
   type RetroPromptContext,
   type ReviewPromptContext,
   type WorkPromptContext,
@@ -462,6 +463,122 @@ Use the \`flux\` MCP server to:
   return parts.join("\n");
 }
 
+// ── Planner Prompt ──────────────────────────────────────────────────
+
+/**
+ * Inject planner context into a prompt template.
+ * Replaces {{AGENDA}} and {{QUEUE_STATS}} placeholders.
+ */
+function injectPlannerContext(
+  template: string,
+  ctx: PlannerPromptContext,
+): string {
+  const statsLines = Object.entries(ctx.issueStats)
+    .map(([status, count]) => `- ${status}: ${count}`)
+    .join("\n");
+
+  const recentLines =
+    ctx.recentSessions.length > 0
+      ? ctx.recentSessions
+          .map((s) => {
+            const issue = s.issueShortId ? ` (${s.issueShortId})` : "";
+            return `- ${s.type}/${s.phase ?? "—"}${issue}: ${s.disposition ?? s.status}${s.note ? ` — ${s.note}` : ""}`;
+          })
+          .join("\n")
+      : "(no recent sessions)";
+
+  const queueStats = `## Issue Counts\n${statsLines}\n\n## Recent Sessions\n${recentLines}`;
+
+  return template
+    .replace(/\{\{AGENDA\}\}/g, ctx.agenda)
+    .replace(/\{\{QUEUE_STATS\}\}/g, queueStats);
+}
+
+export function buildPlannerPrompt(
+  ctx: PlannerPromptContext,
+  provider = "claude",
+): string {
+  const parts: string[] = [];
+  const dispositionSection =
+    provider === "opencode"
+      ? DISPOSITION_SECTION_OPENCODE
+      : DISPOSITION_SECTION_CLAUDE;
+
+  // If custom prompt is provided, use it with placeholder injection
+  if (ctx.customPrompt) {
+    parts.push(injectPlannerContext(ctx.customPrompt, ctx));
+    parts.push(dispositionSection);
+    return parts.join("\n");
+  }
+
+  // Default built-in prompt
+
+  parts.push(`You are a Flux planner agent for the **${ctx.projectSlug}** project. Your job is backlog maintenance — not code. You survey the project state and make targeted adjustments.
+
+## Agenda
+
+${ctx.agenda}
+
+## Current Project State`);
+
+  // Issue stats
+  const statsLines = Object.entries(ctx.issueStats)
+    .map(([status, count]) => `- **${status}**: ${count}`)
+    .join("\n");
+  parts.push(`\n### Issue Counts\n${statsLines}`);
+
+  // Recent sessions
+  if (ctx.recentSessions.length > 0) {
+    parts.push("\n### Recent Sessions");
+    for (const s of ctx.recentSessions) {
+      const issue = s.issueShortId ? ` (${s.issueShortId})` : "";
+      const note = s.note ? ` — ${s.note}` : "";
+      parts.push(
+        `- ${s.type}/${s.phase ?? "—"}${issue}: ${s.disposition ?? s.status}${note}`,
+      );
+    }
+  }
+
+  parts.push(`
+## Your Responsibilities
+
+### 1. Survey
+Read open and deferred issues. Understand the current state of the queue relative to the agenda.
+
+### 2. Reprioritize
+Adjust priorities based on current context. If something is blocking other work, bump it. If something is no longer relevant, defer it. Use \`issues_update\` to change priority or status.
+
+### 3. Seed
+When the queue is thin (few open issues relative to project goals), decompose goals from the agenda into concrete, actionable issues. Each issue should be achievable in a single agent session. Use \`issues_create\` or \`issues_bulk_create\`.
+
+### 4. Prune
+Close obsolete or duplicate issues. Flag issues with repeated failures (high failure count) by adding comments or adjusting priority. Use \`issues_close\` with an appropriate close type.
+
+## Constraints
+
+- **Do NOT write code.** You are a planner, not an implementer.
+- **Do NOT create vague issues.** Every issue must have a clear title, description with acceptance criteria, and a concrete validation strategy.
+- **Do NOT over-seed.** A handful of well-scoped issues is better than a flood. Aim for 3-5 open issues ahead of the work queue, not 20.
+- **Do NOT reprioritize without reason.** Only change priorities when the context has shifted.
+- **Doing nothing is correct** when the backlog is healthy. A well-maintained queue with appropriate priorities and sufficient work queued needs no intervention. Report \`noop\`.
+
+## Flux MCP Tools
+
+Use the \`flux\` MCP server for all operations:
+- \`issues_list\` — list issues (filter by status, priority)
+- \`issues_search\` — search issues by text
+- \`issues_create\` / \`issues_bulk_create\` — create new issues
+- \`issues_update\` — change priority, status, description
+- \`issues_close\` — close with type (completed, noop, duplicate, wontfix)
+- \`issues_defer\` — defer with a note explaining why
+- \`comments_create\` — add context to an issue`);
+
+  // Response format
+  parts.push(dispositionSection);
+
+  return parts.join("\n");
+}
+
 // ── Shared prompt sections ───────────────────────────────────────────
 
 const SUBAGENT_SAFETY_SECTION = `
@@ -642,6 +759,7 @@ export function getDefaultPromptTemplates(): {
   work: string;
   retro: string;
   review: string;
+  planner: string;
 } {
   const work = buildWorkPrompt({
     shortId: "{{SHORT_ID}}",
@@ -674,7 +792,14 @@ export function getDefaultPromptTemplates(): {
     maxReviewIterations: 3,
   });
 
-  return { work, retro, review };
+  const planner = buildPlannerPrompt({
+    projectSlug: "{{PROJECT_SLUG}}",
+    agenda: "{{AGENDA}}",
+    issueStats: { open: 0, in_progress: 0, closed: 0, deferred: 0, stuck: 0 },
+    recentSessions: [],
+  });
+
+  return { work, retro, review, planner };
 }
 
 // ── Status Messages ──────────────────────────────────────────────────

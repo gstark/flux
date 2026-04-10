@@ -82,6 +82,25 @@ export interface ReviewPromptContext {
   customPrompt?: string;
 }
 
+export interface PlannerPromptContext {
+  projectSlug: string;
+  /** The north-star guidance from the [planner] section in .flux */
+  agenda: string;
+  /** Issue counts by status (open, in_progress, closed, deferred, stuck) */
+  issueStats: Record<string, number>;
+  /** Recent session outcomes for context on project activity */
+  recentSessions: Array<{
+    type: string;
+    phase: string | null;
+    status: string;
+    disposition: string | null;
+    note: string | null;
+    issueShortId: string | null;
+  }>;
+  /** Optional custom prompt override from project config */
+  customPrompt?: string;
+}
+
 // ── Agent process types ──────────────────────────────────────────────
 
 export interface SpawnOptions {
@@ -151,6 +170,8 @@ export interface AgentProvider {
   buildRetroPrompt(ctx: RetroPromptContext): string;
   /** Build the prompt for a review session (stateless, new session) */
   buildReviewPrompt(ctx: ReviewPromptContext): string;
+  /** Build the prompt for a planner session (project-scoped, no issue) */
+  buildPlannerPrompt(ctx: PlannerPromptContext): string;
   /** Parse a raw stdout line into provider-normalized events. */
   parseOutputLine(line: string): AgentOutputEvent[];
 }

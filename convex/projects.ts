@@ -52,6 +52,7 @@ export const update = mutation({
     workPrompt: v.optional(v.string()),
     retroPrompt: v.optional(v.string()),
     reviewPrompt: v.optional(v.string()),
+    plannerPrompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
@@ -67,6 +68,8 @@ export const update = mutation({
     if (args.retroPrompt !== undefined) updates.retroPrompt = args.retroPrompt;
     if (args.reviewPrompt !== undefined)
       updates.reviewPrompt = args.reviewPrompt;
+    if (args.plannerPrompt !== undefined)
+      updates.plannerPrompt = args.plannerPrompt;
 
     if (args.slug !== undefined) {
       const newSlug = args.slug;

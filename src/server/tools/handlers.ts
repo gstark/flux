@@ -2,7 +2,12 @@ import type { ConvexClient } from "convex/browser";
 import type { z } from "zod";
 import { api } from "$convex/_generated/api";
 import type { Id } from "$convex/_generated/dataModel";
-import { SessionEventDirection, SessionStatus } from "$convex/schema";
+import {
+  SessionEventDirection,
+  SessionStatus,
+  SessionType,
+} from "$convex/schema";
+import { readFluxConfig } from "../fluxConfig";
 import type { ProjectRunner } from "../orchestrator";
 import {
   CommentsCreateSchema,
@@ -290,6 +295,57 @@ const orchestrator_status: ToolHandler = safeHandler(async (_args, ctx) => {
   }
   const status = runner.getStatus();
   return ok(ctx, { status });
+});
+
+const planner_status: ToolHandler = safeHandler(async (_args, ctx) => {
+  const runner = ctx.getRunner();
+
+  // Read .flux config for agenda preview
+  const projectPath = runner?.getProjectPath();
+  const config = projectPath ? await readFluxConfig(projectPath) : null;
+  const agenda = config?.planner?.agenda;
+  const schedule = config?.planner?.schedule;
+
+  // Find last planner session
+  const sessions = await ctx.convex.query(api.sessions.list, {
+    projectId: ctx.projectId,
+    limit: 20,
+  });
+  const lastPlanner = sessions.find((s) => s.type === SessionType.Planner);
+
+  return ok(ctx, {
+    planner: {
+      configured: !!config?.planner,
+      schedule: schedule ?? null,
+      agendaPreview: agenda
+        ? agenda.slice(0, 200) + (agenda.length > 200 ? "..." : "")
+        : null,
+      lastRun: lastPlanner
+        ? {
+            sessionId: lastPlanner._id,
+            startedAt: lastPlanner.startedAt,
+            endedAt: lastPlanner.endedAt ?? null,
+            status: lastPlanner.status,
+            disposition: lastPlanner.disposition ?? null,
+            note: lastPlanner.note ?? null,
+          }
+        : null,
+    },
+  });
+});
+
+const planner_run: ToolHandler = safeHandler(async (_args, ctx) => {
+  const runner = ctx.getRunner();
+  if (!runner) {
+    return error(
+      ctx,
+      "No runner for this project. Does the project have a valid path?",
+    );
+  }
+  const result = await runner.runPlanner();
+  return ok(ctx, {
+    session: { sessionId: result.sessionId, pid: result.pid },
+  });
 });
 
 const sessions_list = typedHandler(
@@ -842,4 +898,6 @@ export const handlers: Record<string, ToolHandler> = {
   prompts_get,
   prompts_get_defaults,
   prompts_reset,
+  planner_status,
+  planner_run,
 };

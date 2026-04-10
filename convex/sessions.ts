@@ -21,7 +21,7 @@ import {
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
-    issueId: v.id("issues"),
+    issueId: v.optional(v.id("issues")),
     type: sessionTypeValidator,
     agent: v.string(),
     pid: v.optional(v.number()),
@@ -34,12 +34,14 @@ export const create = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error(`Project ${args.projectId} not found`);
 
-    const issue = await ctx.db.get(args.issueId);
-    if (!issue) throw new Error(`Issue ${args.issueId} not found`);
+    if (args.issueId) {
+      const issue = await ctx.db.get(args.issueId);
+      if (!issue) throw new Error(`Issue ${args.issueId} not found`);
+    }
 
     const sessionId = await ctx.db.insert("sessions", {
       projectId: args.projectId,
-      issueId: args.issueId,
+      ...(args.issueId && { issueId: args.issueId }),
       type: args.type,
       agent: args.agent,
       status: SessionStatus.Running,
@@ -168,7 +170,7 @@ export const getWithIssue = query({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return null;
 
-    const issue = await ctx.db.get(session.issueId);
+    const issue = session.issueId ? await ctx.db.get(session.issueId) : null;
     return {
       ...session,
       issueShortId: issue?.shortId ?? null,
@@ -204,7 +206,9 @@ export const listPaginatedWithIssues = query({
     // Enrich each session with issue shortId
     const enrichedPage = await Promise.all(
       page.page.map(async (session) => {
-        const issue = await ctx.db.get(session.issueId);
+        const issue = session.issueId
+          ? await ctx.db.get(session.issueId)
+          : null;
         return {
           ...session,
           issueShortId: issue?.shortId ?? null,
@@ -260,7 +264,7 @@ export const getActiveWithIssue = query({
 
     if (!session) return null;
 
-    const issue = await ctx.db.get(session.issueId);
+    const issue = session.issueId ? await ctx.db.get(session.issueId) : null;
     return {
       ...session,
       issueShortId: issue?.shortId ?? null,
@@ -275,5 +279,44 @@ export const counts = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     return countSessionsByStatus(ctx.db, args.projectId);
+  },
+});
+
+/**
+ * Recent completed/failed sessions for a project — used by the planner prompt
+ * to understand recent activity and outcomes.
+ */
+export const recentForProject = query({
+  args: {
+    projectId: v.id("projects"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_project_startedAt", (q) =>
+        q.eq("projectId", args.projectId),
+      )
+      .order("desc")
+      .take(limit);
+
+    // Enrich with issue shortId where available
+    return await Promise.all(
+      sessions.map(async (session) => {
+        const issue = session.issueId
+          ? await ctx.db.get(session.issueId)
+          : null;
+        return {
+          type: session.type,
+          phase: session.phase ?? null,
+          status: session.status,
+          disposition: session.disposition ?? null,
+          note: session.note ?? null,
+          startedAt: session.startedAt,
+          issueShortId: issue?.shortId ?? null,
+        };
+      }),
+    );
   },
 });

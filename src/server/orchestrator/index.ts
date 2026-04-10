@@ -15,6 +15,7 @@ import {
   SessionType,
 } from "$convex/schema";
 import { getConvexClient } from "../convex";
+import { readFluxConfig } from "../fluxConfig";
 import {
   autoCommitDirtyTree,
   getCommitLog,
@@ -33,6 +34,46 @@ import type {
 import { Disposition, parseDisposition, StatusMessages } from "./agents";
 import { SessionMonitor } from "./monitor";
 
+/**
+ * Parse a cron expression into an approximate interval in milliseconds.
+ * Handles common patterns: `@hourly`, `@daily`, `0 *\/N * * *` (every N hours),
+ * `*\/N * * * *` (every N minutes), `0 * * * *` (every hour).
+ * Returns null for unparseable expressions.
+ *
+ * This is a pragmatic fallback since Bun's in-process cron API is not yet
+ * available in our pinned Bun versions.
+ */
+function parseCronIntervalMs(schedule: string): number | null {
+  const s = schedule.trim();
+  if (s === "@hourly") return 60 * 60 * 1000;
+  if (s === "@daily" || s === "@midnight") return 24 * 60 * 60 * 1000;
+
+  const parts = s.split(/\s+/);
+  if (parts.length !== 5) return null;
+
+  const [minute, hour] = parts;
+
+  // Every N hours: "0 */N * * *" or "* */N * * *"
+  const hourStep = hour?.match(/^\*\/(\d+)$/);
+  if (hourStep) {
+    return Number(hourStep[1]) * 60 * 60 * 1000;
+  }
+
+  // Every N minutes: "*/N * * * *"
+  const minStep = minute?.match(/^\*\/(\d+)$/);
+  if (minStep && hour === "*") {
+    return Number(minStep[1]) * 60 * 1000;
+  }
+
+  // Fixed minute, any hour: "0 * * * *" (every hour)
+  if (hour === "*" && minute !== undefined && /^\d+$/.test(minute)) {
+    return 60 * 60 * 1000;
+  }
+
+  // Fallback: can't determine interval from complex expressions
+  return null;
+}
+
 /** Recovery stats returned by orphan recovery on startup. */
 export type OrphanRecoveryStats = {
   deadSessions: number;
@@ -43,21 +84,22 @@ export type OrphanRecoveryStats = {
 /** Runtime info about the currently active session. */
 interface ActiveSession {
   sessionId: Id<"sessions">;
-  issueId: Id<"issues">;
+  /** Issue ID — absent for planner sessions */
+  issueId?: Id<"issues">;
   process: AgentProcess;
   monitor: SessionMonitor;
   monitorDone: Promise<void>;
   killed: boolean;
   /** Set when the session was killed due to timeout (vs manual kill) */
   timedOut: boolean;
-  /** Git HEAD when the work session started */
-  startHead: string;
+  /** Git HEAD when the work session started (absent for planner sessions) */
+  startHead?: string;
   /** Provider-specific session ID captured from agent output */
   agentSessionId: string | null;
   /** True if persisting agentSessionId to Convex failed. A process restart would lose it. */
   agentSessionIdPersistFailed: boolean;
-  /** Issue context for prompt building */
-  issue: WorkPromptContext;
+  /** Issue context for prompt building (absent for planner sessions) */
+  issue?: WorkPromptContext;
   /** Current phase of the issue lifecycle */
   phase: SessionPhaseValue;
   /** Handle for the session timeout timer (cleared on normal exit) */
@@ -78,7 +120,7 @@ export type OrchestratorLifecycleEvent =
   | {
       type: "session_start";
       sessionId: string;
-      issueId: string;
+      issueId?: string;
       pid: number;
       agent: string;
       monitor: SessionMonitor;
@@ -126,6 +168,14 @@ class ProjectRunner {
   private destroyed = false;
   /** Resolves when the current handleExit() call completes. Used by destroy() to await cleanup. */
   private exitHandlerDone: Promise<void> | null = null;
+  /** Custom planner prompt from project config */
+  private customPlannerPrompt?: string;
+  /** True when a cron tick fired while the runner was busy — planner runs on next idle. */
+  private plannerPending = false;
+  /** Active Bun.cron reference — cleared on destroy or schedule change. */
+  private plannerCronRef: { stop(): void } | null = null;
+  /** Current cron schedule from .flux — used to detect changes. */
+  private plannerSchedule: string | null = null;
 
   constructor(
     projectId: Id<"projects">,
@@ -153,6 +203,25 @@ class ProjectRunner {
 
   getProviderName(): AgentProvider["name"] {
     return this.provider.name;
+  }
+
+  /** Narrowed ActiveSession for issue-based phases (Work/Retro/Review). */
+  private requireIssueSession(caller: string): ActiveSession & {
+    issueId: Id<"issues">;
+    issue: WorkPromptContext;
+    startHead: string;
+  } {
+    const active = this.requireActiveSession(caller);
+    if (!active.issueId || !active.issue || active.startHead === undefined) {
+      throw new Error(
+        `[ProjectRunner] ${caller}: session is not an issue session — missing issueId/issue/startHead.`,
+      );
+    }
+    return active as ActiveSession & {
+      issueId: Id<"issues">;
+      issue: WorkPromptContext;
+      startHead: string;
+    };
   }
 
   /**
@@ -233,6 +302,7 @@ class ProjectRunner {
       this.customWorkPrompt = project.workPrompt;
       this.customRetroPrompt = project.retroPrompt;
       this.customReviewPrompt = project.reviewPrompt;
+      this.customPlannerPrompt = project.plannerPrompt;
     }
 
     // Ensure config row exists (upsert)
@@ -255,6 +325,15 @@ class ProjectRunner {
 
     if (options.autoSchedule !== false) {
       this.startAutoSchedule();
+    }
+
+    // Configure planner cron from .flux file (if [planner] section present)
+    await this.configurePlanner();
+
+    // If planner is overdue (e.g. never run), trigger it now
+    if (this.plannerPending && this.state === OrchestratorState.Idle) {
+      this.plannerPending = false;
+      this.triggerPlanner();
     }
 
     return stats;
@@ -299,6 +378,12 @@ class ProjectRunner {
    */
   async destroy(): Promise<void> {
     this.destroyed = true;
+
+    // Stop planner cron
+    if (this.plannerCronRef) {
+      this.plannerCronRef.stop();
+      this.plannerCronRef = null;
+    }
 
     // Unsubscribe from ready issues
     if (this.unsubscribeReady) {
@@ -550,7 +635,7 @@ class ProjectRunner {
       delay = Math.max(0, this.sessionTimeoutMs - elapsed);
       if (delay === 0) {
         console.warn(
-          `[ProjectRunner] Re-adopted session for ${active.issue.shortId} already exceeded timeout, killing`,
+          `[ProjectRunner] Re-adopted session for ${active.issue?.shortId ?? active.sessionId} already exceeded timeout, killing`,
         );
       }
     }
@@ -559,7 +644,7 @@ class ProjectRunner {
       if (!this.activeSession || this.activeSession.killed) return;
 
       console.error(
-        `[ProjectRunner] Session timeout (${this.sessionTimeoutMs}ms) for ${active.issue.shortId} phase=${active.phase} — sending SIGTERM`,
+        `[ProjectRunner] Session timeout (${this.sessionTimeoutMs}ms) for ${active.issue?.shortId ?? active.sessionId} phase=${active.phase} — sending SIGTERM`,
       );
 
       this.activeSession.timedOut = true;
@@ -712,15 +797,20 @@ class ProjectRunner {
       }
 
       // Last resort: post as a Convex comment so the agent sees it next session.
-      await getConvexClient().mutation(api.comments.create, {
-        issueId,
-        content: message,
-        author: CommentAuthor.User,
-      });
-      console.log(
-        `[ProjectRunner] Nudge delivered as comment (agent "${this.provider.name}" has no stdin and no active session ID yet)`,
+      if (issueId) {
+        await getConvexClient().mutation(api.comments.create, {
+          issueId,
+          content: message,
+          author: CommentAuthor.User,
+        });
+        console.log(
+          `[ProjectRunner] Nudge delivered as comment (agent "${this.provider.name}" has no stdin and no active session ID yet)`,
+        );
+        return;
+      }
+      throw new Error(
+        "Cannot nudge: agent has no stdin, no HTTP API, and session has no issue for comment fallback.",
       );
-      return;
     }
 
     // Format as Claude Code stream-json user message
@@ -787,20 +877,23 @@ class ProjectRunner {
       const convex = getConvexClient();
       const { sessionId, issueId, timedOut, issue } = this.activeSession;
       const cwd = this.projectPath;
+      const label = issue?.shortId ?? `session-${sessionId}`;
 
       // Capture any uncommitted agent work before recording the session end.
-      try {
-        await autoCommitDirtyTree(
-          cwd,
-          issue.shortId,
-          String(sessionId),
-          this.activeSession.phase,
-        );
-      } catch (err) {
-        console.warn(
-          `[ProjectRunner] Auto-commit after killed session failed for ${issue.shortId}:`,
-          err,
-        );
+      if (issue) {
+        try {
+          await autoCommitDirtyTree(
+            cwd,
+            issue.shortId,
+            String(sessionId),
+            this.activeSession.phase,
+          );
+        } catch (err) {
+          console.warn(
+            `[ProjectRunner] Auto-commit after killed session failed for ${label}:`,
+            err,
+          );
+        }
       }
 
       let endHead: string | undefined;
@@ -808,7 +901,7 @@ class ProjectRunner {
         endHead = await getCurrentHead(cwd);
       } catch (err) {
         console.warn(
-          `[ProjectRunner] Failed to capture endHead for killed session ${issue.shortId}:`,
+          `[ProjectRunner] Failed to capture endHead for killed session ${label}:`,
           err,
         );
       }
@@ -826,9 +919,9 @@ class ProjectRunner {
           ...(endHead !== undefined && { endHead }),
         });
 
-        if (timedOut) {
+        if (timedOut && issueId) {
           console.error(
-            `[ProjectRunner] Session timed out for ${issue.shortId} — incrementing failure count`,
+            `[ProjectRunner] Session timed out for ${label} — incrementing failure count`,
           );
           await convex.mutation(api.issues.incrementFailure, {
             issueId,
@@ -855,6 +948,8 @@ class ProjectRunner {
         cleanExit = await this.handleRetroExit();
       } else if (phase === SessionPhase.Review) {
         cleanExit = await this.handleReviewExit(exitCode);
+      } else if (phase === SessionPhase.Planner) {
+        cleanExit = await this.handlePlannerExit(exitCode);
       }
       if (cleanExit && this.activeSession === null) {
         try {
@@ -879,15 +974,17 @@ class ProjectRunner {
 
         // Best-effort auto-commit and endHead capture so retry sessions
         // can see the commit log from this failed attempt.
-        try {
-          await autoCommitDirtyTree(
-            cwd,
-            crashedSession.issue.shortId,
-            String(crashedSession.sessionId),
-            crashedSession.phase,
-          );
-        } catch {
-          // Auto-commit failure is non-fatal here — we're already in a crash path.
+        if (crashedSession.issue) {
+          try {
+            await autoCommitDirtyTree(
+              cwd,
+              crashedSession.issue.shortId,
+              String(crashedSession.sessionId),
+              crashedSession.phase,
+            );
+          } catch {
+            // Auto-commit failure is non-fatal here — we're already in a crash path.
+          }
         }
 
         let endHead: string | undefined;
@@ -918,7 +1015,7 @@ class ProjectRunner {
   }
 
   private async handleWorkExit(exitCode: number): Promise<boolean> {
-    const active = this.requireActiveSession("handleWorkExit");
+    const active = this.requireIssueSession("handleWorkExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
@@ -1084,7 +1181,7 @@ class ProjectRunner {
   }
 
   private async handleRetroExit(): Promise<boolean> {
-    const active = this.requireActiveSession("handleRetroExit");
+    const active = this.requireIssueSession("handleRetroExit");
     const { sessionId, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
@@ -1187,7 +1284,7 @@ class ProjectRunner {
   }
 
   private async handleReviewExit(exitCode: number): Promise<boolean> {
-    const active = this.requireActiveSession("handleReviewExit");
+    const active = this.requireIssueSession("handleReviewExit");
     const { sessionId, issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
@@ -1337,7 +1434,7 @@ class ProjectRunner {
   // ── Retro & review lifecycle ─────────────────────────────────────────
 
   private async startRetro(workNote: string): Promise<void> {
-    const active = this.requireActiveSession("startRetro");
+    const active = this.requireIssueSession("startRetro");
     const cwd = this.projectPath;
 
     const retroPrompt = this.provider.buildRetroPrompt({
@@ -1399,7 +1496,7 @@ class ProjectRunner {
   }
 
   private async startReviewLoop(): Promise<void> {
-    const active = this.requireActiveSession("startReviewLoop");
+    const active = this.requireIssueSession("startReviewLoop");
     const { issueId, startHead, issue } = active;
     const convex = getConvexClient();
     const cwd = this.projectPath;
@@ -1641,6 +1738,252 @@ class ProjectRunner {
     tryNext();
   }
 
+  // ── Planner ────────────────────────────────────────────────────────
+
+  /**
+   * Read the .flux config from the project path and register/update the
+   * planner cron if a [planner] section is present. Called on subscribe()
+   * and on each finalize() to pick up config changes.
+   */
+  async configurePlanner(): Promise<void> {
+    const config = await readFluxConfig(this.projectPath);
+
+    const newSchedule = config?.planner?.schedule ?? null;
+
+    // Schedule unchanged — nothing to do
+    if (newSchedule === this.plannerSchedule) return;
+
+    // Stop the old cron (if any)
+    if (this.plannerCronRef) {
+      this.plannerCronRef.stop();
+      this.plannerCronRef = null;
+      console.log(
+        `[ProjectRunner] Stopped planner cron (was: ${this.plannerSchedule})`,
+      );
+    }
+
+    this.plannerSchedule = newSchedule;
+
+    if (!newSchedule) return;
+
+    // Check if a planner run is overdue (last run older than one interval)
+    try {
+      const convex = getConvexClient();
+      const recent = await convex.query(api.sessions.list, {
+        projectId: this.projectId,
+        limit: 1,
+      });
+      const lastPlanner = recent.find((s) => s.type === SessionType.Planner);
+      if (!lastPlanner) {
+        // Never run — mark pending so we run on next idle
+        this.plannerPending = true;
+      }
+    } catch {
+      // Non-fatal — worst case we just wait for the first cron tick
+    }
+
+    // Register interval timer based on cron schedule
+    const intervalMs = parseCronIntervalMs(newSchedule);
+    if (!intervalMs) {
+      console.warn(
+        `[ProjectRunner] Could not parse planner schedule "${newSchedule}" — skipping cron`,
+      );
+      return;
+    }
+    console.log(
+      `[ProjectRunner] Registering planner interval (${Math.round(intervalMs / 60_000)}min) from schedule: ${newSchedule}`,
+    );
+    const timer = setInterval(() => {
+      if (this.destroyed) return;
+      if (this.state === OrchestratorState.Busy) {
+        console.log(
+          "[ProjectRunner] Planner timer tick — runner busy, deferring to next idle",
+        );
+        this.plannerPending = true;
+        return;
+      }
+      this.triggerPlanner();
+    }, intervalMs);
+    this.plannerCronRef = { stop: () => clearInterval(timer) };
+  }
+
+  /**
+   * Fire-and-forget planner trigger. Reads fresh agenda from .flux each time.
+   */
+  private triggerPlanner(): void {
+    this.runPlanner().catch((err) =>
+      console.error("[ProjectRunner] Planner run failed:", err),
+    );
+  }
+
+  /**
+   * Run a planner session: gather project context, spawn agent, return session info.
+   * Follows the same state-locking pattern as run() for issue sessions.
+   */
+  async runPlanner(): Promise<{ sessionId: Id<"sessions">; pid: number }> {
+    if (this.state === OrchestratorState.Busy) {
+      throw new Error("Runner is busy. Kill the current session first.");
+    }
+
+    this.state = OrchestratorState.Busy;
+
+    try {
+      return await this.executePlannerRun();
+    } catch (err) {
+      this.state = OrchestratorState.Idle;
+      throw err;
+    }
+  }
+
+  private async executePlannerRun(): Promise<{
+    sessionId: Id<"sessions">;
+    pid: number;
+  }> {
+    const convex = getConvexClient();
+
+    // Read fresh config for agenda
+    const config = await readFluxConfig(this.projectPath);
+    const agenda = config?.planner?.agenda;
+    if (!agenda) {
+      throw new Error(
+        "[ProjectRunner] Cannot run planner: no agenda found in .flux [planner] section",
+      );
+    }
+
+    // Fetch project slug for prompt context
+    const project = await convex.query(api.projects.getById, {
+      projectId: this.projectId,
+    });
+    if (!project) {
+      throw new Error(
+        `[ProjectRunner] Cannot run planner: project ${this.projectId} not found`,
+      );
+    }
+
+    // Create planner session (no issueId)
+    const session = await convex.mutation(api.sessions.create, {
+      projectId: this.projectId,
+      type: SessionType.Planner,
+      agent: this.provider.name,
+      pid: 0,
+      phase: SessionPhase.Planner,
+    });
+    if (!session) {
+      throw new Error("Failed to create planner session record");
+    }
+
+    // Gather planner context
+    const [issueCounts, recentSessions] = await Promise.all([
+      convex.query(api.issues.counts, { projectId: this.projectId }),
+      convex.query(api.sessions.recentForProject, {
+        projectId: this.projectId,
+        limit: 20,
+      }),
+    ]);
+
+    const prompt = this.provider.buildPlannerPrompt({
+      projectSlug: project.slug,
+      agenda,
+      issueStats: issueCounts,
+      recentSessions,
+      customPrompt: this.customPlannerPrompt,
+    });
+
+    const cwd = this.projectPath;
+    const agentProcess = this.provider.spawn({
+      cwd,
+      prompt,
+      phase: SessionPhase.Planner,
+      fluxSessionId: session._id,
+      agentName: `${this.provider.name}-planner`,
+    });
+
+    // Update session with actual PID
+    await convex.mutation(api.sessions.update, {
+      sessionId: session._id,
+      pid: agentProcess.pid,
+    });
+
+    // Start monitoring
+    const monitor = new SessionMonitor(session._id);
+    monitor.recordInput(prompt);
+    const monitorDone = monitor.consume(agentProcess.stdout);
+
+    // Track active session
+    const active: ActiveSession = {
+      sessionId: session._id,
+      process: agentProcess,
+      monitor,
+      monitorDone,
+      killed: false,
+      timedOut: false,
+      agentSessionId: null,
+      agentSessionIdPersistFailed: false,
+      phase: SessionPhase.Planner,
+      timeoutTimer: null,
+      structuredOutput: null,
+      hasCommits: null,
+      workDisposition: null,
+    };
+    this.activeSession = active;
+
+    this.emitLifecycle({
+      type: "session_start",
+      sessionId: session._id,
+      pid: agentProcess.pid,
+      agent: this.provider.name,
+      monitor,
+    });
+
+    this.wireProviderOutput(active, monitor);
+    this.trackProcessExit(agentProcess);
+    this.startSessionTimeout();
+    this.startPidWatchdog();
+
+    return { sessionId: session._id, pid: agentProcess.pid };
+  }
+
+  /**
+   * Handle planner session exit. Simple: resolve disposition, update session, finalize.
+   * No retro/review chain, no git tracking, no issue state changes.
+   */
+  private async handlePlannerExit(exitCode: number): Promise<boolean> {
+    const active = this.requireActiveSession("handlePlannerExit");
+    const { sessionId } = active;
+    const convex = getConvexClient();
+
+    const dispositionResult = this.resolveDisposition(active);
+    if (dispositionResult.success) {
+      const { disposition, note } = dispositionResult;
+      console.log(
+        `[ProjectRunner] Planner session ${sessionId}: ${disposition} — ${note}`,
+      );
+      await convex.mutation(api.sessions.update, {
+        sessionId,
+        status: SessionStatus.Completed,
+        endedAt: Date.now(),
+        exitCode,
+        disposition,
+        note,
+      });
+    } else {
+      console.error(
+        `[ProjectRunner] Planner disposition parse failed: ${dispositionResult.error}`,
+      );
+      await convex.mutation(api.sessions.update, {
+        sessionId,
+        status: exitCode === 0 ? SessionStatus.Completed : SessionStatus.Failed,
+        endedAt: Date.now(),
+        exitCode,
+        disposition: Disposition.Fault,
+        note: dispositionResult.error,
+      });
+    }
+
+    this.finalize();
+    return true;
+  }
+
   /**
    * Finalize the current issue lifecycle. Clears active session and
    * transitions to Idle, then schedules next work.
@@ -1656,9 +1999,21 @@ class ProjectRunner {
       state: OrchestratorState.Idle,
     });
 
-    if (!this.destroyed) {
-      this.scheduleNext();
+    if (this.destroyed) return;
+
+    // Re-read .flux config on each idle transition to pick up schedule/agenda changes
+    this.configurePlanner().catch((err) =>
+      console.error("[ProjectRunner] configurePlanner() failed on idle:", err),
+    );
+
+    // If a planner cron tick fired while busy, run the planner now before picking up issues
+    if (this.plannerPending) {
+      this.plannerPending = false;
+      this.triggerPlanner();
+      return;
     }
+
+    this.scheduleNext();
   }
 
   /**
@@ -1681,7 +2036,7 @@ class ProjectRunner {
     const issuesWithLiveSessions = new Set<string>();
     for (const session of sessions) {
       const pid = session.pid;
-      if (pid && isProcessAlive(pid)) {
+      if (pid && isProcessAlive(pid) && session.issueId) {
         issuesWithLiveSessions.add(session.issueId);
       }
     }
@@ -1698,15 +2053,18 @@ class ProjectRunner {
           endedAt: Date.now(),
           exitCode: -1,
         });
-        const issue = await convex.query(api.issues.get, {
-          issueId: session.issueId,
-        });
-        if (issue && issue.status !== IssueStatus.Closed) {
-          await convex.mutation(api.issues.update, {
+        // Planner sessions have no issue — skip issue recovery
+        if (session.issueId) {
+          const issue = await convex.query(api.issues.get, {
             issueId: session.issueId,
-            status: IssueStatus.Open,
-            assignee: null,
           });
+          if (issue && issue.status !== IssueStatus.Closed) {
+            await convex.mutation(api.issues.update, {
+              issueId: session.issueId,
+              status: IssueStatus.Open,
+              assignee: null,
+            });
+          }
         }
         continue;
       }
@@ -1764,7 +2122,7 @@ class ProjectRunner {
   private async adoptOrphanedSession(
     session: {
       _id: Id<"sessions">;
-      issueId: Id<"issues">;
+      issueId?: Id<"issues">;
       type: string;
       agent: string;
       phase?: string;
@@ -1775,6 +2133,14 @@ class ProjectRunner {
     pid: number,
   ): Promise<boolean> {
     const convex = getConvexClient();
+
+    // Planner sessions have no issue — can't be re-adopted
+    if (!session.issueId) {
+      console.log(
+        `[ProjectRunner] Skipping re-adoption of issueless session ${session._id} (PID ${pid})`,
+      );
+      return false;
+    }
 
     const issue = await convex.query(api.issues.get, {
       issueId: session.issueId,

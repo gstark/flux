@@ -17,7 +17,7 @@ export type OrchestratorState =
 /** Public shape of an active session exposed by orchestrator_status. */
 export interface OrchestratorActiveSession {
   sessionId: string;
-  issueId: string;
+  issueId?: string;
   pid: number;
   phase: SessionPhaseValue;
 }

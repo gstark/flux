@@ -7,6 +7,7 @@ import type {
   AgentOutputEvent,
   AgentProcess,
   AgentProvider,
+  PlannerPromptContext,
   ResumeOptions,
   RetroPromptContext,
   ReviewPromptContext,
@@ -81,6 +82,10 @@ export class CodexProvider implements AgentProvider {
 
   buildReviewPrompt(ctx: ReviewPromptContext): string {
     return buildReviewPrompt(ctx);
+  }
+
+  buildPlannerPrompt(_ctx: PlannerPromptContext): string {
+    throw new Error("Planner is not supported by the Codex provider");
   }
 
   parseOutputLine(line: string): AgentOutputEvent[] {

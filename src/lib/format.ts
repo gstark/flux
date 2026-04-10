@@ -19,6 +19,8 @@ export function typeLabel(type: SessionTypeValue): string {
       return "Work";
     case SessionType.Review:
       return "Review";
+    case SessionType.Planner:
+      return "Planner";
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unhandled session type: ${_exhaustive}`);
@@ -34,6 +36,8 @@ export function phaseLabel(phase: SessionPhaseValue): string {
       return "Retro";
     case SessionPhase.Review:
       return "Review";
+    case SessionPhase.Planner:
+      return "Planner";
     default: {
       const _exhaustive: never = phase;
       throw new Error(`Unhandled session phase: ${_exhaustive}`);

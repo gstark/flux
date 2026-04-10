@@ -27,12 +27,14 @@ const PHASE_LABELS: Record<SessionPhaseValue, string> = {
   [SessionPhase.Work]: "Working",
   [SessionPhase.Retro]: "Retro",
   [SessionPhase.Review]: "Review",
+  [SessionPhase.Planner]: "Planning",
 };
 
 const PHASE_ABBREV: Record<SessionPhaseValue, string> = {
   [SessionPhase.Work]: "W",
   [SessionPhase.Retro]: "R",
   [SessionPhase.Review]: "Rev",
+  [SessionPhase.Planner]: "Plan",
 };
 
 /** Max time (ms) to show a transition before giving up and clearing it. */

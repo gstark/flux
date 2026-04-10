@@ -7,6 +7,7 @@ import type {
   AgentOutputEvent,
   AgentProcess,
   AgentProvider,
+  PlannerPromptContext,
   ResumeOptions,
   RetroPromptContext,
   ReviewPromptContext,
@@ -105,6 +106,10 @@ export class OpenCodeProvider implements AgentProvider {
 
   buildReviewPrompt(ctx: ReviewPromptContext): string {
     return buildReviewPrompt(ctx, "opencode");
+  }
+
+  buildPlannerPrompt(_ctx: PlannerPromptContext): string {
+    throw new Error("Planner is not supported by the OpenCode provider");
   }
 
   parseOutputLine(line: string): AgentOutputEvent[] {

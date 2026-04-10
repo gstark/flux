@@ -1,4 +1,5 @@
 import {
+  buildPlannerPrompt,
   buildRetroPrompt,
   buildReviewPrompt,
   buildWorkPrompt,
@@ -9,6 +10,7 @@ import type {
   AgentProvider,
   AgentStdin,
   DispositionResult,
+  PlannerPromptContext,
   ResumeOptions,
   RetroPromptContext,
   ReviewPromptContext,
@@ -74,6 +76,12 @@ const DISPOSITION_SCHEMAS: Record<SessionPhase, string> = {
       "Could NOT complete the review due to an operational problem (not a code quality judgment)",
     note: "Summary of review findings and actions taken, or what blocked you",
   }),
+  [Phase.Planner]: buildDispositionSchema({
+    done: "Planner completed — reprioritized, created, closed, or deferred issues",
+    noop: "Backlog is healthy — no changes needed",
+    fault: "Could not complete planner run due to an operational problem",
+    note: "Summary of changes made (for done), why no changes needed (for noop), or what went wrong (for fault)",
+  }),
 };
 
 /** Build a clean env for spawned agents, stripping Flux-specific vars
@@ -109,6 +117,7 @@ export class ClaudeCodeProvider implements AgentProvider {
         "stream-json",
         "--input-format",
         "stream-json",
+        "--verbose",
         "--json-schema",
         DISPOSITION_SCHEMAS[opts.phase],
         "--dangerously-skip-permissions",
@@ -136,6 +145,7 @@ export class ClaudeCodeProvider implements AgentProvider {
         "stream-json",
         "--input-format",
         "stream-json",
+        "--verbose",
         "--json-schema",
         DISPOSITION_SCHEMAS[opts.phase],
         "--dangerously-skip-permissions",
@@ -167,6 +177,10 @@ export class ClaudeCodeProvider implements AgentProvider {
 
   buildReviewPrompt(ctx: ReviewPromptContext): string {
     return buildReviewPrompt(ctx);
+  }
+
+  buildPlannerPrompt(ctx: PlannerPromptContext): string {
+    return buildPlannerPrompt(ctx);
   }
 
   parseOutputLine(line: string): AgentOutputEvent[] {
