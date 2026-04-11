@@ -14,7 +14,6 @@ import { EpicDetailPage } from "../pages/EpicDetailPage";
 import { EpicsPage } from "../pages/EpicsPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
 import { IssuesPage } from "../pages/IssuesPage";
-import { LabelsPage } from "../pages/LabelsPage";
 import { SessionDetailPage } from "../pages/SessionDetailPage";
 import { SessionsPage } from "../pages/SessionsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -97,13 +96,6 @@ const epicDetailRoute = createRoute({
   errorComponent: RouteError,
 });
 
-const labelsRoute = createRoute({
-  getParentRoute: () => projectLayoutRoute,
-  path: "/labels",
-  component: LabelsPage,
-  errorComponent: RouteError,
-});
-
 const settingsRoute = createRoute({
   getParentRoute: () => projectLayoutRoute,
   path: "/settings",
@@ -119,7 +111,6 @@ const routeTree = rootRoute.addChildren([
     activityRoute,
     sessionsRoute.addChildren([sessionDetailRoute]),
     epicsRoute.addChildren([epicDetailRoute]),
-    labelsRoute,
     settingsRoute,
   ]),
 ]);

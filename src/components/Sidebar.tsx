@@ -7,7 +7,6 @@ import {
   faGear,
   faLayerGroup,
   faScrewdriverWrench,
-  faTags,
   faTerminal,
 } from "./Icon";
 
@@ -37,17 +36,6 @@ export function Sidebar() {
         >
           <FontAwesomeIcon icon={faLayerGroup} aria-hidden="true" />
           Epics
-        </Link>
-      </li>
-      <li>
-        <Link
-          to="/p/$projectSlug/labels"
-          params={params}
-          activeProps={{ className: "menu-active" }}
-          inactiveProps={{ className: "" }}
-        >
-          <FontAwesomeIcon icon={faTags} aria-hidden="true" />
-          Labels
         </Link>
       </li>
       <li>

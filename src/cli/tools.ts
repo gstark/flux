@@ -92,20 +92,6 @@ const TOOL_MAP: Record<string, ToolEntry> = {
     desc: "Close an epic",
   },
 
-  // Labels
-  "labels list": { tool: "labels_list", desc: "List all labels" },
-  "labels create": { tool: "labels_create", desc: "Create a label" },
-  "labels update": {
-    tool: "labels_update",
-    primary: "labelId",
-    desc: "Update a label",
-  },
-  "labels delete": {
-    tool: "labels_delete",
-    primary: "labelId",
-    desc: "Delete a label",
-  },
-
   // Dependencies
   "deps add": { tool: "deps_add", desc: "Add a dependency between issues" },
   "deps remove": {
@@ -184,7 +170,6 @@ const GROUPS: Record<string, string> = {
   issues: "Manage issues",
   comments: "Manage comments",
   epics: "Manage epics",
-  labels: "Manage labels",
   deps: "Manage dependencies",
   sessions: "View sessions",
   orchestrator: "Control the orchestrator",

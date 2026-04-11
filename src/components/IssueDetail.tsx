@@ -19,8 +19,6 @@ import { IssueDescriptionEditor } from "./IssueDescriptionEditor";
 import { IssueMetadata } from "./IssueMetadata";
 import { IssueSessionsList } from "./IssueSessionsList";
 import { IssueTitleEditor } from "./IssueTitleEditor";
-import { LabelBadge } from "./LabelBadge";
-import { LabelPicker } from "./LabelPicker";
 import { Markdown } from "./Markdown";
 import { StatusBadge } from "./StatusBadge";
 
@@ -28,7 +26,6 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const projectId = useProjectId();
   const projectSlug = useProjectSlug();
   const issue = useQuery(api.issues.get, { issueId });
-  const allLabels = useQuery(api.labels.list, { projectId });
   const allEpics = useQuery(api.epics.list, { projectId });
   const updateIssue = useMutation(api.issues.update);
   const retryIssue = useMutation(api.issues.retry);
@@ -41,13 +38,6 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   // Each tracked action manages its own pending boolean.
   // Actions that use `rethrow` propagate failures to child forms so they can
   // keep their UI open on error.
-
-  const [handleLabelsChange, labelsChanging] = useTrackedAction(
-    async (labelIds: Id<"labels">[]) => {
-      await updateIssue({ issueId, labelIds });
-    },
-    showError,
-  );
 
   const [handleSaveTitle, titleSaving] = useTrackedAction(
     async (newTitle: string) => {
@@ -146,19 +136,12 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
 
   // Any mutation in flight — disables interactive controls
   const saving =
-    labelsChanging ||
     titleSaving ||
     descriptionSaving ||
     prioritySaving ||
     epicSaving ||
     closeSaving;
   const busy = saving || deferring || undeferring || resetting;
-
-  // Build a lookup map for label data
-  const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
-  const assignedLabels = (currentIssue.labelIds ?? [])
-    .map((id) => labelMap.get(id))
-    .filter((l): l is NonNullable<typeof l> => l !== undefined);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -209,33 +192,6 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           <span className="badge badge-sm badge-outline">
             {CLOSE_TYPE_LABELS[currentIssue.closeType as CloseTypeValue]}
           </span>
-        )}
-      </div>
-
-      {/* Labels */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium text-base-content/60 text-sm">Labels</h3>
-          {!isClosed && (
-            <LabelPicker
-              selectedIds={currentIssue.labelIds ?? []}
-              onChange={handleLabelsChange}
-              disabled={busy}
-            />
-          )}
-        </div>
-        {assignedLabels.length > 0 ? (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {assignedLabels.map((label) => (
-              <LabelBadge
-                key={label._id}
-                name={label.name}
-                color={label.color}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="mt-1 text-base-content/40 text-sm">No labels</p>
         )}
       </div>
 

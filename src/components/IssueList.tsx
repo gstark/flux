@@ -15,7 +15,6 @@ import {
   faCirclePlay,
   faLayerGroup,
 } from "./Icon";
-import { LabelBadge } from "./LabelBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { SortableHeader, useSortableTable, useSorted } from "./SortableHeader";
 import { StatusBadge } from "./StatusBadge";
@@ -82,9 +81,6 @@ export function IssueList() {
   );
 
   const issueCounts = useQuery(api.issues.counts, { projectId });
-
-  const allLabels = useQuery(api.labels.list, { projectId });
-  const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
 
   const allEpics = useQuery(api.epics.list, { projectId });
   const epicMap = new Map((allEpics ?? []).map((e) => [e._id, e]));
@@ -169,7 +165,6 @@ export function IssueList() {
                   sort={sort}
                   onToggle={toggle}
                 />
-                <th>Labels</th>
                 <th>Epic</th>
                 <SortableHeader
                   label="Status"
@@ -205,27 +200,6 @@ export function IssueList() {
                       className="block px-4 py-3"
                     >
                       {issue.title}
-                    </Link>
-                  </td>
-                  <td className="p-0">
-                    <Link
-                      to="/p/$projectSlug/issues/$issueId"
-                      params={{ projectSlug, issueId: issue._id }}
-                      className="block px-4 py-3"
-                    >
-                      <div className="flex flex-wrap gap-1">
-                        {(issue.labelIds ?? []).map((id) => {
-                          const label = labelMap.get(id);
-                          if (!label) return null;
-                          return (
-                            <LabelBadge
-                              key={id}
-                              name={label.name}
-                              color={label.color}
-                            />
-                          );
-                        })}
-                      </div>
                     </Link>
                   </td>
                   <td className="p-0">

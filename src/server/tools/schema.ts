@@ -240,23 +240,6 @@ export const EpicsCloseSchema = z.object({
   reason: z.string().optional().describe("Why this epic is being closed."),
 });
 
-export const LabelsListSchema = z.object({});
-
-export const LabelsCreateSchema = z.object({
-  name: z.string().describe("Label name (e.g., 'bug', 'feature')."),
-  color: z.string().describe("Hex color for UI badge (e.g., '#ff0000')."),
-});
-
-export const LabelsUpdateSchema = z.object({
-  labelId: z.string().describe("The label's document ID."),
-  name: z.string().optional().describe("New name."),
-  color: z.string().optional().describe("New hex color."),
-});
-
-export const LabelsDeleteSchema = z.object({
-  labelId: z.string().describe("The label's document ID."),
-});
-
 export const DepsAddSchema = z.object({
   blockerId: z
     .string()
@@ -504,30 +487,6 @@ const epics_close: ToolDef = {
   schema: EpicsCloseSchema.shape,
 };
 
-const labels_list: ToolDef = {
-  name: "labels_list",
-  description: "List all labels for the project.",
-  schema: LabelsListSchema.shape,
-};
-
-const labels_create: ToolDef = {
-  name: "labels_create",
-  description: "Create a new label.",
-  schema: LabelsCreateSchema.shape,
-};
-
-const labels_update: ToolDef = {
-  name: "labels_update",
-  description: "Update an existing label.",
-  schema: LabelsUpdateSchema.shape,
-};
-
-const labels_delete: ToolDef = {
-  name: "labels_delete",
-  description: "Delete a label.",
-  schema: LabelsDeleteSchema.shape,
-};
-
 const deps_add: ToolDef = {
   name: "deps_add",
   description:
@@ -690,12 +649,6 @@ export const allTools: ToolDef[] = [
   epics_show,
   epics_update,
   epics_close,
-
-  // Labels
-  labels_list,
-  labels_create,
-  labels_update,
-  labels_delete,
 
   // Dependencies
   deps_add,

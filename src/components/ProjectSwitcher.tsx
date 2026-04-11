@@ -48,12 +48,6 @@ function navigateToProject(
           params: { projectSlug: newSlug },
         });
         return;
-      case "/p/$projectSlug/labels":
-        navigate({
-          to: "/p/$projectSlug/labels",
-          params: { projectSlug: newSlug },
-        });
-        return;
       case "/p/$projectSlug/settings":
         navigate({
           to: "/p/$projectSlug/settings",

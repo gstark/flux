@@ -220,7 +220,6 @@ export default defineSchema({
     closeReason: v.optional(v.string()),
     deferNote: v.optional(v.string()),
     epicId: v.optional(v.id("epics")),
-    labelIds: v.optional(v.array(v.id("labels"))),
     deletedAt: v.optional(v.number()),
     createdInSessionId: v.optional(v.id("sessions")),
     createdByAgent: v.optional(v.string()),
@@ -248,14 +247,6 @@ export default defineSchema({
     author: commentAuthorValidator,
     createdAt: v.number(),
   }).index("by_issue", ["issueId"]),
-
-  labels: defineTable({
-    projectId: v.id("projects"),
-    name: v.string(),
-    color: v.string(),
-  })
-    .index("by_project", ["projectId"])
-    .index("by_project_name", ["projectId", "name"]),
 
   epics: defineTable({
     projectId: v.id("projects"),

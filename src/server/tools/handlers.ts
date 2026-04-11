@@ -33,9 +33,6 @@ import {
   IssuesSearchSchema,
   IssuesUndeferSchema,
   IssuesUpdateSchema,
-  LabelsCreateSchema,
-  LabelsDeleteSchema,
-  LabelsUpdateSchema,
   OrchestratorRunSchema,
   PromptsResetSchema,
   PromptsSetRetroSchema,
@@ -690,48 +687,6 @@ const deps_listForIssue = typedHandler(
   },
 );
 
-// ── Labels ────────────────────────────────────────────────────────────
-
-const labels_list: ToolHandler = safeHandler(async (_args, ctx) => {
-  const labels = await ctx.convex.query(api.labels.list, {
-    projectId: ctx.projectId,
-  });
-  return ok(ctx, { labels, count: labels.length });
-});
-
-const labels_create = typedHandler(
-  LabelsCreateSchema,
-  async ({ name, color }, ctx) => {
-    const labelId = await ctx.convex.mutation(api.labels.create, {
-      projectId: ctx.projectId,
-      name,
-      color,
-    });
-    return ok(ctx, { labelId, name, color });
-  },
-);
-
-const labels_update = typedHandler(
-  LabelsUpdateSchema,
-  async ({ labelId, ...updates }, ctx) => {
-    const updated = await ctx.convex.mutation(api.labels.update, {
-      labelId: labelId as Id<"labels">,
-      ...updates,
-    });
-    return ok(ctx, { label: updated });
-  },
-);
-
-const labels_delete = typedHandler(
-  LabelsDeleteSchema,
-  async ({ labelId }, ctx) => {
-    await ctx.convex.mutation(api.labels.remove, {
-      labelId: labelId as Id<"labels">,
-    });
-    return ok(ctx, { deleted: labelId });
-  },
-);
-
 // ── Prompts ──────────────────────────────────────────────────────────
 
 const prompts_set_work = typedHandler(
@@ -883,10 +838,6 @@ export const handlers: Record<string, ToolHandler> = {
   epics_show,
   epics_update,
   epics_close,
-  labels_list,
-  labels_create,
-  labels_update,
-  labels_delete,
   deps_add,
   deps_remove,
   deps_listForIssue,

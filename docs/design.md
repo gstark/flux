@@ -55,14 +55,6 @@ An autonomous agent orchestrator with built-in issue tracking, realtime UI, and 
 | issueCounter | number | Default 0. Incremented on issue create for JIRA-style shortIds. |
 | **Indexes** | by_slug | |
 
-### labels
-| Field | Type | Notes |
-|-------|------|-------|
-| projectId | id("projects") | |
-| name | string | "bug", "chore", "feature", etc. |
-| color | string? | Hex color for UI badge |
-| **Indexes** | by_project, by_project_name (unique) | |
-
 ### epics
 | Field | Type | Notes |
 |-------|------|-------|
@@ -71,7 +63,6 @@ An autonomous agent orchestrator with built-in issue tracking, realtime UI, and 
 | title | string | |
 | description | string? | |
 | status | "open" \| "closed" | |
-| labelIds | id("labels")[] | References to labels table |
 | closedAt | number? | |
 | closeReason | string? | |
 | updatedAt | number? | Last modified timestamp. Updated on field changes, child issue changes, comments. |
@@ -88,7 +79,6 @@ An autonomous agent orchestrator with built-in issue tracking, realtime UI, and 
 | description | string? | |
 | status | "open" \| "in_progress" \| "closed" \| "deferred" \| "stuck" | See Status Semantics below. |
 | priority | "critical" \| "high" \| "medium" \| "low" | Named priorities. Critical = drop everything, Low = when time permits. |
-| labelIds | id("labels")[] | References to labels table |
 | assignee | string? | |
 | failureCount | number | Default 0. Incremented per failed work attempt (fault, malformed response, timeout, orphan). **Reset to 0 only when:** user calls `issues_retry`. **Never reset on success** — history preserved for investigation. Circuit breaker trips at `maxFailures` (default 3). |
 | reviewIterations | number | Default 0. Incremented on each review session completion (each pass through the review loop). |
@@ -487,14 +477,6 @@ Note: `issues_delete` is intentionally not exposed to agents. Agents should defe
 | `epics_close` | Close epic (no validation — can close with open issues; UI shows open issue count in epic list) |
 
 **Note**: `epics_delete` is UI-only. Agents cannot delete epics.
-
-### Labels Tools
-| Tool | Description |
-|------|-------------|
-| `labels_list` | List labels for project |
-| `labels_create` | Create label |
-| `labels_update` | Update label |
-| `labels_delete` | Delete label |
 
 ### Dependencies Tools
 | Tool | Description |

@@ -29,28 +29,6 @@ export const runAll = internalMutation({
       }
     }
 
-    // --- Project Seeds (Labels) ---
-    const labels = [
-      { name: "bug", color: "#dc2626" },
-      { name: "feature", color: "#2563eb" },
-      { name: "chore", color: "#6b7280" },
-      { name: "friction", color: "#f59e0b" },
-    ];
-
-    let labelsAdded = 0;
-    for (const label of labels) {
-      const existing = await ctx.db
-        .query("labels")
-        .withIndex("by_project_name", (q) =>
-          q.eq("projectId", projectId).eq("name", label.name),
-        )
-        .first();
-      if (!existing) {
-        await ctx.db.insert("labels", { ...label, projectId });
-        labelsAdded++;
-      }
-    }
-
     // --- Orchestrator Config ---
     const existingConfig = await ctx.db
       .query("orchestratorConfig")
@@ -68,7 +46,6 @@ export const runAll = internalMutation({
 
     return {
       llmCostsAdded,
-      labelsAdded,
       orchestratorConfigCreated: !existingConfig,
     };
   },

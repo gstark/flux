@@ -168,7 +168,7 @@ export const remove = mutation({
 //
 // Convex limits ~8192 document operations per mutation. A project with many
 // issues (each with comments, dependencies), sessions (each with events),
-// labels, epics, and configs can exceed this in a single transaction.
+// epics, and configs can exceed this in a single transaction.
 //
 // Strategy: an internalAction loops through cleanup steps, calling an
 // internalMutation per batch. Each batch stays well under the limit.
@@ -211,7 +211,6 @@ const CHILDREN_PER_PARENT_LIMIT = 200;
 const CascadeSteps = {
   Issues: "issues",
   Sessions: "sessions",
-  Labels: "labels",
   Epics: "epics",
   OrchestratorConfig: "orchestratorConfig",
   StatusCounts: "statusCounts",
@@ -222,7 +221,6 @@ type CascadeStep = (typeof CascadeSteps)[keyof typeof CascadeSteps];
 const cascadeStepValidator = v.union(
   v.literal(CascadeSteps.Issues),
   v.literal(CascadeSteps.Sessions),
-  v.literal(CascadeSteps.Labels),
   v.literal(CascadeSteps.Epics),
   v.literal(CascadeSteps.OrchestratorConfig),
   v.literal(CascadeSteps.StatusCounts),
@@ -231,7 +229,6 @@ const cascadeStepValidator = v.union(
 const CASCADE_STEPS: CascadeStep[] = [
   CascadeSteps.Issues,
   CascadeSteps.Sessions,
-  CascadeSteps.Labels,
   CascadeSteps.Epics,
   CascadeSteps.OrchestratorConfig,
   CascadeSteps.StatusCounts,
@@ -398,18 +395,6 @@ export const cascadeDeleteBatch = internalMutation({
 
           // All events deleted — safe to delete the session itself.
           await ctx.db.delete(session._id);
-          deleted++;
-        }
-        break;
-      }
-
-      case CascadeSteps.Labels: {
-        const labels = await ctx.db
-          .query("labels")
-          .withIndex("by_project", (q) => q.eq("projectId", projectId))
-          .take(batchSize);
-        for (const label of labels) {
-          await ctx.db.delete(label._id);
           deleted++;
         }
         break;

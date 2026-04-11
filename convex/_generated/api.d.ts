@@ -12,7 +12,6 @@ import type * as comments from "../comments.js";
 import type * as deps from "../deps.js";
 import type * as epics from "../epics.js";
 import type * as issues from "../issues.js";
-import type * as labels from "../labels.js";
 import type * as llmCosts from "../llmCosts.js";
 import type * as migrations from "../migrations.js";
 import type * as nuke from "../nuke.js";
@@ -34,7 +33,6 @@ declare const fullApi: ApiFromModules<{
   deps: typeof deps;
   epics: typeof epics;
   issues: typeof issues;
-  labels: typeof labels;
   llmCosts: typeof llmCosts;
   migrations: typeof migrations;
   nuke: typeof nuke;
