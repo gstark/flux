@@ -97,6 +97,10 @@ export const IssuesCreateSchema = z.object({
     .describe(
       "Defaults to 'medium'. Use 'critical' only for drop-everything issues.",
     ),
+  epicId: z
+    .string()
+    .optional()
+    .describe("Attach the new issue to an epic (epic document ID)."),
 });
 
 export const IssuesListSchema = z.object({
@@ -131,6 +135,13 @@ export const IssuesUpdateSchema = z.object({
     .nullable()
     .optional()
     .describe("Assign to an agent or person. Pass null to clear."),
+  epicId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Attach to an epic (epic document ID). Pass null to detach from any epic.",
+    ),
 });
 
 export const IssuesCloseSchema = z.object({

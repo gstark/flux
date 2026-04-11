@@ -415,6 +415,9 @@ Examples:
   flux issues update FLUX-42 --title "New title" --priority high
   flux issues close FLUX-42 --closeType completed --reason "Fixed in PR #123"
   flux issues create --title "Fix login bug" --priority high
+  flux issues create --title "Ship checkout v2" --epicId <epicDocId>
+  flux issues update FLUX-42 --epicId <epicDocId>
+  flux issues update FLUX-42 --epicId null            # detach from epic
   flux comments create FLUX-42 --content "Looks good"
   flux orchestrator run FLUX-42
   flux orchestrator status

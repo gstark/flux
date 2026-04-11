@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
   useCallback,
   useEffect,
@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { api } from "$convex/_generated/api";
+import type { Id } from "$convex/_generated/dataModel";
 import type { IssuePriorityValue } from "$convex/schema";
 import { IssuePriority } from "$convex/schema";
 import { useDismissableError } from "../hooks/useDismissableError";
@@ -28,6 +29,7 @@ export function CreateIssueModal({
   const projectSlug = useProjectSlug();
   const navigate = useNavigate();
   const createIssue = useMutation(api.issues.create);
+  const epics = useQuery(api.epics.list, { projectId });
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,6 +38,7 @@ export function CreateIssueModal({
   const [priority, setPriority] = useState<IssuePriorityValue>(
     IssuePriority.Medium,
   );
+  const [epicId, setEpicId] = useState<string>("");
   const [titleError, setTitleError] = useState(false);
   const { error: submitError, showError, clearError } = useDismissableError();
   const [submitting, setSubmitting] = useState(false);
@@ -63,6 +66,7 @@ export function CreateIssueModal({
     setTitle("");
     setDescription("");
     setPriority(IssuePriority.Medium);
+    setEpicId("");
     setTitleError(false);
     clearError();
     setSubmitting(false);
@@ -88,6 +92,7 @@ export function CreateIssueModal({
         title: trimmedTitle,
         description: description.trim() || undefined,
         priority,
+        ...(epicId && { epicId: epicId as Id<"epics"> }),
       });
     } catch (err) {
       showError(err);
@@ -154,6 +159,24 @@ export function CreateIssueModal({
               {PRIORITY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
+                </option>
+              ))}
+            </select>
+          </fieldset>
+
+          {/* Epic */}
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Epic</legend>
+            <select
+              className="select w-full"
+              value={epicId}
+              onChange={(e) => setEpicId(e.target.value)}
+              disabled={epics === undefined}
+            >
+              <option value="">No epic</option>
+              {(epics ?? []).map((epic) => (
+                <option key={epic._id} value={epic._id}>
+                  {epic.title}
                 </option>
               ))}
             </select>

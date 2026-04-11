@@ -183,12 +183,13 @@ async function resolveIssueId(
 
 const issues_create = typedHandler(
   IssuesCreateSchema,
-  async ({ title, description, priority }, ctx) => {
+  async ({ title, description, priority, epicId }, ctx) => {
     const issueId = await ctx.convex.mutation(api.issues.create, {
       projectId: ctx.projectId,
       title,
       description,
       priority,
+      ...(epicId && { epicId: epicId as Id<"epics"> }),
       ...(ctx.sessionId && { createdInSessionId: ctx.sessionId }),
       ...(ctx.agentName && { createdByAgent: ctx.agentName }),
       ...(ctx.issueId && { sourceIssueId: ctx.issueId }),
@@ -232,11 +233,14 @@ const issues_get = typedHandler(IssuesGetSchema, async ({ issueId }, ctx) => {
 
 const issues_update = typedHandler(
   IssuesUpdateSchema,
-  async ({ issueId, ...updates }, ctx) => {
+  async ({ issueId, epicId, ...updates }, ctx) => {
     const resolvedIssueId = await resolveIssueId(ctx, issueId);
     const updated = await ctx.convex.mutation(api.issues.update, {
       issueId: resolvedIssueId,
       ...updates,
+      ...(epicId !== undefined && {
+        epicId: epicId === null ? null : (epicId as Id<"epics">),
+      }),
     });
     return ok(ctx, { issue: updated });
   },

@@ -9,7 +9,12 @@ import { useDismissableError } from "../hooks/useDismissableError";
 import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import { DeferModal, type DeferModalHandle } from "./DeferModal";
 import { ErrorBanner } from "./ErrorBanner";
-import { FontAwesomeIcon, faCirclePause, faCirclePlay } from "./Icon";
+import {
+  FontAwesomeIcon,
+  faCirclePause,
+  faCirclePlay,
+  faLayerGroup,
+} from "./Icon";
 import { LabelBadge } from "./LabelBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { SortableHeader, useSortableTable, useSorted } from "./SortableHeader";
@@ -80,6 +85,9 @@ export function IssueList() {
 
   const allLabels = useQuery(api.labels.list, { projectId });
   const labelMap = new Map((allLabels ?? []).map((l) => [l._id, l]));
+
+  const allEpics = useQuery(api.epics.list, { projectId });
+  const epicMap = new Map((allEpics ?? []).map((e) => [e._id, e]));
 
   const totalAllIssues =
     issueCounts === undefined
@@ -162,6 +170,7 @@ export function IssueList() {
                   onToggle={toggle}
                 />
                 <th>Labels</th>
+                <th>Epic</th>
                 <SortableHeader
                   label="Status"
                   sortKey="status"
@@ -218,6 +227,31 @@ export function IssueList() {
                         })}
                       </div>
                     </Link>
+                  </td>
+                  <td className="p-0">
+                    {(() => {
+                      const epic = issue.epicId
+                        ? epicMap.get(issue.epicId)
+                        : undefined;
+                      if (!epic) {
+                        return <span className="block px-4 py-3" />;
+                      }
+                      return (
+                        <Link
+                          to="/p/$projectSlug/epics/$epicId"
+                          params={{ projectSlug, epicId: epic._id }}
+                          className="block max-w-[14rem] truncate px-4 py-3 text-sm hover:underline"
+                          title={epic.title}
+                        >
+                          <FontAwesomeIcon
+                            icon={faLayerGroup}
+                            className="mr-1.5 text-base-content/60"
+                            aria-hidden="true"
+                          />
+                          {epic.title}
+                        </Link>
+                      );
+                    })()}
                   </td>
                   <td className="p-0">
                     <Link

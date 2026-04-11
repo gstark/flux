@@ -12,7 +12,7 @@ import { PRIORITY_OPTIONS } from "../lib/format";
 import { CommentsThread } from "./CommentsThread";
 import { DependencySection } from "./DependencySection";
 import { ErrorBanner } from "./ErrorBanner";
-import { FontAwesomeIcon, faArrowLeft } from "./Icon";
+import { FontAwesomeIcon, faArrowLeft, faLayerGroup } from "./Icon";
 import { IssueActionsToolbar } from "./IssueActionsToolbar";
 import { CLOSE_TYPE_LABELS } from "./IssueCloseForm";
 import { IssueDescriptionEditor } from "./IssueDescriptionEditor";
@@ -29,6 +29,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const projectSlug = useProjectSlug();
   const issue = useQuery(api.issues.get, { issueId });
   const allLabels = useQuery(api.labels.list, { projectId });
+  const allEpics = useQuery(api.epics.list, { projectId });
   const updateIssue = useMutation(api.issues.update);
   const retryIssue = useMutation(api.issues.retry);
   const closeIssue = useMutation(api.issues.close);
@@ -65,6 +66,16 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
   const [handlePriorityChange, prioritySaving] = useTrackedAction(
     async (value: string) => {
       await updateIssue({ issueId, priority: value as IssuePriorityValue });
+    },
+    showError,
+  );
+
+  const [handleEpicChange, epicSaving] = useTrackedAction(
+    async (value: string) => {
+      await updateIssue({
+        issueId,
+        epicId: value === "" ? null : (value as Id<"epics">),
+      });
     },
     showError,
   );
@@ -139,6 +150,7 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
     titleSaving ||
     descriptionSaving ||
     prioritySaving ||
+    epicSaving ||
     closeSaving;
   const busy = saving || deferring || undeferring || resetting;
 
@@ -224,6 +236,77 @@ export function IssueDetail({ issueId }: { issueId: Id<"issues"> }) {
           </div>
         ) : (
           <p className="mt-1 text-base-content/40 text-sm">No labels</p>
+        )}
+      </div>
+
+      {/* Epic */}
+      <div>
+        <h3 className="mb-1 font-medium text-base-content/60 text-sm">Epic</h3>
+        {isClosed ? (
+          currentIssue.epicId ? (
+            (() => {
+              const epic = (allEpics ?? []).find(
+                (e) => e._id === currentIssue.epicId,
+              );
+              if (!epic) {
+                return (
+                  <p className="text-base-content/40 text-sm">
+                    (epic unavailable)
+                  </p>
+                );
+              }
+              return (
+                <Link
+                  to="/p/$projectSlug/epics/$epicId"
+                  params={{ projectSlug, epicId: epic._id }}
+                  className="inline-flex items-center gap-1.5 text-sm hover:underline"
+                >
+                  <FontAwesomeIcon
+                    icon={faLayerGroup}
+                    className="text-base-content/60"
+                    aria-hidden="true"
+                  />
+                  {epic.title}
+                </Link>
+              );
+            })()
+          ) : (
+            <p className="text-base-content/40 text-sm">No epic</p>
+          )
+        ) : (
+          <div className="flex items-center gap-2">
+            <select
+              className="select select-sm"
+              value={currentIssue.epicId ?? ""}
+              onChange={(e) => handleEpicChange(e.target.value)}
+              disabled={busy || allEpics === undefined}
+            >
+              <option value="">No epic</option>
+              {(allEpics ?? []).map((epic) => (
+                <option key={epic._id} value={epic._id}>
+                  {epic.title}
+                </option>
+              ))}
+            </select>
+            {currentIssue.epicId &&
+              (() => {
+                const epic = (allEpics ?? []).find(
+                  (e) => e._id === currentIssue.epicId,
+                );
+                if (!epic) return null;
+                return (
+                  <Link
+                    to="/p/$projectSlug/epics/$epicId"
+                    params={{ projectSlug, epicId: epic._id }}
+                    className="btn btn-ghost btn-sm"
+                    title={`Open epic: ${epic.title}`}
+                  >
+                    <FontAwesomeIcon icon={faLayerGroup} aria-hidden="true" />
+                    Open
+                  </Link>
+                );
+              })()}
+          </div>
         )}
       </div>
 

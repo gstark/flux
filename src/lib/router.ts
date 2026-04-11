@@ -10,6 +10,8 @@ import { RootLayout } from "../components/RootLayout";
 import { RouteError } from "../components/RouteError";
 import { ActivityPage } from "../pages/ActivityPage";
 import { DashboardPage } from "../pages/DashboardPage";
+import { EpicDetailPage } from "../pages/EpicDetailPage";
+import { EpicsPage } from "../pages/EpicsPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
 import { IssuesPage } from "../pages/IssuesPage";
 import { LabelsPage } from "../pages/LabelsPage";
@@ -81,6 +83,20 @@ const sessionDetailRoute = createRoute({
   errorComponent: RouteError,
 });
 
+const epicsRoute = createRoute({
+  getParentRoute: () => projectLayoutRoute,
+  path: "/epics",
+  component: EpicsPage,
+  errorComponent: RouteError,
+});
+
+const epicDetailRoute = createRoute({
+  getParentRoute: () => epicsRoute,
+  path: "$epicId",
+  component: EpicDetailPage,
+  errorComponent: RouteError,
+});
+
 const labelsRoute = createRoute({
   getParentRoute: () => projectLayoutRoute,
   path: "/labels",
@@ -102,6 +118,7 @@ const routeTree = rootRoute.addChildren([
     issuesRoute.addChildren([issueDetailRoute]),
     activityRoute,
     sessionsRoute.addChildren([sessionDetailRoute]),
+    epicsRoute.addChildren([epicDetailRoute]),
     labelsRoute,
     settingsRoute,
   ]),

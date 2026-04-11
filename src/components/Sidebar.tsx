@@ -5,6 +5,7 @@ import {
   faCircleDot,
   faClockRotateLeft,
   faGear,
+  faLayerGroup,
   faScrewdriverWrench,
   faTags,
   faTerminal,
@@ -25,6 +26,17 @@ export function Sidebar() {
         >
           <FontAwesomeIcon icon={faCircleDot} aria-hidden="true" />
           Issues
+        </Link>
+      </li>
+      <li>
+        <Link
+          to="/p/$projectSlug/epics"
+          params={params}
+          activeProps={{ className: "menu-active" }}
+          inactiveProps={{ className: "" }}
+        >
+          <FontAwesomeIcon icon={faLayerGroup} aria-hidden="true" />
+          Epics
         </Link>
       </li>
       <li>
