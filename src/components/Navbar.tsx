@@ -49,12 +49,13 @@ export function Navbar({
         {onCreateClick && (
           <button
             type="button"
-            className="btn btn-ghost btn-sm gap-2"
+            className="btn btn-ghost gap-2"
             onClick={onCreateClick}
+            aria-label="New issue"
             title={`New issue (${modKey}${shiftKey}N)`}
           >
             <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
-            <kbd className="kbd kbd-xs">
+            <kbd className="kbd kbd-sm">
               {modKey}
               {shiftKey}N
             </kbd>
@@ -63,12 +64,13 @@ export function Navbar({
         {onSearchClick && (
           <button
             type="button"
-            className="btn btn-ghost btn-sm gap-2"
+            className="btn btn-ghost gap-2"
             onClick={onSearchClick}
+            aria-label="Search issues"
             title={`Search issues (${modKey}K)`}
           >
             <FontAwesomeIcon icon={faMagnifyingGlass} aria-hidden="true" />
-            <kbd className="kbd kbd-xs">{modKey}K</kbd>
+            <kbd className="kbd kbd-sm">{modKey}K</kbd>
           </button>
         )}
         {supported && (
