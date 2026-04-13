@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "concurrently --kill-others-on-fail \"bun --watch --no-clear-screen src/index.ts\" \"convex dev\" \"bunx vite\"",
     "build:frontend": "bunx vite build",
+    "build:convex": "bunx convex deploy -y",
+    "build": "bun run build:convex && bun run build:frontend",
     "start": "NODE_ENV=production bun src/index.ts",
     "check": "biome check --write",
     "smoke:mcp-followup": "bun src/cli.ts mcp smoke-followup",

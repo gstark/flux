@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type DaemonInstallOpts,
+  type DaemonMode,
   plistPath as getPlistPath,
   IS_LINUX,
   isDaemonLoaded,
@@ -154,7 +155,9 @@ function generatePlist(opts: {
 `;
 }
 
-export async function daemonInstall(opts: DaemonInstallOpts = {}): Promise<void> {
+export async function daemonInstall(
+  opts: DaemonInstallOpts = {},
+): Promise<void> {
   if (IS_LINUX) return daemonInstallLinux(opts);
 
   const root = projectRoot();
@@ -167,18 +170,33 @@ export async function daemonInstall(opts: DaemonInstallOpts = {}): Promise<void>
   const bunPath = resolveBunPath();
   const convexUrl = resolveConvexUrl();
   const { fluxPort, fluxVitePort } = resolvePorts(opts);
+  const mode: DaemonMode = opts.mode ?? "dev";
   const envVars = {
     CONVEX_URL: convexUrl,
     FLUX_PORT: String(fluxPort),
     FLUX_VITE_PORT: String(fluxVitePort),
   };
-  const shellCommand = `${bunPath} run dev`;
+  const shellCommand =
+    mode === "prod" ? `${bunPath} run start` : `${bunPath} run dev`;
 
+  console.log(`Mode:            ${mode}`);
   console.log(`Bun:             ${bunPath}`);
   console.log(`Shell:           /bin/zsh -l -c "exec ${shellCommand}"`);
   console.log(`CONVEX_URL:      ${envVars.CONVEX_URL}`);
   console.log(`FLUX_PORT:       ${envVars.FLUX_PORT}`);
-  console.log(`FLUX_VITE_PORT:  ${envVars.FLUX_VITE_PORT}`);
+  if (mode === "dev") {
+    console.log(`FLUX_VITE_PORT:  ${envVars.FLUX_VITE_PORT}`);
+  }
+
+  if (mode === "prod") {
+    const distIndex = join(root, "dist/index.html");
+    if (!existsSync(distIndex)) {
+      throw new Error(
+        `Prod mode requires a built frontend at ${distIndex}. ` +
+          `Run: bun run build`,
+      );
+    }
+  }
 
   // 2. Ensure directories exist
   mkdirSync(logDir, { recursive: true });

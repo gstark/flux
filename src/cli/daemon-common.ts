@@ -32,7 +32,9 @@ export function daemonConfigPath(): string {
 export function readDaemonConfig(): DaemonConfig {
   const path = daemonConfigPath();
   if (existsSync(path)) {
-    const parsed = JSON.parse(readFileSync(path, "utf-8")) as Partial<DaemonConfig>;
+    const parsed = JSON.parse(
+      readFileSync(path, "utf-8"),
+    ) as Partial<DaemonConfig>;
     if (
       typeof parsed.fluxPort !== "number" ||
       typeof parsed.fluxVitePort !== "number"
@@ -60,6 +62,8 @@ export function writeDaemonConfig(cfg: DaemonConfig): void {
 // Install-time port resolution (shared by macOS + Linux installers)
 // ---------------------------------------------------------------------------
 
+export type DaemonMode = "dev" | "prod";
+
 export type DaemonInstallOpts = {
   /** API/server port (FLUX_PORT). Falls back to env, then default 8042. */
   fluxPort?: number;
@@ -69,6 +73,12 @@ export type DaemonInstallOpts = {
    * first instead of colliding with an unrelated default.
    */
   fluxVitePort?: number;
+  /**
+   * Run mode. "dev" (default) starts `bun run dev` (watch + vite + convex dev).
+   * "prod" starts `bun run start` — serves the pre-built `dist/` and expects
+   * CONVEX_URL to point at a deployed Convex backend.
+   */
+  mode?: DaemonMode;
 };
 
 /**

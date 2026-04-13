@@ -33,6 +33,15 @@ function takeFlag(args: string[], name: string): string | undefined {
   return undefined;
 }
 
+/** Parse a boolean `--name` flag. Returns true if present, false otherwise. */
+function takeBoolFlag(args: string[], name: string): boolean {
+  const long = `--${name}`;
+  const idx = args.indexOf(long);
+  if (idx === -1) return false;
+  args.splice(idx, 1);
+  return true;
+}
+
 function parsePort(raw: string, flag: string): number {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > 65535) {
@@ -49,19 +58,24 @@ if (isToolCommand(args)) {
   const installArgs = args.slice(2);
   const fluxPortRaw = takeFlag(installArgs, "port");
   const fluxVitePortRaw = takeFlag(installArgs, "vite-port");
+  const prodMode = takeBoolFlag(installArgs, "prod");
   if (installArgs.length > 0) {
     console.error(
       `Unknown argument(s) for 'daemon install': ${installArgs.join(" ")}`,
     );
-    console.error(`Usage: flux daemon install [--port N] [--vite-port N]`);
+    console.error(
+      `Usage: flux daemon install [--prod] [--port N] [--vite-port N]`,
+    );
     process.exit(1);
   }
   await daemonInstall({
-    fluxPort: fluxPortRaw === undefined ? undefined : parsePort(fluxPortRaw, "--port"),
+    fluxPort:
+      fluxPortRaw === undefined ? undefined : parsePort(fluxPortRaw, "--port"),
     fluxVitePort:
       fluxVitePortRaw === undefined
         ? undefined
         : parsePort(fluxVitePortRaw, "--vite-port"),
+    mode: prodMode ? "prod" : "dev",
   });
 } else {
   // Daemon and utility commands (no flags)

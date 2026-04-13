@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import {
   type DaemonInstallOpts,
+  type DaemonMode,
   isDaemonActiveLinux,
   isServiceInstalledLinux,
   LABEL,
@@ -81,6 +82,7 @@ function generateServiceFile(opts: {
   bunPath: string;
   workingDirectory: string;
   logDir: string;
+  mode: DaemonMode;
   envVars: {
     CONVEX_URL: string;
     FLUX_PORT: string;
@@ -92,6 +94,10 @@ function generateServiceFile(opts: {
   const bunDir = dirname(opts.bunPath);
   const existingPath = process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin";
   const path = `${bunDir}:${existingPath}`;
+  const execCommand =
+    opts.mode === "prod"
+      ? `${opts.bunPath} run start`
+      : `${opts.bunPath} run dev`;
 
   return `[Unit]
 Description=Flux daemon
@@ -100,7 +106,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${opts.workingDirectory}
-ExecStart=${opts.bunPath} run dev
+ExecStart=${execCommand}
 Environment=PATH=${path}
 Environment=CONVEX_URL=${opts.envVars.CONVEX_URL}
 Environment=FLUX_PORT=${opts.envVars.FLUX_PORT}
@@ -131,16 +137,30 @@ export async function daemonInstallLinux(
   const bunPath = resolveBunPath();
   const convexUrl = resolveConvexUrl();
   const { fluxPort, fluxVitePort } = resolvePorts(opts);
+  const mode: DaemonMode = opts.mode ?? "dev";
   const envVars = {
     CONVEX_URL: convexUrl,
     FLUX_PORT: String(fluxPort),
     FLUX_VITE_PORT: String(fluxVitePort),
   };
 
+  console.log(`Mode:            ${mode}`);
   console.log(`Bun:             ${bunPath}`);
   console.log(`CONVEX_URL:      ${envVars.CONVEX_URL}`);
   console.log(`FLUX_PORT:       ${envVars.FLUX_PORT}`);
-  console.log(`FLUX_VITE_PORT:  ${envVars.FLUX_VITE_PORT}`);
+  if (mode === "dev") {
+    console.log(`FLUX_VITE_PORT:  ${envVars.FLUX_VITE_PORT}`);
+  }
+
+  if (mode === "prod") {
+    const distIndex = join(root, "dist/index.html");
+    if (!existsSync(distIndex)) {
+      throw new Error(
+        `Prod mode requires a built frontend at ${distIndex}. ` +
+          `Run: bun run build`,
+      );
+    }
+  }
 
   // Ensure directories exist
   mkdirSync(logDir, { recursive: true });
@@ -162,6 +182,7 @@ export async function daemonInstallLinux(
     bunPath,
     workingDirectory: root,
     logDir,
+    mode,
     envVars,
   });
   writeFileSync(service, serviceContent);
