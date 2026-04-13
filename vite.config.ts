@@ -7,6 +7,7 @@ import { defineConfig } from "vite";
 // no runtime dep on the CLI module graph. The Bun reverse-proxy in
 // src/server/index.ts targets the same FLUX_VITE_PORT.
 const FLUX_VITE_PORT = Number(process.env.FLUX_VITE_PORT) || 8043;
+const fluxBackend = `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -20,6 +21,11 @@ export default defineConfig({
     strictPort: true,
     hmr: {
       port: FLUX_VITE_PORT,
+    },
+    proxy: {
+      "/api": fluxBackend,
+      "/health": fluxBackend,
+      "/p": fluxBackend,
     },
   },
 });

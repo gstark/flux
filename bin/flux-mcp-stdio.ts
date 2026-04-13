@@ -3,10 +3,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { readFluxConfig } from "../src/server/fluxConfig";
 import { callFluxTool } from "../src/server/fluxToolHttp";
 import { allTools } from "../src/server/tools/schema";
+import { resolveFluxUrl } from "../src/shared/fluxUrl";
 
-const FLUX_URL =
-  process.env.FLUX_URL ??
-  `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
+const FLUX_URL = resolveFluxUrl();
 
 /**
  * Find the git repo root by walking up from cwd.

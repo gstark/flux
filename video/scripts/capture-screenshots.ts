@@ -12,7 +12,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-const BASE_URL = "http://localhost:8042";
+const BASE_URL = `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
 const OUTPUT_DIR = join(import.meta.dir, "..", "public", "screenshots");
 
 interface ScreenshotSpec {
