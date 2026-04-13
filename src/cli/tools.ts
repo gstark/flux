@@ -6,6 +6,8 @@ import { toolsByName } from "../server/tools/schema";
 const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
 
 type ToolEntry = { tool: string; primary?: string; desc: string };
+type TopLevelCommand = { desc: string };
+type Project = { id: string; slug?: string; name?: string; path?: string | null };
 
 const TOOL_MAP: Record<string, ToolEntry> = {
   // Issues
@@ -166,6 +168,12 @@ const TOOL_MAP: Record<string, ToolEntry> = {
   },
 };
 
+const TOP_LEVEL_COMMANDS: Record<string, TopLevelCommand> = {
+  open: {
+    desc: "Open the current project in Flux using the default browser",
+  },
+};
+
 const GROUPS: Record<string, string> = {
   issues: "Manage issues",
   comments: "Manage comments",
@@ -201,8 +209,6 @@ async function prompt(question: string): Promise<string> {
   });
 }
 
-type Project = { id: string; slug?: string; path?: string | null };
-
 async function fetchProjects(): Promise<Project[]> {
   const res = await fetch(`${FLUX_URL}/api/projects`).catch(() => null);
   if (!res || !res.ok) {
@@ -212,6 +218,70 @@ async function fetchProjects(): Promise<Project[]> {
     );
   }
   return res.json();
+}
+
+async function fetchProject(projectId: string): Promise<Project> {
+  const res = await fetch(`${FLUX_URL}/api/projects/${projectId}`).catch(
+    () => null,
+  );
+  if (!res || !res.ok) {
+    die(
+      `Cannot load Flux project ${projectId} from ${FLUX_URL}.\n` +
+        "Is the daemon running? Start it: launchctl start dev.flux.daemon",
+    );
+  }
+  return res.json();
+}
+
+export function buildProjectUrl(projectSlug: string): string {
+  return new URL(`/p/${projectSlug}/issues`, FLUX_URL).toString();
+}
+
+function browserOpenCommand(url: string): string[] {
+  switch (process.platform) {
+    case "darwin":
+      return ["open", url];
+    case "linux":
+      return ["xdg-open", url];
+    case "win32":
+      return ["cmd", "/c", "start", "", url];
+    default:
+      die(`Unsupported platform for browser launch: ${process.platform}`);
+  }
+}
+
+async function openInBrowser(url: string): Promise<void> {
+  const command = browserOpenCommand(url);
+
+  let proc: Bun.Subprocess<"ignore", "ignore", "pipe">;
+  try {
+    proc = Bun.spawn(command, {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    die(`Failed to launch the browser opener (${command[0]}): ${message}`);
+  }
+
+  const stderr = (await new Response(proc.stderr).text()).trim();
+  const code = await proc.exited;
+  if (code !== 0) {
+    const detail = stderr ? `: ${stderr}` : "";
+    die(`Browser opener failed (${command[0]})${detail}`);
+  }
+}
+
+async function openCurrentProject(): Promise<void> {
+  const projectId = await resolveProjectId();
+  const project = await fetchProject(projectId);
+  if (!project.slug) {
+    die(`Project ${projectId} is missing a slug.`);
+  }
+
+  const url = buildProjectUrl(project.slug);
+  await openInBrowser(url);
+  console.log(url);
 }
 
 /**
@@ -234,11 +304,10 @@ async function pickProject(
   console.error("No Flux project configured for this repo.\n");
 
   // Show existing projects
-  for (let i = 0; i < projects.length; i++) {
-    const p = projects[i];
+  for (const [index, p] of projects.entries()) {
     const label = p.slug ?? p.id;
     const pathHint = p.path ? ` — ${p.path}` : "";
-    console.error(`  ${i + 1}. ${label}${pathHint}`);
+    console.error(`  ${index + 1}. ${label}${pathHint}`);
   }
   if (repoRoot) {
     console.error(`  n. Create new project for ${repoRoot}`);
@@ -262,6 +331,9 @@ async function pickProject(
   }
 
   const selected = projects[idx];
+  if (!selected) {
+    die(`Invalid selection: ${answer}`);
+  }
   if (repoRoot) {
     await writeFluxFile(repoRoot, selected.id);
   }
@@ -316,6 +388,9 @@ async function resolveProjectId(): Promise<string> {
 
   if (projects.length === 1) {
     const project = projects[0];
+    if (!project) {
+      die("Flux returned an invalid single-project response.");
+    }
     // If we have a repo root, persist the selection
     if (repoRoot) {
       await writeFluxFile(repoRoot, project.id);
@@ -335,13 +410,15 @@ function parseArgs(
   const args: Record<string, unknown> = {};
   let i = 0;
 
-  if (primaryField && i < argv.length && !argv[i].startsWith("--")) {
-    args[primaryField] = argv[i];
+  const first = argv[i];
+  if (primaryField && first && !first.startsWith("--")) {
+    args[primaryField] = first;
     i++;
   }
 
   while (i < argv.length) {
     const arg = argv[i];
+    if (!arg) break;
 
     if (arg.startsWith("--")) {
       const eqIdx = arg.indexOf("=");
@@ -379,6 +456,7 @@ function printToolsHelp(): void {
   console.log(`flux — CLI for the Flux issue tracker
 
 Usage: flux <group> <command> [args] [options]
+       flux <command>
 
 Groups:`);
 
@@ -387,6 +465,10 @@ Groups:`);
   }
 
   console.log(`  ${"daemon".padEnd(16)}Manage the Flux daemon`);
+  console.log("\nTop-level commands:");
+  for (const [command, entry] of Object.entries(TOP_LEVEL_COMMANDS)) {
+    console.log(`  ${command.padEnd(16)}${entry.desc}`);
+  }
 
   console.log(`
 Run 'flux <group>' for subcommand help.
@@ -407,6 +489,7 @@ Examples:
   flux orchestrator run FLUX-42
   flux orchestrator status
   flux sessions show <sessionId>
+  flux open
 
 Project: reads .flux file at git repo root, or set FLUX_PROJECT_ID.`);
 }
@@ -427,6 +510,7 @@ function printGroupHelp(group: string): void {
     if (!key.startsWith(`${group} `)) continue;
     const action = key.slice(group.length + 1);
     const entry = TOOL_MAP[key];
+    if (!entry) continue;
     const primaryHint = entry.primary ? ` <${entry.primary}>` : "";
     const usage = `${action}${primaryHint}`;
     console.log(`  ${usage.padEnd(28)}${entry.desc}`);
@@ -476,8 +560,9 @@ function die(message: string): never {
 export function isToolCommand(args: string[]): boolean {
   if (args.length === 0) return true;
   const first = args[0];
+  if (!first) return false;
   if (first === "--help" || first === "-h") return true;
-  return first in GROUPS;
+  return first in GROUPS || first in TOP_LEVEL_COMMANDS;
 }
 
 /** Run a tool command from argv (after slicing off the process args). */
@@ -488,8 +573,27 @@ export async function runToolCommand(argv: string[]): Promise<void> {
     process.exit(0);
   }
 
+  if (argv[0] === "open") {
+    if (argv.includes("--help") || argv.includes("-h")) {
+      console.log("flux open");
+      console.log(
+        "\n  Open the current Flux project in the default browser.",
+      );
+      process.exit(0);
+    }
+    if (argv.length > 1) {
+      die("flux open does not accept arguments.");
+    }
+    await openCurrentProject();
+    return;
+  }
+
   const group = argv[0];
   const action = argv[1];
+  if (!group) {
+    printToolsHelp();
+    process.exit(0);
+  }
 
   // Group only → show group help
   if (!action || action === "--help" || action === "-h") {
