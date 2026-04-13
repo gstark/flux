@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
+const FLUX_URL =
+  process.env.FLUX_URL ??
+  `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
 const HTTP_TIMEOUT_MS = 3_000;
 
 type FluxProject = {

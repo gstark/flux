@@ -3,7 +3,9 @@
 import { readFluxConfig } from "../server/fluxConfig";
 import { toolsByName } from "../server/tools/schema";
 
-const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
+const FLUX_URL =
+  process.env.FLUX_URL ??
+  `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
 
 type ToolEntry = { tool: string; primary?: string; desc: string };
 
