@@ -569,7 +569,10 @@ const issues_bulk_create = typedHandler(
       ...(ctx.sessionId && { createdInSessionId: ctx.sessionId }),
       ...(ctx.agentName && { createdByAgent: ctx.agentName }),
     });
-    return ok(ctx, { issues: created, count: created.length });
+    return ok(ctx, {
+      issues: created.map(normalizeIssue),
+      count: created.length,
+    });
   },
 );
 
@@ -585,7 +588,10 @@ const issues_bulk_update = typedHandler(
     const issues = await ctx.convex.mutation(api.issues.bulkUpdate, {
       updates: resolved,
     });
-    return ok(ctx, { issues, count: issues.length });
+    return ok(ctx, {
+      issues: issues.map(normalizeIssue),
+      count: issues.length,
+    });
   },
 );
 
