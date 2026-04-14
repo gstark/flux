@@ -358,6 +358,10 @@ export async function daemonStatusLinux(): Promise<void> {
       );
       console.log(`Sessions: ${health.sessions} active`);
       console.log(`Memory:   ${health.memory.rss} MB RSS`);
+    } else {
+      console.log(`\n--- Runtime ---`);
+      console.log(`Health:   unreachable (http://localhost:${port}/health)`);
+      console.log(`          HTTP ${resp.status}`);
     }
   } catch {
     console.log(`\n--- Runtime ---`);
@@ -384,18 +388,17 @@ export async function daemonStatusLinux(): Promise<void> {
       console.log(stderrTail);
     }
   }
-
-  console.log(`\nLive logs: journalctl --user -u ${LABEL} -f`);
 }
 
 // ---------------------------------------------------------------------------
-// Shared formatting helpers
+// Small internal utilities
 // ---------------------------------------------------------------------------
 
 function formatSeconds(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
+
   if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
   if (hours > 0) return `${hours}h ${minutes % 60}m`;
   if (minutes > 0) return `${minutes}m ${totalSeconds % 60}s`;

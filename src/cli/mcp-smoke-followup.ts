@@ -3,8 +3,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { resolveFluxUrl } from "../shared/fluxUrl";
 
-const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
+const FLUX_URL = resolveFluxUrl();
 const HTTP_TIMEOUT_MS = 3_000;
 
 type FluxProject = {

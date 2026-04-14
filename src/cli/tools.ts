@@ -2,8 +2,9 @@
 
 import { readFluxConfig } from "../server/fluxConfig";
 import { toolsByName } from "../server/tools/schema";
+import { resolveFluxUrl } from "../shared/fluxUrl";
 
-const FLUX_URL = process.env.FLUX_URL ?? "http://localhost:8042";
+const FLUX_URL = resolveFluxUrl();
 
 type ToolEntry = { tool: string; primary?: string; desc: string };
 type TopLevelCommand = { desc: string };
