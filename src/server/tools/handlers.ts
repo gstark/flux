@@ -147,6 +147,37 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+const OPTIONAL_ISSUE_FIELDS = [
+  "description",
+  "assignee",
+  "closedAt",
+  "updatedAt",
+  "sourceIssueId",
+  "reviewIterations",
+  "closeType",
+  "closeReason",
+  "deferNote",
+  "epicId",
+  "deletedAt",
+  "createdInSessionId",
+  "createdByAgent",
+] as const;
+
+/**
+ * Converts undefined optional fields to null so JSON.stringify preserves them.
+ * Without this, agents cannot distinguish "field not stored" from "stored as undefined"
+ * because JSON.stringify silently strips undefined values.
+ */
+function normalizeIssue<T extends Record<string, unknown>>(issue: T): T {
+  const normalized = { ...issue };
+  for (const field of OPTIONAL_ISSUE_FIELDS) {
+    if (normalized[field] === undefined) {
+      (normalized as Record<string, unknown>)[field] = null;
+    }
+  }
+  return normalized;
+}
+
 async function resolveIssueId(
   ctx: ToolContext,
   issueIdOrShortId: string,
@@ -189,7 +220,7 @@ const issues_create = typedHandler(
     const issue = await ctx.convex.query(api.issues.get, {
       issueId: issueId as Id<"issues">,
     });
-    return ok(ctx, { issue });
+    return ok(ctx, { issue: issue ? normalizeIssue(issue) : null });
   },
 );
 
@@ -220,7 +251,7 @@ const issues_get = typedHandler(IssuesGetSchema, async ({ issueId }, ctx) => {
       `Issue not found: ${issueId}. Use issues_search to confirm the issue exists in this project.`,
     );
   }
-  return ok(ctx, { issue });
+  return ok(ctx, { issue: normalizeIssue(issue) });
 });
 
 const issues_update = typedHandler(
@@ -234,7 +265,7 @@ const issues_update = typedHandler(
         epicId: epicId === null ? null : (epicId as Id<"epics">),
       }),
     });
-    return ok(ctx, { issue: updated });
+    return ok(ctx, { issue: normalizeIssue(updated) });
   },
 );
 
@@ -441,7 +472,7 @@ const issues_close = typedHandler(
       closeType,
       closeReason: reason,
     });
-    return ok(ctx, { issue: updated });
+    return ok(ctx, { issue: normalizeIssue(updated) });
   },
 );
 
@@ -452,7 +483,7 @@ const issues_retry = typedHandler(
     const updated = await ctx.convex.mutation(api.issues.retry, {
       issueId: resolvedIssueId,
     });
-    return ok(ctx, { issue: updated });
+    return ok(ctx, { issue: normalizeIssue(updated) });
   },
 );
 
@@ -464,7 +495,7 @@ const issues_defer = typedHandler(
       issueId: resolvedIssueId,
       note,
     });
-    return ok(ctx, { issue: updated });
+    return ok(ctx, { issue: normalizeIssue(updated) });
   },
 );
 
@@ -476,7 +507,7 @@ const issues_undefer = typedHandler(
       issueId: resolvedIssueId,
       note,
     });
-    return ok(ctx, { issue: updated });
+    return ok(ctx, { issue: normalizeIssue(updated) });
   },
 );
 
