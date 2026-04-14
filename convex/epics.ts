@@ -3,6 +3,13 @@ import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { EpicStatus, epicStatusValidator } from "./schema";
 
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
@@ -21,12 +28,20 @@ export const create = mutation({
       );
     }
 
+    const worktreeSlug = args.useWorktree ? slugify(args.title) : undefined;
+    if (args.useWorktree && !worktreeSlug) {
+      throw new Error(
+        `Epic title "${args.title}" produces an empty slug — cannot use as worktree name.`,
+      );
+    }
+
     return await ctx.db.insert("epics", {
       projectId: args.projectId,
       title: args.title,
       description: args.description,
       status: EpicStatus.Open,
       useWorktree: args.useWorktree,
+      worktreeSlug,
     });
   },
 });
@@ -114,10 +129,38 @@ export const update = mutation({
       Object.entries(rest).filter(([, v]) => v !== undefined),
     );
 
+    if (rest.useWorktree && !epic.worktreeSlug) {
+      const title = rest.title ?? epic.title;
+      const slug = slugify(title);
+      if (!slug) {
+        throw new Error(
+          `Epic title "${title}" produces an empty slug — cannot use as worktree name.`,
+        );
+      }
+      patch.worktreeSlug = slug;
+    }
+
     if (Object.keys(patch).length === 0) return epic;
 
     await ctx.db.patch(epicId, patch);
     return await ctx.db.get(epicId);
+  },
+});
+
+export const setWorktreeSlug = mutation({
+  args: {
+    epicId: v.id("epics"),
+    worktreeSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const epic = await ctx.db.get(args.epicId);
+    if (!epic) throw new Error(`Epic ${args.epicId} not found`);
+    if (epic.worktreeSlug) {
+      throw new Error(
+        `Epic ${args.epicId} already has worktreeSlug "${epic.worktreeSlug}" — slug is immutable.`,
+      );
+    }
+    await ctx.db.patch(args.epicId, { worktreeSlug: args.worktreeSlug });
   },
 });
 

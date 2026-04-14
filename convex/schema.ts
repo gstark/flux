@@ -257,6 +257,7 @@ export default defineSchema({
     closedAt: v.optional(v.number()),
     closeReason: v.optional(v.string()),
     useWorktree: v.optional(v.boolean()),
+    worktreeSlug: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"]),

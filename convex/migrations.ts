@@ -308,6 +308,47 @@ export const shiftTimestamps = internalMutation({
 });
 
 /**
+ * Backfill `worktreeSlug` on epics that have `useWorktree=true` but no slug.
+ *
+ * Added for FLUX-53 (worktree slug derived from mutable title). Computes
+ * the slug from the current title and persists it so future title changes
+ * don't orphan the worktree.
+ *
+ * Safe to re-run: skips epics that already have a worktreeSlug.
+ */
+export const backfillWorktreeSlug = internalMutation({
+  handler: async (ctx) => {
+    const allEpics = await ctx.db.query("epics").collect();
+
+    let patched = 0;
+    let skipped = 0;
+
+    for (const epic of allEpics) {
+      if (epic.worktreeSlug || !epic.useWorktree) {
+        skipped++;
+        continue;
+      }
+
+      const slug = epic.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+
+      if (!slug) {
+        throw new Error(
+          `Epic ${epic._id} title "${epic.title}" produces an empty slug — fix title before migrating.`,
+        );
+      }
+
+      await ctx.db.patch(epic._id, { worktreeSlug: slug });
+      patched++;
+    }
+
+    return { patched, skipped, total: allEpics.length };
+  },
+});
+
+/**
  * Fix sessions with invalid type/phase="workshop" and extra fields like epicId.
  *
  * The document k9720fmqq0pa92rz6x8nbb4fpd84rxk9 has type: "workshop",
