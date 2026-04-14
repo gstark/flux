@@ -69,8 +69,9 @@ export function SSEProvider({
         listener(new MessageEvent("open"));
       }
 
+      const captured = set;
       return () => {
-        set.delete(listener);
+        captured.delete(listener);
       };
     },
   );
