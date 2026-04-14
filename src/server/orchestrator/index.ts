@@ -486,21 +486,11 @@ class ProjectRunner {
               `[ProjectRunner] Epic ${issue.epicId} has useWorktree=true but project has no worktreeBase configured.`,
             );
           }
-          let epicSlug = epic.worktreeSlug;
+          const epicSlug = epic.worktreeSlug;
           if (!epicSlug) {
-            epicSlug = epic.title
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/^-|-$/g, "");
-            if (!epicSlug) {
-              throw new Error(
-                `[ProjectRunner] Epic "${epic.title}" produces an empty slug — cannot create worktree.`,
-              );
-            }
-            await convex.mutation(api.epics.setWorktreeSlug, {
-              epicId: epic._id,
-              worktreeSlug: epicSlug,
-            });
+            throw new Error(
+              `[ProjectRunner] Epic ${epic._id} has useWorktree=true but no worktreeSlug — run migrations:backfillWorktreeSlug`,
+            );
           }
           const worktreePath = `${project.worktreeBase}/${epicSlug}`;
           const branchName = `epic/${epicSlug}`;

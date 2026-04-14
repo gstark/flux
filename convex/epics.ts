@@ -147,23 +147,6 @@ export const update = mutation({
   },
 });
 
-export const setWorktreeSlug = mutation({
-  args: {
-    epicId: v.id("epics"),
-    worktreeSlug: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const epic = await ctx.db.get(args.epicId);
-    if (!epic) throw new Error(`Epic ${args.epicId} not found`);
-    if (epic.worktreeSlug) {
-      throw new Error(
-        `Epic ${args.epicId} already has worktreeSlug "${epic.worktreeSlug}" — slug is immutable.`,
-      );
-    }
-    await ctx.db.patch(args.epicId, { worktreeSlug: args.worktreeSlug });
-  },
-});
-
 export const close = mutation({
   args: {
     epicId: v.id("epics"),
