@@ -282,8 +282,10 @@ export async function startServer() {
       });
     };
   } else {
-    // Dev mode: reverse-proxy to Vite for frontend assets and SPA routes
-    const VITE_ORIGIN = "http://localhost:8043";
+    // Dev mode: reverse-proxy to Vite for frontend assets and SPA routes.
+    // Vite's port is picked up from FLUX_VITE_PORT (set by `flux daemon install`).
+    const vitePort = Number(process.env.FLUX_VITE_PORT) || 8043;
+    const VITE_ORIGIN = `http://localhost:${vitePort}`;
     routes["/*"] = async (req: Request) => {
       const url = new URL(req.url);
       const target = new URL(url.pathname + url.search, VITE_ORIGIN);

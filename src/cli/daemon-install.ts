@@ -3,12 +3,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import {
+  type DaemonInstallOpts,
+  type DaemonMode,
   plistPath as getPlistPath,
   IS_LINUX,
   isDaemonLoaded,
   LABEL,
+  resolvePorts,
+  writeDaemonConfig,
 } from "./daemon-common";
 import { daemonInstallLinux } from "./daemon-linux";
+
+export type { DaemonInstallOpts } from "./daemon-common";
 
 /** Escape XML special characters for safe interpolation into plist values. */
 function escapeXml(s: string): string {
@@ -19,9 +25,8 @@ function escapeXml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Read CONVEX_URL and FLUX_PORT from env, falling back to .env.local in the project root. */
-function resolveEnvVars(): { CONVEX_URL: string; FLUX_PORT: string } {
-  const fluxPort = process.env.FLUX_PORT ?? "8042";
+/** Read CONVEX_URL from env, falling back to .env.local in the project root. */
+function resolveConvexUrl(): string {
   let convexUrl = process.env.CONVEX_URL;
 
   if (!convexUrl) {
@@ -50,7 +55,7 @@ function resolveEnvVars(): { CONVEX_URL: string; FLUX_PORT: string } {
     );
   }
 
-  return { CONVEX_URL: convexUrl, FLUX_PORT: fluxPort };
+  return convexUrl;
 }
 
 /** Resolve the Flux project root (directory containing this source tree). */
@@ -118,7 +123,11 @@ function generatePlist(opts: {
   shellCommand: string;
   workingDirectory: string;
   logDir: string;
-  envVars: { CONVEX_URL: string; FLUX_PORT: string };
+  envVars: {
+    CONVEX_URL: string;
+    FLUX_PORT: string;
+    FLUX_VITE_PORT: string;
+  };
   path: string;
 }): string {
   const e = {
@@ -127,6 +136,7 @@ function generatePlist(opts: {
     shellCmd: escapeXml(opts.shellCommand),
     convexUrl: escapeXml(opts.envVars.CONVEX_URL),
     fluxPort: escapeXml(opts.envVars.FLUX_PORT),
+    fluxVitePort: escapeXml(opts.envVars.FLUX_VITE_PORT),
     logDir: escapeXml(opts.logDir),
     path: escapeXml(opts.path),
   };
@@ -157,6 +167,8 @@ function generatePlist(opts: {
 		<string>${e.convexUrl}</string>
 		<key>FLUX_PORT</key>
 		<string>${e.fluxPort}</string>
+		<key>FLUX_VITE_PORT</key>
+		<string>${e.fluxVitePort}</string>
 	</dict>
 
 	<key>KeepAlive</key>
@@ -178,8 +190,10 @@ function generatePlist(opts: {
 `;
 }
 
-export async function daemonInstall(): Promise<void> {
-  if (IS_LINUX) return daemonInstallLinux();
+export async function daemonInstall(
+  opts: DaemonInstallOpts = {},
+): Promise<void> {
+  if (IS_LINUX) return daemonInstallLinux(opts);
 
   const root = projectRoot();
   const home = homedir();
@@ -187,17 +201,39 @@ export async function daemonInstall(): Promise<void> {
   const launchAgentsDir = join(home, "Library/LaunchAgents");
   const logDir = join(home, ".flux/logs");
 
-  // 1. Resolve dependencies
+  // 1. Resolve dependencies + ports
   const bunPath = resolveBunPath();
-  const envVars = resolveEnvVars();
-  const shellCommand = `${bunPath} run dev`;
   const path = resolvePathForPlist(bunPath);
+  const convexUrl = resolveConvexUrl();
+  const { fluxPort, fluxVitePort } = resolvePorts(opts);
+  const mode: DaemonMode = opts.mode ?? "dev";
+  const envVars = {
+    CONVEX_URL: convexUrl,
+    FLUX_PORT: String(fluxPort),
+    FLUX_VITE_PORT: String(fluxVitePort),
+  };
+  const shellCommand =
+    mode === "prod" ? `${bunPath} run start` : `${bunPath} run dev`;
 
-  console.log(`Bun:        ${bunPath}`);
-  console.log(`PATH:       ${path}`);
-  console.log(`Shell:      /bin/zsh -l -c "exec ${shellCommand}"`);
-  console.log(`CONVEX_URL: ${envVars.CONVEX_URL}`);
-  console.log(`FLUX_PORT:  ${envVars.FLUX_PORT}`);
+  console.log(`Mode:            ${mode}`);
+  console.log(`Bun:             ${bunPath}`);
+  console.log(`PATH:            ${path}`);
+  console.log(`Shell:           /bin/zsh -l -c "exec ${shellCommand}"`);
+  console.log(`CONVEX_URL:      ${envVars.CONVEX_URL}`);
+  console.log(`FLUX_PORT:       ${envVars.FLUX_PORT}`);
+  if (mode === "dev") {
+    console.log(`FLUX_VITE_PORT:  ${envVars.FLUX_VITE_PORT}`);
+  }
+
+  if (mode === "prod") {
+    const distIndex = join(root, "dist/index.html");
+    if (!existsSync(distIndex)) {
+      throw new Error(
+        `Prod mode requires a built frontend at ${distIndex}. ` +
+          `Run: bun run build`,
+      );
+    }
+  }
 
   // 2. Ensure directories exist
   mkdirSync(logDir, { recursive: true });
@@ -220,11 +256,14 @@ export async function daemonInstall(): Promise<void> {
   writeFileSync(plist, plistContent);
   console.log(`Wrote ${plist}`);
 
-  // 5. Load the plist
+  // 5. Persist port choice so status/start commands resolve the right URL
+  writeDaemonConfig({ fluxPort, fluxVitePort });
+
+  // 6. Load the plist
   execSync(`launchctl load "${plist}"`, { stdio: "pipe" });
   console.log(`Loaded ${LABEL}`);
 
-  // 6. Verify
+  // 7. Verify
   if (!isDaemonLoaded()) {
     throw new Error(
       `Failed to verify ${LABEL} registration. Check: launchctl list | grep ${LABEL}`,

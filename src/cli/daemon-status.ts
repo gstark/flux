@@ -2,7 +2,12 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { plistPath as getPlistPath, IS_LINUX, LABEL } from "./daemon-common";
+import {
+  plistPath as getPlistPath,
+  IS_LINUX,
+  LABEL,
+  readDaemonConfig,
+} from "./daemon-common";
 import { daemonStatusLinux } from "./daemon-linux";
 
 /** Parse the output of `launchctl list <label>` into a key-value map. */
@@ -66,7 +71,7 @@ function tailFile(path: string, lines: number): string | null {
 }
 
 /** Fetch runtime info from the daemon's /health endpoint. */
-async function fetchHealth(port: string): Promise<{
+async function fetchHealth(port: number): Promise<{
   version: string;
   uptime: number;
   projects: { total: number; idle: number; busy: number };
@@ -90,7 +95,7 @@ export async function daemonStatus(): Promise<void> {
   const home = homedir();
   const plist = getPlistPath();
   const logDir = join(home, ".flux/logs");
-  const port = process.env.FLUX_PORT ?? "8042";
+  const { fluxPort: port } = readDaemonConfig();
 
   // Check if plist exists
   const installed = existsSync(plist);

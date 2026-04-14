@@ -9,19 +9,23 @@ import {
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import {
+  type DaemonInstallOpts,
+  type DaemonMode,
   isDaemonActiveLinux,
   isServiceInstalledLinux,
   LABEL,
+  readDaemonConfig,
+  resolvePorts,
   servicePath,
+  writeDaemonConfig,
 } from "./daemon-common";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Read CONVEX_URL and FLUX_PORT from env, falling back to .env.local. */
-function resolveEnvVars(): { CONVEX_URL: string; FLUX_PORT: string } {
-  const fluxPort = process.env.FLUX_PORT ?? "8042";
+/** Read CONVEX_URL from env, falling back to .env.local. */
+function resolveConvexUrl(): string {
   let convexUrl = process.env.CONVEX_URL;
 
   if (!convexUrl) {
@@ -48,7 +52,7 @@ function resolveEnvVars(): { CONVEX_URL: string; FLUX_PORT: string } {
     );
   }
 
-  return { CONVEX_URL: convexUrl, FLUX_PORT: fluxPort };
+  return convexUrl;
 }
 
 /** Resolve the Flux project root (two levels up from src/cli/). */
@@ -78,13 +82,22 @@ function generateServiceFile(opts: {
   bunPath: string;
   workingDirectory: string;
   logDir: string;
-  envVars: { CONVEX_URL: string; FLUX_PORT: string };
+  mode: DaemonMode;
+  envVars: {
+    CONVEX_URL: string;
+    FLUX_PORT: string;
+    FLUX_VITE_PORT: string;
+  };
 }): string {
   // Prepend the directory containing bun to PATH so that concurrently's
   // subprocesses (bun --watch, bunx vite, convex) can all find it.
   const bunDir = dirname(opts.bunPath);
   const existingPath = process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin";
   const path = `${bunDir}:${existingPath}`;
+  const execCommand =
+    opts.mode === "prod"
+      ? `${opts.bunPath} run start`
+      : `${opts.bunPath} run dev`;
 
   return `[Unit]
 Description=Flux daemon
@@ -93,10 +106,11 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${opts.workingDirectory}
-ExecStart=${opts.bunPath} run dev
+ExecStart=${execCommand}
 Environment=PATH=${path}
 Environment=CONVEX_URL=${opts.envVars.CONVEX_URL}
 Environment=FLUX_PORT=${opts.envVars.FLUX_PORT}
+Environment=FLUX_VITE_PORT=${opts.envVars.FLUX_VITE_PORT}
 Restart=always
 RestartSec=3
 StandardOutput=append:${opts.logDir}/daemon.stdout.log
@@ -111,7 +125,9 @@ WantedBy=default.target
 // Exported commands
 // ---------------------------------------------------------------------------
 
-export async function daemonInstallLinux(): Promise<void> {
+export async function daemonInstallLinux(
+  opts: DaemonInstallOpts = {},
+): Promise<void> {
   const root = projectRoot();
   const home = homedir();
   const service = servicePath();
@@ -119,11 +135,32 @@ export async function daemonInstallLinux(): Promise<void> {
   const logDir = join(home, ".flux/logs");
 
   const bunPath = resolveBunPath();
-  const envVars = resolveEnvVars();
+  const convexUrl = resolveConvexUrl();
+  const { fluxPort, fluxVitePort } = resolvePorts(opts);
+  const mode: DaemonMode = opts.mode ?? "dev";
+  const envVars = {
+    CONVEX_URL: convexUrl,
+    FLUX_PORT: String(fluxPort),
+    FLUX_VITE_PORT: String(fluxVitePort),
+  };
 
-  console.log(`Bun:        ${bunPath}`);
-  console.log(`CONVEX_URL: ${envVars.CONVEX_URL}`);
-  console.log(`FLUX_PORT:  ${envVars.FLUX_PORT}`);
+  console.log(`Mode:            ${mode}`);
+  console.log(`Bun:             ${bunPath}`);
+  console.log(`CONVEX_URL:      ${envVars.CONVEX_URL}`);
+  console.log(`FLUX_PORT:       ${envVars.FLUX_PORT}`);
+  if (mode === "dev") {
+    console.log(`FLUX_VITE_PORT:  ${envVars.FLUX_VITE_PORT}`);
+  }
+
+  if (mode === "prod") {
+    const distIndex = join(root, "dist/index.html");
+    if (!existsSync(distIndex)) {
+      throw new Error(
+        `Prod mode requires a built frontend at ${distIndex}. ` +
+          `Run: bun run build`,
+      );
+    }
+  }
 
   // Ensure directories exist
   mkdirSync(logDir, { recursive: true });
@@ -145,10 +182,14 @@ export async function daemonInstallLinux(): Promise<void> {
     bunPath,
     workingDirectory: root,
     logDir,
+    mode,
     envVars,
   });
   writeFileSync(service, serviceContent);
   console.log(`Wrote ${service}`);
+
+  // Persist port choice so status/start commands resolve the right URL
+  writeDaemonConfig({ fluxPort, fluxVitePort });
 
   // Reload systemd, enable and start
   execSync("systemctl --user daemon-reload", { stdio: "pipe" });
@@ -218,8 +259,8 @@ export async function daemonStartLinux(): Promise<void> {
   execSync(`systemctl --user start ${LABEL}`, { stdio: "pipe" });
   console.log(`Started ${LABEL}.`);
 
-  const port = process.env.FLUX_PORT ?? "8042";
-  console.log(`\nVerify: curl http://localhost:${port}/health`);
+  const { fluxPort } = readDaemonConfig();
+  console.log(`\nVerify: curl http://localhost:${fluxPort}/health`);
   console.log(`Or run: flux daemon status`);
 }
 
@@ -243,7 +284,7 @@ export async function daemonStatusLinux(): Promise<void> {
   const service = servicePath();
   const home = homedir();
   const logDir = join(home, ".flux/logs");
-  const port = process.env.FLUX_PORT ?? "8042";
+  const { fluxPort: port } = readDaemonConfig();
 
   const installed = isServiceInstalledLinux();
   const active = isDaemonActiveLinux();
