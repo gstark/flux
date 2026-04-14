@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 import { $ } from "bun";
 import type { SessionPhaseValue } from "$convex/schema";
 import { isProcessAlive } from "./process";
@@ -213,7 +214,19 @@ export async function ensureWorktree(
 
   if (gitFileOrDir) return false;
 
-  await fs.mkdir(worktreePath, { recursive: true });
-  await $`git -C ${repoPath} worktree add ${worktreePath} -b ${branchName}`;
+  // Prune stale worktree entries (e.g., directory was manually deleted)
+  await $`git -C ${repoPath} worktree prune`;
+
+  await fs.mkdir(path.dirname(worktreePath), { recursive: true });
+
+  const branchExists =
+    (await $`git -C ${repoPath} branch --list ${branchName}`.text()).trim()
+      .length > 0;
+
+  if (branchExists) {
+    await $`git -C ${repoPath} worktree add ${worktreePath} ${branchName}`;
+  } else {
+    await $`git -C ${repoPath} worktree add ${worktreePath} -b ${branchName}`;
+  }
   return true;
 }
