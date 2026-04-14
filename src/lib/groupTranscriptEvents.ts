@@ -48,6 +48,12 @@ export type TranscriptNode =
       timestamp: number;
       parsed: Extract<ParsedLine, { kind: "text" }>;
     }
+  | {
+      type: "rate_limit";
+      key: string;
+      timestamp: number;
+      parsed: Extract<ParsedLine, { kind: "rate_limit" }>;
+    }
   | { type: "tool_call"; key: string; timestamp: number; pair: ToolCallPair }
   | {
       type: "system";
@@ -81,6 +87,12 @@ type PendingOutputItem =
       eventId: string;
       timestamp: number;
       parsed: Extract<ParsedLine, { kind: "text" }>;
+    }
+  | {
+      tag: "rate_limit";
+      eventId: string;
+      timestamp: number;
+      parsed: Extract<ParsedLine, { kind: "rate_limit" }>;
     }
   | {
       tag: "tool_use";
@@ -271,6 +283,15 @@ export function groupTranscriptEvents(
           });
           continue;
         }
+        if (item.kind === "rate_limit") {
+          pendingOutput.push({
+            tag: "rate_limit",
+            eventId: event._id,
+            timestamp: event.timestamp,
+            parsed: item,
+          });
+          continue;
+        }
         if (item.kind === "tool_use") {
           // De-duplicate tool_use items by toolId — streaming events
           // (content_block_start) and the full assistant message both emit the
@@ -347,6 +368,13 @@ function flushPendingInterleaved(
       nodes.push({
         type: "text",
         key: `text:${item.eventId}:${nodes.length}`,
+        timestamp: item.timestamp,
+        parsed: item.parsed,
+      });
+    } else if (item.tag === "rate_limit") {
+      nodes.push({
+        type: "rate_limit",
+        key: `rate_limit:${item.eventId}`,
         timestamp: item.timestamp,
         parsed: item.parsed,
       });

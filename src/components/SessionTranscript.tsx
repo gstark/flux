@@ -1,6 +1,7 @@
 import type { PaginationStatus } from "convex/react";
 import { useMemo } from "react";
 import type { TranscriptNode } from "../lib/groupTranscriptEvents";
+import { formatTime } from "../lib/format";
 import { Markdown } from "./Markdown";
 import { Timestamp } from "./Timestamp";
 import { ToolCallCard } from "./ToolCallCard";
@@ -86,6 +87,84 @@ function SystemNode({
         {JSON.stringify(node.raw, null, 2)}
       </pre>
     </details>
+  );
+}
+
+function formatRateLimitReset(resetsAt: number | null): string {
+  if (resetsAt === null) return "unknown";
+  return formatTime(resetsAt * 1000);
+}
+
+function rateLimitSummary(
+  node: Extract<TranscriptNode, { type: "rate_limit" }>,
+): string {
+  const parts: string[] = [];
+  if (node.parsed.info.rateLimitType) parts.push(node.parsed.info.rateLimitType);
+  if (node.parsed.info.status) parts.push(node.parsed.info.status);
+  if (node.parsed.info.overageStatus) {
+    parts.push(`overage ${node.parsed.info.overageStatus}`);
+  }
+  if (node.parsed.info.resetsAt !== null) {
+    parts.push(`resets ${formatRateLimitReset(node.parsed.info.resetsAt)}`);
+  }
+  return parts.length > 0 ? parts.join(" / ") : "Rate limit event";
+}
+
+function renderRateLimitValue(value: string | boolean | null): string {
+  if (value === null) return "unknown";
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  return value;
+}
+
+function RateLimitNode({
+  node,
+}: {
+  node: Extract<TranscriptNode, { type: "rate_limit" }>;
+}) {
+  const details: Array<[label: string, value: string]> = [
+    ["Status", renderRateLimitValue(node.parsed.info.status)],
+    ["Window", renderRateLimitValue(node.parsed.info.rateLimitType)],
+    ["Resets", formatRateLimitReset(node.parsed.info.resetsAt)],
+    ["Overage", renderRateLimitValue(node.parsed.info.overageStatus)],
+    [
+      "Overage reason",
+      renderRateLimitValue(node.parsed.info.overageDisabledReason),
+    ],
+    [
+      "Using overage",
+      renderRateLimitValue(node.parsed.info.isUsingOverage),
+    ],
+    ["Session", renderRateLimitValue(node.parsed.sessionId)],
+    ["Event UUID", renderRateLimitValue(node.parsed.uuid)],
+  ];
+
+  return (
+    <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
+      <div className="font-medium text-warning-content">Rate limit event</div>
+      <div className="mt-1 text-base-content/60 text-xs">
+        {rateLimitSummary(node)}
+      </div>
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        {details.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-base-content/50 text-xs uppercase tracking-wide">
+              {label}
+            </dt>
+            <dd className="min-w-0 break-all font-mono text-[11px] text-base-content/80">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <details className="mt-3 rounded-md border border-base-content/10 bg-base-100/60">
+        <summary className="cursor-pointer px-3 py-2 text-base-content/50 text-xs">
+          Raw event JSON
+        </summary>
+        <pre className="overflow-x-auto border-base-content/10 border-t p-3 font-mono text-[11px] text-base-content/70">
+          {JSON.stringify(node.parsed.raw, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }
 
@@ -179,6 +258,15 @@ export function SessionTranscript({
                         pair={node.pair}
                         expanded={recentToolCallKeys.has(node.key)}
                       />
+                    </div>
+                    <Timestamp ts={node.timestamp} />
+                  </div>
+                );
+              case "rate_limit":
+                return (
+                  <div key={node.key} className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <RateLimitNode node={node} />
                     </div>
                     <Timestamp ts={node.timestamp} />
                   </div>

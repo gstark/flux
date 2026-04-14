@@ -30,6 +30,20 @@ export type ParsedLine =
       blockIndex: number;
       jsonDelta: string;
     }
+  | {
+      kind: "rate_limit";
+      uuid: string | null;
+      sessionId: string | null;
+      info: {
+        status: string | null;
+        resetsAt: number | null;
+        rateLimitType: string | null;
+        overageStatus: string | null;
+        overageDisabledReason: string | null;
+        isUsingOverage: boolean | null;
+      };
+      raw: Record<string, unknown>;
+    }
   | { kind: "system_init"; raw: Record<string, unknown> }
   | { kind: "skip" };
 
@@ -323,6 +337,43 @@ function parseClaudeStreamLine(line: string): ParsedLine[] {
   // ── system: init / config events ─────────────────────────────────
   if (obj.type === "system") {
     return [{ kind: "system_init", raw: obj }];
+  }
+
+  // ── rate limit diagnostics ────────────────────────────────────────
+  if (obj.type === "rate_limit_event") {
+    const info =
+      obj.rate_limit_info &&
+      typeof obj.rate_limit_info === "object" &&
+      !Array.isArray(obj.rate_limit_info)
+        ? (obj.rate_limit_info as Record<string, unknown>)
+        : null;
+
+    return [
+      {
+        kind: "rate_limit",
+        uuid: typeof obj.uuid === "string" ? obj.uuid : null,
+        sessionId: typeof obj.session_id === "string" ? obj.session_id : null,
+        info: {
+          status: typeof info?.status === "string" ? info.status : null,
+          resetsAt: typeof info?.resetsAt === "number" ? info.resetsAt : null,
+          rateLimitType:
+            typeof info?.rateLimitType === "string" ? info.rateLimitType : null,
+          overageStatus:
+            typeof info?.overageStatus === "string"
+              ? info.overageStatus
+              : null,
+          overageDisabledReason:
+            typeof info?.overageDisabledReason === "string"
+              ? info.overageDisabledReason
+              : null,
+          isUsingOverage:
+            typeof info?.isUsingOverage === "boolean"
+              ? info.isUsingOverage
+              : null,
+        },
+        raw: obj,
+      },
+    ];
   }
 
   // ── message lifecycle events — no displayable content ────────────
