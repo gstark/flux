@@ -44,9 +44,7 @@ export async function validateProjectPath(
   }
 
   // Check it's a git repository
-  try {
-    await $`git -C ${path} rev-parse --git-dir`.quiet();
-  } catch {
+  if (!(await isGitRepo(path))) {
     return {
       ok: false,
       error: `Directory is not a git repository: ${path}`,
@@ -54,6 +52,17 @@ export async function validateProjectPath(
   }
 
   return { ok: true };
+}
+
+/**
+ * Check whether a path is inside a git repository.
+ * Handles both normal repos (.git/HEAD) and worktrees (.git is a file).
+ */
+export async function isGitRepo(dirPath: string): Promise<boolean> {
+  return (
+    (await Bun.file(`${dirPath}/.git/HEAD`).exists()) ||
+    (await Bun.file(`${dirPath}/.git`).exists())
+  );
 }
 
 /**
@@ -208,11 +217,7 @@ export async function ensureWorktree(
   worktreePath: string,
   branchName: string,
 ): Promise<boolean> {
-  const gitFileOrDir =
-    (await Bun.file(`${worktreePath}/.git/HEAD`).exists()) ||
-    (await Bun.file(`${worktreePath}/.git`).exists());
-
-  if (gitFileOrDir) return false;
+  if (await isGitRepo(worktreePath)) return false;
 
   // Prune stale worktree entries (e.g., directory was manually deleted)
   await $`git -C ${repoPath} worktree prune`;
