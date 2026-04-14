@@ -523,14 +523,18 @@ const comments_create = typedHandler(
 
 const issues_bulk_create = typedHandler(
   IssuesBulkCreateSchema,
-  async ({ issues }, ctx) => {
-    // Auto-set sourceIssueId on each issue when called from within an agent session
-    const issuesWithSource = ctx.issueId
-      ? issues.map((i) => ({ ...i, sourceIssueId: ctx.issueId }))
-      : issues;
+  async ({ issues, epicId }, ctx) => {
+    const enriched = issues.map(({ epicId: perIssueEpicId, ...rest }) => {
+      const resolvedEpicId = perIssueEpicId ?? epicId;
+      return {
+        ...rest,
+        ...(ctx.issueId && { sourceIssueId: ctx.issueId }),
+        ...(resolvedEpicId && { epicId: resolvedEpicId as Id<"epics"> }),
+      };
+    });
     const created = await ctx.convex.mutation(api.issues.bulkCreate, {
       projectId: ctx.projectId,
-      issues: issuesWithSource,
+      issues: enriched,
       ...(ctx.sessionId && { createdInSessionId: ctx.sessionId }),
       ...(ctx.agentName && { createdByAgent: ctx.agentName }),
     });

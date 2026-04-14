@@ -288,8 +288,18 @@ export const IssuesBulkCreateSchema = z.object({
       title: z.string(),
       description: z.string().optional(),
       priority: issuePriorityEnum.optional(),
+      epicId: z
+        .string()
+        .optional()
+        .describe("Epic ID override for this issue."),
     }),
   ).describe("Array of issues to create."),
+  epicId: z
+    .string()
+    .optional()
+    .describe(
+      "Attach all created issues to this epic (epic document ID). Per-issue epicId takes precedence.",
+    ),
 });
 
 export const IssuesBulkUpdateSchema = z.object({
