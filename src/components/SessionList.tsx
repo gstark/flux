@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { useMemo, useState } from "react";
 import { api } from "$convex/_generated/api";
-import type { SessionStatusValue } from "$convex/schema";
+import type { SessionPhaseValue, SessionStatusValue } from "$convex/schema";
 import { SessionStatus } from "$convex/schema";
 import { useProjectId, useProjectSlug } from "../hooks/useProjectId";
 import {
@@ -30,6 +30,31 @@ const SESSION_STATUS_ORDER: Record<string, number> = {
   [SessionStatus.Completed]: 1,
   [SessionStatus.Failed]: 2,
 };
+
+function buildStatusTooltip(session: {
+  status: SessionStatusValue;
+  phase?: SessionPhaseValue;
+  note?: string | null;
+  transitionSummary?: string | null;
+}) {
+  const parts: string[] = [];
+
+  if (session.transitionSummary) {
+    parts.push(session.transitionSummary);
+  } else if (session.status === SessionStatus.Running) {
+    parts.push(
+      session.phase
+        ? `Still running in ${phaseLabel(session.phase)}.`
+        : "Still running.",
+    );
+  }
+
+  if (session.note) {
+    parts.push(`Agent note: ${session.note}`);
+  }
+
+  return parts.length > 0 ? parts.join("\n\n") : undefined;
+}
 
 export function SessionList() {
   const projectId = useProjectId();
@@ -161,6 +186,7 @@ export function SessionList() {
                   sort={sort}
                   onToggle={toggle}
                 />
+                <th>Created</th>
                 <SortableHeader
                   label="Agent"
                   sortKey="agent"
@@ -208,7 +234,10 @@ export function SessionList() {
                       params={{ projectSlug, sessionId: session._id }}
                       className="block px-4 py-3"
                     >
-                      <SessionStatusBadge status={session.status} />
+                      <SessionStatusBadge
+                        status={session.status}
+                        title={buildStatusTooltip(session)}
+                      />
                     </Link>
                   </td>
                   <td>
@@ -220,6 +249,28 @@ export function SessionList() {
                       >
                         {session.issueShortId}
                       </Link>
+                    ) : (
+                      <span className="text-base-content/40">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {session.createdIssues.length > 0 ? (
+                      <div className="flex max-w-72 flex-wrap gap-1">
+                        {session.createdIssues.map((createdIssue) => (
+                          <Link
+                            key={createdIssue._id}
+                            to="/p/$projectSlug/issues/$issueId"
+                            params={{
+                              projectSlug,
+                              issueId: createdIssue._id,
+                            }}
+                            title={createdIssue.title}
+                            className="badge badge-outline badge-sm font-mono transition-colors hover:border-primary hover:text-primary"
+                          >
+                            {createdIssue.shortId}
+                          </Link>
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-base-content/40">—</span>
                     )}

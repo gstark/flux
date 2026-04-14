@@ -289,6 +289,7 @@ export default defineSchema({
     lastHeartbeat: v.optional(v.number()),
     disposition: v.optional(dispositionValidator),
     note: v.optional(v.string()),
+    transitionSummary: v.optional(v.string()),
     agentSessionId: v.optional(v.string()),
     startHead: v.optional(v.string()),
     endHead: v.optional(v.string()),

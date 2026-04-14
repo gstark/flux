@@ -33,10 +33,17 @@ function statusConfig(status: SessionStatusValue): {
   }
 }
 
-export function SessionStatusBadge({ status }: { status: SessionStatusValue }) {
+export function SessionStatusBadge({
+  status,
+  title,
+}: {
+  status: SessionStatusValue;
+  title?: string;
+}) {
   const config = statusConfig(status);
   return (
     <span
+      title={title}
       className={`badge gap-1 whitespace-nowrap px-2 py-1 text-xs leading-none ${config.className}`}
     >
       <Icon name={config.icon} />

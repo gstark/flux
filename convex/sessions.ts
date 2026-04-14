@@ -75,6 +75,7 @@ export const update = mutation({
     lastHeartbeat: v.optional(v.number()),
     disposition: v.optional(dispositionValidator),
     note: v.optional(v.string()),
+    transitionSummary: v.optional(v.string()),
     agentSessionId: v.optional(v.string()),
     startHead: v.optional(v.string()),
     endHead: v.optional(v.string()),
@@ -206,12 +207,25 @@ export const listPaginatedWithIssues = query({
     // Enrich each session with issue shortId
     const enrichedPage = await Promise.all(
       page.page.map(async (session) => {
-        const issue = session.issueId
-          ? await ctx.db.get(session.issueId)
-          : null;
+        const [issue, createdIssues] = await Promise.all([
+          session.issueId ? ctx.db.get(session.issueId) : Promise.resolve(null),
+          ctx.db
+            .query("issues")
+            .withIndex("by_created_in_session", (q) =>
+              q
+                .eq("createdInSessionId", session._id)
+                .eq("deletedAt", undefined),
+            )
+            .collect(),
+        ]);
         return {
           ...session,
           issueShortId: issue?.shortId ?? null,
+          createdIssues: createdIssues.map((createdIssue) => ({
+            _id: createdIssue._id,
+            shortId: createdIssue.shortId,
+            title: createdIssue.title,
+          })),
         };
       }),
     );
