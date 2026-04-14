@@ -194,9 +194,7 @@ describe("Custom prompt injection", () => {
         diff: "diff",
         commitLog: "log",
         relatedIssues: [],
-        comments: [
-          { author: "user", content: "Important context" },
-        ],
+        comments: [{ author: "user", content: "Important context" }],
         reviewIteration: 1,
         maxReviewIterations: 3,
       };

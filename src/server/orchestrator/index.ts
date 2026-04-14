@@ -444,7 +444,11 @@ class ProjectRunner {
           "Set a path via PATCH /api/projects/:id.",
       );
     }
-    const pathExists = await Bun.file(`${this.projectPath}/.git/HEAD`).exists();
+    // For git worktrees, .git is a file (not a directory) pointing to the main repo.
+    // Accept either .git/HEAD (normal repo) or .git as a file (worktree).
+    const pathExists =
+      (await Bun.file(`${this.projectPath}/.git/HEAD`).exists()) ||
+      (await Bun.file(`${this.projectPath}/.git`).exists());
     if (!pathExists) {
       throw new Error(
         `[ProjectRunner] Cannot spawn agent: project path "${this.projectPath}" ` +

@@ -6,6 +6,7 @@ import {
   faClockRotateLeft,
   faGear,
   faLayerGroup,
+  faRobot,
   faScrewdriverWrench,
   faTerminal,
 } from "./Icon";
@@ -58,6 +59,17 @@ export function Sidebar() {
         >
           <FontAwesomeIcon icon={faClockRotateLeft} aria-hidden="true" />
           Sessions
+        </Link>
+      </li>
+      <li>
+        <Link
+          to="/p/$projectSlug/prompts"
+          params={params}
+          activeProps={{ className: "menu-active" }}
+          inactiveProps={{ className: "" }}
+        >
+          <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
+          Prompts
         </Link>
       </li>
       <li>

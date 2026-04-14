@@ -14,6 +14,7 @@ import { EpicDetailPage } from "../pages/EpicDetailPage";
 import { EpicsPage } from "../pages/EpicsPage";
 import { IssueDetailPage } from "../pages/IssueDetailPage";
 import { IssuesPage } from "../pages/IssuesPage";
+import { PromptsPage } from "../pages/PromptsPage";
 import { SessionDetailPage } from "../pages/SessionDetailPage";
 import { SessionsPage } from "../pages/SessionsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -103,6 +104,13 @@ const settingsRoute = createRoute({
   errorComponent: RouteError,
 });
 
+const promptsRoute = createRoute({
+  getParentRoute: () => projectLayoutRoute,
+  path: "/prompts",
+  component: PromptsPage,
+  errorComponent: RouteError,
+});
+
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   projectsRedirectRoute,
@@ -112,6 +120,7 @@ const routeTree = rootRoute.addChildren([
     sessionsRoute.addChildren([sessionDetailRoute]),
     epicsRoute.addChildren([epicDetailRoute]),
     settingsRoute,
+    promptsRoute,
   ]),
 ]);
 
