@@ -29,6 +29,7 @@ import type {
   AgentProcess,
   AgentProvider,
   DispositionResult,
+  Disposition as DispositionValue,
   WorkPromptContext,
 } from "./agents";
 import { Disposition, parseDisposition, StatusMessages } from "./agents";
@@ -74,6 +75,38 @@ function parseCronIntervalMs(schedule: string): number | null {
   return null;
 }
 
+function formatPhaseForSummary(phase: SessionPhaseValue): string {
+  switch (phase) {
+    case SessionPhase.Work:
+      return "work";
+    case SessionPhase.Retro:
+      return "retro";
+    case SessionPhase.Review:
+      return "review";
+    case SessionPhase.Planner:
+      return "planner";
+    default: {
+      const _exhaustive: never = phase;
+      throw new Error(`Unhandled phase for summary: ${_exhaustive}`);
+    }
+  }
+}
+
+function plannerTransitionSummary(disposition: DispositionValue): string {
+  switch (disposition) {
+    case Disposition.Done:
+      return "Planner finished and recorded its planning output.";
+    case Disposition.Noop:
+      return "Planner finished with no new work to queue.";
+    case Disposition.Fault:
+      return "Planner reported an operational problem and stopped.";
+    default: {
+      const _exhaustive: never = disposition;
+      throw new Error(`Unhandled planner disposition: ${_exhaustive}`);
+    }
+  }
+}
+
 /** Recovery stats returned by orphan recovery on startup. */
 export type OrphanRecoveryStats = {
   deadSessions: number;
@@ -109,7 +142,7 @@ interface ActiveSession {
   /** Whether commits were made during the work phase (set by handleWorkExit) */
   hasCommits: boolean | null;
   /** The work disposition — carried forward so handleRetroExit can decide review/close/finalize */
-  workDisposition: Disposition | null;
+  workDisposition: DispositionValue | null;
 }
 
 /**
@@ -203,6 +236,16 @@ class ProjectRunner {
 
   getProviderName(): AgentProvider["name"] {
     return this.provider.name;
+  }
+
+  private async setSessionTransitionSummary(
+    sessionId: Id<"sessions">,
+    transitionSummary: string,
+  ): Promise<void> {
+    await getConvexClient().mutation(api.sessions.update, {
+      sessionId,
+      transitionSummary,
+    });
   }
 
   /** Narrowed ActiveSession for issue-based phases (Work/Retro/Review). */
@@ -912,6 +955,9 @@ class ProjectRunner {
           status: SessionStatus.Failed,
           endedAt: Date.now(),
           exitCode,
+          transitionSummary: timedOut
+            ? `Timed out during ${formatPhaseForSummary(this.activeSession.phase)}. The session failed and the lifecycle stopped.`
+            : `Killed during ${formatPhaseForSummary(this.activeSession.phase)}. The session failed and the lifecycle stopped.`,
           disposition: timedOut ? Disposition.Fault : undefined,
           note: timedOut
             ? `Session timed out after ${this.sessionTimeoutMs}ms (phase: ${this.activeSession.phase})`
@@ -1000,6 +1046,7 @@ class ProjectRunner {
             status: SessionStatus.Failed,
             endedAt: Date.now(),
             exitCode,
+            transitionSummary: `An orchestrator error interrupted ${formatPhaseForSummary(crashedSession.phase)}. The session was marked failed.`,
             ...(endHead !== undefined && { endHead }),
           });
         } catch (updateErr) {
@@ -1048,6 +1095,9 @@ class ProjectRunner {
         : undefined,
       note: dispositionResult.success ? dispositionResult.note : undefined,
       agentSessionId: active.agentSessionId ?? undefined,
+      transitionSummary: dispositionResult.success
+        ? undefined
+        : "Work ended, but the result could not be parsed, so Flux stopped before retro.",
       ...(endHead !== undefined && { endHead }),
     });
 
@@ -1154,12 +1204,20 @@ class ProjectRunner {
       }
 
       if (disposition === Disposition.Fault) {
+        await this.setSessionTransitionSummary(
+          sessionId,
+          "Work faulted and retro could not run because the provider session ID was missing. The lifecycle stopped after marking the issue failed.",
+        );
         // Fault without agentSessionId — can't resume for retro.
         // incrementFailure already set issue to Open/Stuck, just finalize.
         this.finalize();
       } else if (!active.hasCommits) {
         // No agentSessionId (can't resume for retro) and no commits —
         // close directly since there's nothing to review.
+        await this.setSessionTransitionSummary(
+          sessionId,
+          "Work finished without review because retro could not run without a provider session ID, and there were no code changes to review.",
+        );
         const closeType =
           disposition === Disposition.Noop
             ? CloseType.Noop
@@ -1174,6 +1232,10 @@ class ProjectRunner {
         });
         this.finalize();
       } else {
+        await this.setSessionTransitionSummary(
+          sessionId,
+          "Work produced code changes, so Flux started review directly. Retro was skipped because the provider session ID was missing.",
+        );
         await this.startReviewLoop();
       }
     }
@@ -1239,6 +1301,12 @@ class ProjectRunner {
     // incrementFailure already set the issue to Open/Stuck. Skip review
     // and close — just finalize.
     if (active.workDisposition === Disposition.Fault) {
+      await this.setSessionTransitionSummary(
+        sessionId,
+        retroResult.success
+          ? "Retro finished after a work fault. Review was skipped and the issue stayed open for retry."
+          : "Work faulted, and retro output could not be parsed. Review was skipped and the issue stayed open for retry.",
+      );
       this.finalize();
       return true;
     }
@@ -1263,6 +1331,12 @@ class ProjectRunner {
     // No commits → skip code review and close the issue directly.
     // Retro still ran (above) to capture friction/tooling insights.
     if (!hasCommits) {
+      await this.setSessionTransitionSummary(
+        sessionId,
+        retroResult.success
+          ? "Retro found no code changes to review, so Flux closed the issue without starting review."
+          : "Retro output could not be parsed, but there were still no code changes to review, so Flux closed the issue without starting review.",
+      );
       const closeType =
         active.workDisposition === Disposition.Noop
           ? CloseType.Noop
@@ -1279,6 +1353,12 @@ class ProjectRunner {
       return true;
     }
 
+    await this.setSessionTransitionSummary(
+      sessionId,
+      retroResult.success
+        ? "Retro finished and code changes were present, so Flux started review."
+        : "Retro output could not be parsed, but code changes were present, so Flux started review anyway.",
+    );
     await this.startReviewLoop();
     return true;
   }
@@ -1317,6 +1397,9 @@ class ProjectRunner {
         : undefined,
       note: dispositionResult.success ? dispositionResult.note : undefined,
       agentSessionId: active.agentSessionId ?? undefined,
+      transitionSummary: dispositionResult.success
+        ? undefined
+        : "Review ended, but the result could not be parsed, so Flux stopped and left the issue open.",
       ...(endHead !== undefined && { endHead }),
     });
 
@@ -1336,6 +1419,10 @@ class ProjectRunner {
     const { disposition, note } = dispositionResult;
 
     if (disposition === Disposition.Fault) {
+      await this.setSessionTransitionSummary(
+        sessionId,
+        "Review reported an operational problem, so Flux stopped and left the issue open for retry.",
+      );
       console.error(
         `[ProjectRunner] Review fault for ${issue.shortId}: ${note}`,
       );
@@ -1354,6 +1441,10 @@ class ProjectRunner {
     );
 
     if (disposition === Disposition.Noop) {
+      await this.setSessionTransitionSummary(
+        sessionId,
+        "Review found no remaining issues, so Flux closed the issue.",
+      );
       await convex.mutation(api.issues.close, {
         issueId,
         closeType: CloseType.Completed,
@@ -1381,6 +1472,10 @@ class ProjectRunner {
     }
 
     if (!hasCommits) {
+      await this.setSessionTransitionSummary(
+        sessionId,
+        "Review recorded findings without changing code, so Flux closed the issue instead of starting another review.",
+      );
       await convex.mutation(api.issues.close, {
         issueId,
         closeType: CloseType.Completed,
@@ -1411,6 +1506,10 @@ class ProjectRunner {
       console.log(
         `[ProjectRunner] Review iteration limit reached for ${issue.shortId} (${newIterations}/${this.maxReviewIterations}), but disposition is "done" — closing.`,
       );
+      await this.setSessionTransitionSummary(
+        sessionId,
+        `Review made inline fixes on the final allowed iteration (${newIterations}/${this.maxReviewIterations}), so Flux closed the issue instead of re-reviewing.`,
+      );
       await convex.mutation(api.issues.close, {
         issueId,
         closeType: CloseType.Completed,
@@ -1427,6 +1526,10 @@ class ProjectRunner {
     } catch {
       // Non-fatal
     }
+    await this.setSessionTransitionSummary(
+      sessionId,
+      `Review changed code, so Flux started another review iteration (${newIterations + 1}/${this.maxReviewIterations}).`,
+    );
     await this.startReviewLoop();
     return true;
   }
@@ -1965,6 +2068,7 @@ class ProjectRunner {
         exitCode,
         disposition,
         note,
+        transitionSummary: plannerTransitionSummary(disposition),
       });
     } else {
       console.error(
@@ -1977,6 +2081,8 @@ class ProjectRunner {
         exitCode,
         disposition: Disposition.Fault,
         note: dispositionResult.error,
+        transitionSummary:
+          "Planner ended, but the result could not be parsed, so the session stopped without another phase.",
       });
     }
 
@@ -2052,6 +2158,7 @@ class ProjectRunner {
           status: SessionStatus.Failed,
           endedAt: Date.now(),
           exitCode: -1,
+          transitionSummary: `Recovered a dead ${formatPhaseForSummary(session.phase ?? SessionPhase.Work)} session with no live process and marked it failed.`,
         });
         // Planner sessions have no issue — skip issue recovery
         if (session.issueId) {
