@@ -3,7 +3,7 @@ import {
   type OrchestratorStatusData,
 } from "@/shared/orchestrator";
 import { api } from "$convex/_generated/api";
-import type { Id } from "$convex/_generated/dataModel";
+import type { Doc, Id } from "$convex/_generated/dataModel";
 import type { SessionPhaseValue } from "$convex/schema";
 import {
   CloseType,
@@ -469,63 +469,82 @@ class ProjectRunner {
     }
     const issue = claimResult.issue;
 
-    // 2. Resolve cwd — use a worktree if the issue's epic has useWorktree enabled
-    let cwd = this.projectPath;
-    if (issue.epicId) {
-      const epic = await convex.query(api.epics.get, {
-        epicId: issue.epicId,
-      });
-      if (epic?.useWorktree) {
-        const project = await convex.query(api.projects.getById, {
-          projectId: this.projectId,
-        });
-        if (!project?.worktreeBase) {
-          throw new Error(
-            `[ProjectRunner] Epic ${issue.epicId} has useWorktree=true but project has no worktreeBase configured.`,
-          );
-        }
-        const epicSlug = epic.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
-        if (!epicSlug) {
-          throw new Error(
-            `[ProjectRunner] Epic "${epic.title}" produces an empty slug — cannot create worktree.`,
-          );
-        }
-        const worktreePath = `${project.worktreeBase}/${epicSlug}`;
-        const branchName = `epic/${epicSlug}`;
-        await ensureWorktree(this.projectPath, worktreePath, branchName);
-        cwd = worktreePath;
-      }
-    }
-
-    // 3. Record startHead before spawning
-    const startHead = await getCurrentHead(cwd);
-
-    // 4. Auto-commit dirty tree before starting work.
+    // Steps 2–5 can fail (worktree setup, git ops, session creation).
+    // If anything throws after claim, unclaim the issue so the scheduler retries it.
+    let cwd: string;
+    let session: Doc<"sessions">;
+    let startHead: string | undefined;
     try {
-      await autoCommitDirtyTree(cwd, issue.shortId, "pre-session");
+      // 2. Resolve cwd — use a worktree if the issue's epic has useWorktree enabled
+      cwd = this.projectPath;
+      if (issue.epicId) {
+        const epic = await convex.query(api.epics.get, {
+          epicId: issue.epicId,
+        });
+        if (epic?.useWorktree) {
+          const project = await convex.query(api.projects.getById, {
+            projectId: this.projectId,
+          });
+          if (!project?.worktreeBase) {
+            throw new Error(
+              `[ProjectRunner] Epic ${issue.epicId} has useWorktree=true but project has no worktreeBase configured.`,
+            );
+          }
+          const epicSlug = epic.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+          if (!epicSlug) {
+            throw new Error(
+              `[ProjectRunner] Epic "${epic.title}" produces an empty slug — cannot create worktree.`,
+            );
+          }
+          const worktreePath = `${project.worktreeBase}/${epicSlug}`;
+          const branchName = `epic/${epicSlug}`;
+          await ensureWorktree(this.projectPath, worktreePath, branchName);
+          cwd = worktreePath;
+        }
+      }
+
+      // 3. Record startHead before spawning
+      startHead = await getCurrentHead(cwd);
+
+      // 4. Auto-commit dirty tree before starting work.
+      try {
+        await autoCommitDirtyTree(cwd, issue.shortId, "pre-session");
+      } catch (err) {
+        console.warn(
+          `[ProjectRunner] Auto-commit before session failed for ${issue.shortId} — ` +
+            "proceeding with dirty tree:",
+          err,
+        );
+      }
+
+      // 5. Create session record first (without PID) so we have a session ID
+      const created = await convex.mutation(api.sessions.create, {
+        projectId: this.projectId,
+        issueId,
+        type: SessionType.Work,
+        agent: this.provider.name,
+        pid: 0, // Placeholder - will be updated after spawn
+        startHead,
+        phase: SessionPhase.Work,
+      });
+      if (!created) {
+        throw new Error("Failed to create session record");
+      }
+      session = created;
     } catch (err) {
-      console.warn(
-        `[ProjectRunner] Auto-commit before session failed for ${issue.shortId} — ` +
-          "proceeding with dirty tree:",
+      console.error(
+        `[ProjectRunner] Failed after claiming ${issue.shortId}, unclaiming:`,
         err,
       );
-    }
-
-    // 5. Create session record first (without PID) so we have a session ID
-    const session = await convex.mutation(api.sessions.create, {
-      projectId: this.projectId,
-      issueId,
-      type: SessionType.Work,
-      agent: this.provider.name,
-      pid: 0, // Placeholder - will be updated after spawn
-      startHead,
-      phase: SessionPhase.Work,
-    });
-    if (!session) {
-      throw new Error("Failed to create session record");
+      await convex.mutation(api.issues.update, {
+        issueId,
+        status: IssueStatus.Open,
+        assignee: null,
+      });
+      throw err;
     }
 
     // 6. Build prompt and spawn agent with session context
