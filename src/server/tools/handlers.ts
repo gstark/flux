@@ -587,11 +587,12 @@ const epics_list = typedHandler(
 
 const epics_create = typedHandler(
   EpicsCreateSchema,
-  async ({ title, description }, ctx) => {
+  async ({ title, description, useWorktree }, ctx) => {
     const epicId = await ctx.convex.mutation(api.epics.create, {
       projectId: ctx.projectId,
       title,
       description,
+      useWorktree,
     });
     const epic = await ctx.convex.query(api.epics.get, {
       epicId: epicId as Id<"epics">,
@@ -618,7 +619,11 @@ const epics_update = typedHandler(
   async ({ epicId, ...updates }, ctx) => {
     const updated = await ctx.convex.mutation(api.epics.update, {
       epicId: epicId as Id<"epics">,
-      ...updates,
+      ...(updates as {
+        title?: string;
+        description?: string;
+        useWorktree?: boolean;
+      }),
     });
     return ok(ctx, { epic: updated });
   },

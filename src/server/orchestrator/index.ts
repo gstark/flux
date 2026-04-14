@@ -18,6 +18,7 @@ import { getConvexClient } from "../convex";
 import { readFluxConfig } from "../fluxConfig";
 import {
   autoCommitDirtyTree,
+  ensureWorktree,
   getCommitLog,
   getCommitLogBetween,
   getCurrentHead,
@@ -468,8 +469,31 @@ class ProjectRunner {
     }
     const issue = claimResult.issue;
 
-    // 2. Use project's configured path as cwd
-    const cwd = this.projectPath;
+    // 2. Resolve cwd — use a worktree if the issue's epic has useWorktree enabled
+    let cwd = this.projectPath;
+    if (issue.epicId) {
+      const epic = await convex.query(api.epics.get, {
+        epicId: issue.epicId,
+      });
+      if (epic?.useWorktree) {
+        const project = await convex.query(api.projects.getById, {
+          projectId: this.projectId,
+        });
+        if (!project?.worktreeBase) {
+          throw new Error(
+            `[ProjectRunner] Epic ${issue.epicId} has useWorktree=true but project has no worktreeBase configured.`,
+          );
+        }
+        const epicSlug = epic.title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+        const worktreePath = `${project.worktreeBase}/${epicSlug}`;
+        const branchName = `epic/${epicSlug}`;
+        await ensureWorktree(this.projectPath, worktreePath, branchName);
+        cwd = worktreePath;
+      }
+    }
 
     // 3. Record startHead before spawning
     const startHead = await getCurrentHead(cwd);

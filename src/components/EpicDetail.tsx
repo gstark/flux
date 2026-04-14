@@ -29,6 +29,7 @@ export function EpicDetail({ epicId }: { epicId: Id<"epics"> }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [useWorktree, setUseWorktree] = useState(false);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
 
@@ -63,6 +64,7 @@ export function EpicDetail({ epicId }: { epicId: Id<"epics"> }) {
     if (!epic) return;
     setTitle(epic.title);
     setDescription(epic.description ?? "");
+    setUseWorktree(epic.useWorktree ?? false);
     setEditing(true);
   }
 
@@ -78,6 +80,7 @@ export function EpicDetail({ epicId }: { epicId: Id<"epics"> }) {
         epicId: epic._id,
         title: trimmed,
         description: description.trim() || undefined,
+        useWorktree,
       });
       setEditing(false);
     } catch (err) {
@@ -152,6 +155,19 @@ export function EpicDetail({ epicId }: { epicId: Id<"epics"> }) {
             placeholder="Description (markdown supported)"
             rows={6}
           />
+          <label
+            className="label cursor-pointer justify-start gap-2"
+            htmlFor="use-worktree-toggle"
+          >
+            <input
+              id="use-worktree-toggle"
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={useWorktree}
+              onChange={(e) => setUseWorktree(e.target.checked)}
+            />
+            <span className="label-text">Use git worktree</span>
+          </label>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -182,6 +198,9 @@ export function EpicDetail({ epicId }: { epicId: Id<"epics"> }) {
             >
               {epic.status}
             </span>
+            {epic.useWorktree && (
+              <span className="badge badge-outline badge-sm">worktree</span>
+            )}
             {!isClosed && (
               <button
                 type="button"

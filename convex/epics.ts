@@ -8,16 +8,25 @@ export const create = mutation({
     projectId: v.id("projects"),
     title: v.string(),
     description: v.optional(v.string()),
+    useWorktree: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error(`Project ${args.projectId} not found`);
+
+    if (args.useWorktree && !project.worktreeBase) {
+      throw new Error(
+        "Cannot enable worktree on epic: project has no worktreeBase configured. " +
+          "Set worktreeBase on the project first.",
+      );
+    }
 
     return await ctx.db.insert("epics", {
       projectId: args.projectId,
       title: args.title,
       description: args.description,
       status: EpicStatus.Open,
+      useWorktree: args.useWorktree,
     });
   },
 });
@@ -84,11 +93,22 @@ export const update = mutation({
     epicId: v.id("epics"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
+    useWorktree: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { epicId, ...rest } = args;
     const epic = await ctx.db.get(epicId);
     if (!epic) throw new Error(`Epic ${epicId} not found`);
+
+    if (rest.useWorktree) {
+      const project = await ctx.db.get(epic.projectId);
+      if (!project?.worktreeBase) {
+        throw new Error(
+          "Cannot enable worktree on epic: project has no worktreeBase configured. " +
+            "Set worktreeBase on the project first.",
+        );
+      }
+    }
 
     const patch: Partial<Doc<"epics">> = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),

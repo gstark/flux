@@ -192,3 +192,28 @@ export async function autoCommitDirtyTree(
   await $`git -C ${cwd} commit -m ${message}`;
   return true;
 }
+
+/**
+ * Ensure a git worktree exists at the given path, creating it if necessary.
+ * Uses the current branch's HEAD as the starting point for a new branch.
+ *
+ * @param repoPath - The main repository path
+ * @param worktreePath - Absolute path where the worktree should live
+ * @param branchName - Branch name for the worktree
+ * @returns true if a new worktree was created, false if it already existed
+ */
+export async function ensureWorktree(
+  repoPath: string,
+  worktreePath: string,
+  branchName: string,
+): Promise<boolean> {
+  const gitFileOrDir =
+    (await Bun.file(`${worktreePath}/.git/HEAD`).exists()) ||
+    (await Bun.file(`${worktreePath}/.git`).exists());
+
+  if (gitFileOrDir) return false;
+
+  await fs.mkdir(worktreePath, { recursive: true });
+  await $`git -C ${repoPath} worktree add ${worktreePath} -b ${branchName}`;
+  return true;
+}

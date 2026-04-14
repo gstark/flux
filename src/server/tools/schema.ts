@@ -220,6 +220,13 @@ export const EpicsCreateSchema = z.object({
     .string()
     .optional()
     .describe("Detailed description. Supports markdown."),
+  useWorktree: z
+    .boolean()
+    .optional()
+    .describe(
+      "Run all issues in this epic inside a dedicated git worktree. " +
+        "Requires worktreeBase to be set on the project.",
+    ),
 });
 
 export const EpicsShowSchema = z.object({
@@ -233,6 +240,13 @@ export const EpicsUpdateSchema = z.object({
     .string()
     .optional()
     .describe("New description. Supports markdown."),
+  useWorktree: z
+    .boolean()
+    .optional()
+    .describe(
+      "Run all issues in this epic inside a dedicated git worktree. " +
+        "Requires worktreeBase to be set on the project.",
+    ),
 });
 
 export const EpicsCloseSchema = z.object({
