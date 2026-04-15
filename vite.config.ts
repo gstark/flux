@@ -26,6 +26,7 @@ export default defineConfig({
       "/api": fluxBackend,
       "/health": fluxBackend,
       "/p": fluxBackend,
+      "/sse": fluxBackend,
     },
   },
 });
