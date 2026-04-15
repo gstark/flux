@@ -95,7 +95,10 @@ export function IssueList() {
   type IssueItem = (typeof issues)[number];
   type IssueSortKey = "id" | "title" | "status" | "priority";
 
-  const { sort, toggle } = useSortableTable<IssueSortKey>();
+  const { sort, toggle } = useSortableTable<IssueSortKey>({
+    key: "id",
+    direction: "desc",
+  });
   const comparators = useMemo(
     () => ({
       id: (a: IssueItem, b: IssueItem) =>
