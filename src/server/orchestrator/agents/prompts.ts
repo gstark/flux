@@ -111,6 +111,17 @@ You have access to the \`flux\` MCP server. Use it to:
 - Add comments to this issue: \`comments_create\`
 - Check system health via \`_meta\` in any response
 
+## Flux CLI Tools
+
+You have access to the \`flux\` command line interface. Use it to:
+- Help with the cli tool itself: flux --help
+- Help with any sub-tool: flux <TOOL> --help
+- Search related issues: flux issues list
+- Create follow-up issues: flux issues create
+- Add comments to this issue: flux issues update
+- Check system health: flux orchestrator status
+
+
 **Do NOT close, update status, or modify the assigned issue.** The orchestrator manages the full issue lifecycle (work → retro → review → close) based on your disposition.`);
 
   parts.push(SUBAGENT_SAFETY_SECTION);
@@ -238,7 +249,7 @@ If anything you encountered has been a problem before, that is a priority issue.
 
 ## Creating Follow-Up Issues
 
-Use the Flux MCP tools to create follow-up issues:
+Use the Flux MCP tools, or the CLI if the MCP is unavailable, to create follow-up issues:
 - \`issues_create\` for a single issue
 - \`issues_bulk_create\` for multiple issues
 
@@ -451,8 +462,8 @@ Priority for follow-up issues:
 If you make inline fixes, commit them with clear messages. Each commit should be a logical unit.
 Always use a single atomic command: \`git add <files> && git commit -m "MESSAGE"\` — never separate add and commit into two calls.
 
-## Flux MCP Tools
-Use the \`flux\` MCP server to:
+## Flux MCP/CLI Tools
+Use the \`flux\` MCP server, or the \'flux\' CLI if the MCP is not available, to:
 - Create follow-up issues: \`issues_create\`, \`issues_bulk_create\`
 - Search for duplicates before filing: \`issues_search\`
 - Add review comments: \`comments_create\``);
@@ -564,7 +575,7 @@ Close obsolete or duplicate issues. Flag issues with repeated failures (high fai
 
 ## Flux MCP Tools
 
-Use the \`flux\` MCP server for all operations:
+Use the \`flux\` MCP server, or the \'flux\' CLI if the MCP is unavailable, for all operations:
 - \`issues_list\` — list issues (filter by status, priority)
 - \`issues_search\` — search issues by text
 - \`issues_create\` / \`issues_bulk_create\` — create new issues
