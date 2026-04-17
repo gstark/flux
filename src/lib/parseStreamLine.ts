@@ -552,17 +552,10 @@ function parsePiStreamLine(line: string): ParsedLine[] {
   }
 
   if (obj.type === "message_update") {
-    const event = obj.assistantMessageEvent as Record<string, unknown> | undefined;
-    if (!event) return [{ kind: "skip" }];
-
-    if (
-      event.type === "thinking_delta" &&
-      typeof event.delta === "string" &&
-      event.delta.trim()
-    ) {
-      return [{ kind: "text", text: event.delta, source: "delta" }];
-    }
-
+    // Pi emits token/word-level thinking deltas before the turn-level summary.
+    // If we surface them here, tool_result events flush pending output before
+    // turn_end arrives, which leaves the transcript split into one-word rows.
+    // Prefer the complete turn_end thinking block for readable transcripts.
     return [{ kind: "skip" }];
   }
 
