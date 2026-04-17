@@ -147,6 +147,7 @@ export const AgentKind = {
   Claude: "claude",
   Codex: "codex",
   OpenCode: "opencode",
+  Pi: "pi",
 } as const;
 
 export type AgentKindValue = (typeof AgentKind)[keyof typeof AgentKind];
@@ -155,6 +156,7 @@ export const agentKindValidator = v.union(
   v.literal(AgentKind.Claude),
   v.literal(AgentKind.Codex),
   v.literal(AgentKind.OpenCode),
+  v.literal(AgentKind.Pi),
 );
 
 // ── Derived value types (single source of truth) ─────────────────────

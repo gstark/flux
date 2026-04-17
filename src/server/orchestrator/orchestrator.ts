@@ -100,7 +100,7 @@ class Orchestrator {
             projectId: project._id,
           })
         : null;
-      const desiredAgent = config?.agent ?? AgentKind.Claude;
+      const desiredAgent = config?.agent ?? AgentKind.Pi;
 
       if (hasPath && !this.runners.has(project._id)) {
         // Create a new runner for this project

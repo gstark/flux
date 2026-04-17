@@ -104,7 +104,9 @@ function whichOrNull(name: string): string | null {
 function resolvePathForPlist(bunPath: string): string {
   // Binaries spawned by the daemon and orchestrator agents
   const required = [bunPath];
-  const optional = ["claude", "codex", "opencode", "git"].map(whichOrNull);
+  const optional = ["claude", "codex", "opencode", "pi", "git"].map(
+    whichOrNull,
+  );
 
   const dirs = new Set<string>();
   for (const p of [...required, ...optional.filter(Boolean)]) {
