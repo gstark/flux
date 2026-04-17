@@ -576,6 +576,15 @@ function parsePiStreamLine(line: string): ParsedLine[] {
     for (const block of message.content) {
       if (!block || typeof block !== "object") continue;
       const part = block as Record<string, unknown>;
+
+      if (part.type === "thinking") {
+        const text = extractPiThinkingText(part);
+        if (text) {
+          results.push({ kind: "text", text, source: "full" });
+        }
+        continue;
+      }
+
       if (part.type !== "toolCall") continue;
 
       const toolName = canonicalizeToolName(
@@ -699,4 +708,35 @@ function extractPiToolResultText(result: unknown): string {
   }
 
   return JSON.stringify(obj);
+}
+
+function extractPiThinkingText(block: Record<string, unknown>): string | null {
+  if (typeof block.thinking === "string" && block.thinking.trim()) {
+    return block.thinking;
+  }
+
+  const signature = block.thinkingSignature;
+  if (!signature || typeof signature !== "string") {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(signature) as Record<string, unknown>;
+    const summary = parsed.summary;
+    if (!Array.isArray(summary)) {
+      return null;
+    }
+
+    const text = summary
+      .flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [] as string[];
+        const item = entry as Record<string, unknown>;
+        return typeof item.text === "string" ? [item.text] : [];
+      })
+      .join("\n");
+
+    return text || null;
+  } catch {
+    return null;
+  }
 }
