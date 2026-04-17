@@ -403,9 +403,9 @@ export function SettingsForm() {
                   }}
                 >
                   <option value={AgentKind.Claude}>Claude Code</option>
-                  <option value={AgentKind.Codex}>Codex (coming soon)</option>
+                  <option value={AgentKind.Codex}>Codex</option>
                   <option value={AgentKind.OpenCode}>
-                    OpenCode (coming soon)
+                    OpenCode
                   </option>
                 </select>
               </fieldset>
@@ -496,12 +496,6 @@ export function SettingsForm() {
                 <span className="text-sm text-success">Saved</span>
               )}
             </div>
-            <p className="mt-3 text-base-content/60 text-sm">
-              Codex and OpenCode selection is wired through configuration and
-              runner lifecycle, but their process adapters are not implemented
-              yet. Selecting either will fail fast when a session tries to
-              start.
-            </p>
             <ErrorBanner error={configError} onDismiss={clearConfigError} />
           </section>
         </form>
