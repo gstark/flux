@@ -29,8 +29,18 @@ import { OpenCodeProvider } from "./opencode";
 import { PiProvider } from "./pi";
 import type { AgentKind, AgentProvider } from "./types";
 
+function describeUnknownAgent(agent: unknown): string {
+  const value = String(agent);
+  const codePoints = [...value]
+    .map((char) => `U+${char.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0")}`)
+    .join(" ");
+  return `${JSON.stringify(value)} (type=${typeof agent}${codePoints ? `, codePoints=${codePoints}` : ""})`;
+}
+
 export function createAgentProvider(agent: AgentKind): AgentProvider {
-  switch (agent) {
+  const kind = String(agent);
+
+  switch (kind) {
     case "claude":
       return new ClaudeCodeProvider();
     case "codex":
@@ -39,9 +49,7 @@ export function createAgentProvider(agent: AgentKind): AgentProvider {
       return new OpenCodeProvider();
     case "pi":
       return new PiProvider();
-    default: {
-      const exhaustive: never = agent;
-      throw new Error(`Unknown agent provider: ${String(exhaustive)}`);
-    }
+    default:
+      throw new Error(`Unknown agent provider: ${describeUnknownAgent(agent)}`);
   }
 }
