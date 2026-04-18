@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { faChevronRight, FontAwesomeIcon } from "../components/Icon";
 import { getDefaultPromptTemplates } from "../server/orchestrator/agents/prompts";
 
 const PROMPTS = [
@@ -31,6 +32,57 @@ const PROMPTS = [
 
 const templates = getDefaultPromptTemplates();
 
+function PromptCard({
+  prompt,
+  isOpen,
+  onToggle,
+}: {
+  prompt: (typeof PROMPTS)[number];
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="rounded-box border border-base-300/60 bg-base-200/70 shadow-sm transition-colors duration-200">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-semibold"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={`prompt-panel-${prompt.key}`}
+      >
+        <div>
+          <span className="text-base">The {prompt.name} Prompt</span>
+          <p className="mt-0.5 font-normal text-base-content/60 text-sm leading-6">
+            {prompt.description}
+          </p>
+        </div>
+        <FontAwesomeIcon
+          icon={faChevronRight}
+          aria-hidden="true"
+          className={`shrink-0 text-sm text-base-content/50 transition-transform duration-200 ease-out ${isOpen ? "rotate-90" : ""}`}
+        />
+      </button>
+      <div
+        id={`prompt-panel-${prompt.key}`}
+        aria-hidden={!isOpen}
+        className={`overflow-hidden px-5 transition-[max-height,opacity,padding-bottom] duration-200 ease-out ${isOpen ? "max-h-[70vh] pb-5 opacity-100" : "max-h-0 pb-0 opacity-0"}`}
+      >
+        <div
+          className={`rounded-xl border border-base-300/60 bg-base-300/80 p-4 shadow-sm transition-transform duration-200 ease-out ${isOpen ? "translate-y-0" : "-translate-y-1"}`}
+        >
+          {templates[prompt.key] ? (
+            <pre className="max-h-[60vh] overflow-x-auto overflow-y-auto whitespace-pre-wrap text-xs leading-5">
+              {templates[prompt.key]}
+            </pre>
+          ) : (
+            <p className="text-base-content/60 text-sm italic">No prompt</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PromptsPage() {
   useDocumentTitle("Prompts");
   const [open, setOpen] = useState<string | null>(null);
@@ -48,34 +100,12 @@ export function PromptsPage() {
         {PROMPTS.map((prompt) => {
           const isOpen = open === prompt.key;
           return (
-            <div key={prompt.key} className="collapse rounded-box bg-base-200">
-              <button
-                type="button"
-                className="collapse-title flex w-full items-center justify-between text-left font-semibold"
-                onClick={() => setOpen(isOpen ? null : prompt.key)}
-                aria-expanded={isOpen}
-              >
-                <div>
-                  <span className="text-base">{prompt.name} Prompt</span>
-                  <p className="mt-0.5 font-normal text-base-content/60 text-sm">
-                    {prompt.description}
-                  </p>
-                </div>
-                <span
-                  className={`ml-4 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
-                  aria-hidden="true"
-                >
-                  ▶
-                </span>
-              </button>
-              {isOpen && (
-                <div className="collapse-content">
-                  <pre className="max-h-[60vh] overflow-x-auto overflow-y-auto whitespace-pre-wrap rounded bg-base-300 p-4 text-xs">
-                    {templates[prompt.key]}
-                  </pre>
-                </div>
-              )}
-            </div>
+            <PromptCard
+              key={prompt.key}
+              prompt={prompt}
+              isOpen={isOpen}
+              onToggle={() => setOpen(isOpen ? null : prompt.key)}
+            />
           );
         })}
       </div>
