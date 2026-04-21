@@ -238,6 +238,22 @@ export function buildProjectUrl(projectSlug: string): string {
   return new URL(`/p/${projectSlug}/issues`, FLUX_URL).toString();
 }
 
+export function buildToolHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  const sessionId = process.env.FLUX_SESSION_ID;
+  const agentName = process.env.FLUX_AGENT_NAME;
+  const issueId = process.env.FLUX_ISSUE_ID;
+
+  if (sessionId) headers["X-Flux-Session-Id"] = sessionId;
+  if (agentName) headers["X-Flux-Agent-Name"] = agentName;
+  if (issueId) headers["X-Flux-Issue-Id"] = issueId;
+
+  return headers;
+}
+
 function browserOpenCommand(url: string): string[] {
   switch (process.platform) {
     case "darwin":
@@ -628,7 +644,7 @@ export async function runToolCommand(argv: string[]): Promise<void> {
   // Call the API
   const response = await fetch(toolsUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildToolHeaders(),
     body: JSON.stringify({ tool: entry.tool, args: toolArgs }),
   }).catch((err: Error) => {
     die(

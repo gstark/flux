@@ -5,18 +5,16 @@ import { handlers, type ToolContext } from "./index";
 
 function makeContext() {
   const query = mock(async (_fn: unknown, args: Record<string, unknown>) => {
-    if (args.query === "LUCKYDO-221") {
-      return [
-        {
-          _id: "issues_doc_221" as Id<"issues">,
-          shortId: "LUCKYDO-221",
-          title: "Issue 221",
-        },
-      ];
+    if (args.shortId === "LUCKYDO-221") {
+      return {
+        _id: "issues_doc_221" as Id<"issues">,
+        shortId: "LUCKYDO-221",
+        title: "Issue 221",
+      };
     }
 
-    if (args.query === "LUCKYDO-999") {
-      return [];
+    if (args.shortId === "LUCKYDO-999") {
+      return null;
     }
 
     if (args.issueId === ("issues_doc_221" as Id<"issues">)) {
@@ -82,9 +80,7 @@ describe("comment tools short ID resolution", () => {
     expect(query).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        projectId: "project_1",
-        query: "LUCKYDO-221",
-        limit: 10,
+        shortId: "LUCKYDO-221",
       }),
     );
     expect(mutation).toHaveBeenCalledWith(
@@ -123,9 +119,7 @@ describe("comment tools short ID resolution", () => {
       1,
       expect.anything(),
       expect.objectContaining({
-        projectId: "project_1",
-        query: "LUCKYDO-221",
-        limit: 10,
+        shortId: "LUCKYDO-221",
       }),
     );
     expect(query).toHaveBeenNthCalledWith(
@@ -168,9 +162,7 @@ describe("issues_get short ID resolution", () => {
       1,
       expect.anything(),
       expect.objectContaining({
-        projectId: "project_1",
-        query: "LUCKYDO-221",
-        limit: 10,
+        shortId: "LUCKYDO-221",
       }),
     );
     expect(query).toHaveBeenNthCalledWith(
@@ -210,7 +202,146 @@ describe("issues_get short ID resolution", () => {
       error: string;
     };
     expect(payload.error).toBe(
-      "Issue not found for short ID LUCKYDO-999. Use issues_search to confirm the issue exists in this project.",
+      "Issue not found for short ID LUCKYDO-999. Use issues_search to confirm the issue exists.",
     );
+  });
+});
+
+describe("follow-up issue epic inheritance", () => {
+  test("issues_create inherits epicId from the source issue when omitted", async () => {
+    const sourceIssueId = "issues_source_1" as Id<"issues">;
+    const inheritedEpicId = "epics_doc_1" as Id<"epics">;
+    const createdIssueId = "issues_created_1" as Id<"issues">;
+
+    const query = mock(async (_fn: unknown, args: Record<string, unknown>) => {
+      if (args.issueId === sourceIssueId) {
+        return {
+          _id: sourceIssueId,
+          shortId: "LUCKYDO-42",
+          title: "Source issue",
+          epicId: inheritedEpicId,
+        };
+      }
+
+      if (args.issueId === createdIssueId) {
+        return {
+          _id: createdIssueId,
+          shortId: "LUCKYDO-43",
+          title: "Follow-up issue",
+          epicId: inheritedEpicId,
+        };
+      }
+
+      throw new Error(`Unexpected query args: ${JSON.stringify(args)}`);
+    });
+
+    const mutation = mock(async (_fn: unknown, args: Record<string, unknown>) => {
+      expect(args).toEqual(
+        expect.objectContaining({
+          projectId: "project_1",
+          title: "Follow-up issue",
+          epicId: inheritedEpicId,
+          sourceIssueId,
+        }),
+      );
+      return createdIssueId;
+    });
+
+    const ctx: ToolContext = {
+      convex: { query, mutation } as unknown as ConvexClient,
+      projectId: "project_1" as Id<"projects">,
+      projectSlug: "luckydo",
+      getRunner: () => undefined,
+      issueId: sourceIssueId,
+    };
+
+    const issuesCreate = handlers.issues_create;
+    expect(issuesCreate).toBeDefined();
+    if (!issuesCreate) {
+      throw new Error("issues_create handler is not defined");
+    }
+
+    const result = await issuesCreate({ title: "Follow-up issue" }, ctx);
+
+    expect(result.isError).toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(mutation).toHaveBeenCalledTimes(1);
+  });
+
+  test("issues_bulk_create inherits epicId from the source issue when omitted", async () => {
+    const sourceIssueId = "issues_source_1" as Id<"issues">;
+    const inheritedEpicId = "epics_doc_1" as Id<"epics">;
+
+    const query = mock(async (_fn: unknown, args: Record<string, unknown>) => {
+      if (args.issueId === sourceIssueId) {
+        return {
+          _id: sourceIssueId,
+          shortId: "LUCKYDO-42",
+          title: "Source issue",
+          epicId: inheritedEpicId,
+        };
+      }
+
+      throw new Error(`Unexpected query args: ${JSON.stringify(args)}`);
+    });
+
+    const mutation = mock(async (_fn: unknown, args: Record<string, unknown>) => {
+      expect(args).toEqual(
+        expect.objectContaining({
+          projectId: "project_1",
+          issues: [
+            expect.objectContaining({
+              title: "Follow-up 1",
+              epicId: inheritedEpicId,
+              sourceIssueId,
+            }),
+            expect.objectContaining({
+              title: "Follow-up 2",
+              epicId: inheritedEpicId,
+              sourceIssueId,
+            }),
+          ],
+        }),
+      );
+      return [
+        {
+          _id: "issues_created_1",
+          shortId: "LUCKYDO-43",
+          title: "Follow-up 1",
+          epicId: inheritedEpicId,
+        },
+        {
+          _id: "issues_created_2",
+          shortId: "LUCKYDO-44",
+          title: "Follow-up 2",
+          epicId: inheritedEpicId,
+        },
+      ];
+    });
+
+    const ctx: ToolContext = {
+      convex: { query, mutation } as unknown as ConvexClient,
+      projectId: "project_1" as Id<"projects">,
+      projectSlug: "luckydo",
+      getRunner: () => undefined,
+      issueId: sourceIssueId,
+    };
+
+    const issuesBulkCreate = handlers.issues_bulk_create;
+    expect(issuesBulkCreate).toBeDefined();
+    if (!issuesBulkCreate) {
+      throw new Error("issues_bulk_create handler is not defined");
+    }
+
+    const result = await issuesBulkCreate(
+      {
+        issues: [{ title: "Follow-up 1" }, { title: "Follow-up 2" }],
+      },
+      ctx,
+    );
+
+    expect(result.isError).toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(mutation).toHaveBeenCalledTimes(1);
   });
 });

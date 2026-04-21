@@ -187,17 +187,39 @@ async function resolveIssueId(
   );
 }
 
+async function resolveInheritedEpicId(
+  ctx: ToolContext,
+): Promise<Id<"epics"> | undefined> {
+  if (!ctx.issueId) return undefined;
+
+  const sourceIssue = await ctx.convex.query(api.issues.get, {
+    issueId: ctx.issueId,
+  });
+  if (!sourceIssue) {
+    throw new Error(
+      `Source issue ${ctx.issueId} not found while creating follow-up issue.`,
+    );
+  }
+
+  return sourceIssue.epicId;
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────
 
 const issues_create = typedHandler(
   IssuesCreateSchema,
   async ({ title, description, priority, epicId }, ctx) => {
+    const inheritedEpicId = epicId
+      ? undefined
+      : await resolveInheritedEpicId(ctx);
+
     const issueId = await ctx.convex.mutation(api.issues.create, {
       projectId: ctx.projectId,
       title,
       description,
       priority,
       ...(epicId && { epicId: epicId as Id<"epics"> }),
+      ...(inheritedEpicId && { epicId: inheritedEpicId }),
       ...(ctx.sessionId && { createdInSessionId: ctx.sessionId }),
       ...(ctx.agentName && { createdByAgent: ctx.agentName }),
       ...(ctx.issueId && { sourceIssueId: ctx.issueId }),
@@ -540,8 +562,12 @@ const comments_create = typedHandler(
 const issues_bulk_create = typedHandler(
   IssuesBulkCreateSchema,
   async ({ issues, epicId }, ctx) => {
+    const inheritedEpicId = epicId
+      ? undefined
+      : await resolveInheritedEpicId(ctx);
+
     const enriched = issues.map(({ epicId: perIssueEpicId, ...rest }) => {
-      const resolvedEpicId = perIssueEpicId ?? epicId;
+      const resolvedEpicId = perIssueEpicId ?? epicId ?? inheritedEpicId;
       return {
         ...rest,
         ...(ctx.issueId && { sourceIssueId: ctx.issueId }),
