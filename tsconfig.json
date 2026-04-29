@@ -17,7 +17,7 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
+    "allowArbitraryExtensions": true,
     "paths": {
       "@/*": ["./src/*"],
       "$convex/*": ["./convex/*"]

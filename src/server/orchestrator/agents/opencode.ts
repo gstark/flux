@@ -131,7 +131,7 @@ function wrapProcess(
 ): AgentProcess {
   return {
     pid: proc.pid,
-    stdout: proc.stdout as ReadableStream<Uint8Array>,
+    stdout: proc.stdout as unknown as ReadableStream<Uint8Array>,
     stdin: null,
     httpNudge: async (sessionId: string, message: string): Promise<void> => {
       const url = `http://127.0.0.1:${port}/session/${sessionId}/prompt_async`;

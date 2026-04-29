@@ -236,6 +236,9 @@ async function pickProject(
   // Show existing projects
   for (let i = 0; i < projects.length; i++) {
     const p = projects[i];
+    if (!p) {
+      throw new Error(`Project index ${i} unexpectedly missing during picker render.`);
+    }
     const label = p.slug ?? p.id;
     const pathHint = p.path ? ` — ${p.path}` : "";
     console.error(`  ${i + 1}. ${label}${pathHint}`);
@@ -262,6 +265,9 @@ async function pickProject(
   }
 
   const selected = projects[idx];
+  if (!selected) {
+    throw new Error(`Project selection ${idx} unexpectedly missing after bounds validation.`);
+  }
   if (repoRoot) {
     await writeFluxFile(repoRoot, selected.id);
   }
@@ -316,6 +322,9 @@ async function resolveProjectId(): Promise<string> {
 
   if (projects.length === 1) {
     const project = projects[0];
+    if (!project) {
+      throw new Error("Expected one project but array element was missing.");
+    }
     // If we have a repo root, persist the selection
     if (repoRoot) {
       await writeFluxFile(repoRoot, project.id);
@@ -335,13 +344,17 @@ function parseArgs(
   const args: Record<string, unknown> = {};
   let i = 0;
 
-  if (primaryField && i < argv.length && !argv[i].startsWith("--")) {
-    args[primaryField] = argv[i];
+  const firstArg = argv[i];
+  if (primaryField && firstArg !== undefined && !firstArg.startsWith("--")) {
+    args[primaryField] = firstArg;
     i++;
   }
 
   while (i < argv.length) {
     const arg = argv[i];
+    if (arg === undefined) {
+      throw new Error(`Missing argv entry at index ${i} during argument parsing.`);
+    }
 
     if (arg.startsWith("--")) {
       const eqIdx = arg.indexOf("=");
@@ -427,6 +440,9 @@ function printGroupHelp(group: string): void {
     if (!key.startsWith(`${group} `)) continue;
     const action = key.slice(group.length + 1);
     const entry = TOOL_MAP[key];
+    if (!entry) {
+      throw new Error(`Tool entry for key ${key} unexpectedly missing.`);
+    }
     const primaryHint = entry.primary ? ` <${entry.primary}>` : "";
     const usage = `${action}${primaryHint}`;
     console.log(`  ${usage.padEnd(28)}${entry.desc}`);
@@ -476,6 +492,9 @@ function die(message: string): never {
 export function isToolCommand(args: string[]): boolean {
   if (args.length === 0) return true;
   const first = args[0];
+  if (first === undefined) {
+    throw new Error("First CLI arg unexpectedly missing despite non-empty args array.");
+  }
   if (first === "--help" || first === "-h") return true;
   return first in GROUPS;
 }
@@ -489,6 +508,9 @@ export async function runToolCommand(argv: string[]): Promise<void> {
   }
 
   const group = argv[0];
+  if (group === undefined) {
+    throw new Error("CLI group unexpectedly missing after argv length guard.");
+  }
   const action = argv[1];
 
   // Group only → show group help

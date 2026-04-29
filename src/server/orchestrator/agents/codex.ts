@@ -104,7 +104,7 @@ export class CodexProvider implements AgentProvider {
 function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
   return {
     pid: proc.pid,
-    stdout: proc.stdout as ReadableStream<Uint8Array>,
+    stdout: proc.stdout as unknown as ReadableStream<Uint8Array>,
     stdin: null,
     httpNudge: null,
     kill: () => proc.kill(),

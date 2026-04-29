@@ -260,7 +260,7 @@ function parseStructuredOutput(
 }
 
 function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
-  const rawStdin = proc.stdin as
+  const rawStdin = proc.stdin as unknown as
     | (AgentStdin & { end?: () => void })
     | undefined;
   const stdin: AgentStdin | null = rawStdin
@@ -273,7 +273,7 @@ function wrapProcess(proc: ReturnType<typeof Bun.spawn>): AgentProcess {
 
   return {
     pid: proc.pid,
-    stdout: proc.stdout as ReadableStream<Uint8Array>,
+    stdout: proc.stdout as unknown as ReadableStream<Uint8Array>,
     stdin,
     httpNudge: null,
     kill: () => proc.kill(),

@@ -15,8 +15,7 @@ function parseInline(text: string): ReactNode[] {
   let lastIndex = 0;
 
   for (const match of text.matchAll(inlinePattern)) {
-    const matchIndex = match.index;
-    // Push any text before this match
+    const matchIndex = match.index ?? lastIndex;
     if (matchIndex > lastIndex) {
       nodes.push(text.slice(lastIndex, matchIndex));
     }
