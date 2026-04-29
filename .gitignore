@@ -35,6 +35,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Flux project ID (deployment-specific)
 .flux
+.dev-preview.pid
 
 # Playwright screenshots & debug snapshots (dumped at repo root)
 /*.png

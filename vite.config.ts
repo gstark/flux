@@ -3,6 +3,9 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const FLUX_VITE_PORT = Number(process.env.FLUX_VITE_PORT) || 8043;
+const fluxBackend = `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -11,10 +14,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8043,
+    port: FLUX_VITE_PORT,
     strictPort: true,
     hmr: {
-      port: 8043,
+      port: FLUX_VITE_PORT,
+    },
+    proxy: {
+      "/api": fluxBackend,
+      "/health": fluxBackend,
+      "/p": fluxBackend,
+      "/sse": fluxBackend,
     },
   },
 });
