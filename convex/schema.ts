@@ -189,6 +189,40 @@ export function toPriorityOrder(priority: IssuePriorityValue): number {
   return order;
 }
 
+const SHORT_ID_PATTERN = /^[A-Za-z]+(-[A-Za-z]+)*-\d+$/;
+
+export function looksLikeShortId(value: string): boolean {
+  return SHORT_ID_PATTERN.test(value.trim());
+}
+
+export const issueFields = {
+  projectId: v.id("projects"),
+  shortId: v.string(),
+  title: v.string(),
+  description: v.optional(v.string()),
+  status: issueStatusValidator,
+  priority: issuePriorityValidator,
+  priorityOrder: v.number(),
+  assignee: v.optional(v.string()),
+  failureCount: v.number(),
+  closedAt: v.optional(v.number()),
+  updatedAt: v.optional(v.number()),
+  sourceIssueId: v.optional(v.id("issues")),
+  reviewIterations: v.optional(v.number()),
+  closeType: v.optional(closeTypeValidator),
+  closeReason: v.optional(v.string()),
+  deferNote: v.optional(v.string()),
+  epicId: v.optional(v.id("epics")),
+  deletedAt: v.optional(v.number()),
+  createdInSessionId: v.optional(v.id("sessions")),
+  createdByAgent: v.optional(v.string()),
+};
+
+export const optionalIssueFields = Object.keys(issueFields).filter(
+  (key) =>
+    issueFields[key as keyof typeof issueFields].isOptional === "optional",
+) as Array<keyof typeof issueFields>;
+
 export default defineSchema({
   projects: defineTable({
     slug: v.string(),
@@ -200,30 +234,10 @@ export default defineSchema({
     retroPrompt: v.optional(v.string()),
     reviewPrompt: v.optional(v.string()),
     plannerPrompt: v.optional(v.string()),
+    worktreeBase: v.optional(v.string()),
   }).index("by_slug", ["slug"]),
 
-  issues: defineTable({
-    projectId: v.id("projects"),
-    shortId: v.string(),
-    title: v.string(),
-    description: v.optional(v.string()),
-    status: issueStatusValidator,
-    priority: issuePriorityValidator,
-    priorityOrder: v.number(),
-    assignee: v.optional(v.string()),
-    failureCount: v.number(),
-    closedAt: v.optional(v.number()),
-    updatedAt: v.optional(v.number()),
-    sourceIssueId: v.optional(v.id("issues")),
-    reviewIterations: v.optional(v.number()),
-    closeType: v.optional(closeTypeValidator),
-    closeReason: v.optional(v.string()),
-    deferNote: v.optional(v.string()),
-    epicId: v.optional(v.id("epics")),
-    deletedAt: v.optional(v.number()),
-    createdInSessionId: v.optional(v.id("sessions")),
-    createdByAgent: v.optional(v.string()),
-  })
+  issues: defineTable(issueFields)
     .index("by_project_deletedAt_status", ["projectId", "deletedAt", "status"])
     .index("by_project_priority", ["projectId", "deletedAt", "priorityOrder"])
     .index("by_project_status_priority", [
@@ -234,6 +248,7 @@ export default defineSchema({
     ])
     .index("by_epic", ["epicId"])
     .index("by_project_shortId", ["projectId", "shortId"])
+    .index("by_shortId", ["shortId"])
     .index("by_source_issue", ["sourceIssueId", "deletedAt"])
     .index("by_created_in_session", ["createdInSessionId", "deletedAt"])
     .searchIndex("search_title", {
@@ -255,6 +270,8 @@ export default defineSchema({
     status: epicStatusValidator,
     closedAt: v.optional(v.number()),
     closeReason: v.optional(v.string()),
+    useWorktree: v.optional(v.boolean()),
+    worktreeSlug: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
     .index("by_project_status", ["projectId", "status"]),
@@ -279,6 +296,7 @@ export default defineSchema({
     lastHeartbeat: v.optional(v.number()),
     disposition: v.optional(dispositionValidator),
     note: v.optional(v.string()),
+    transitionSummary: v.optional(v.string()),
     agentSessionId: v.optional(v.string()),
     startHead: v.optional(v.string()),
     endHead: v.optional(v.string()),

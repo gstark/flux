@@ -220,6 +220,13 @@ export const EpicsCreateSchema = z.object({
     .string()
     .optional()
     .describe("Detailed description. Supports markdown."),
+  useWorktree: z
+    .boolean()
+    .optional()
+    .describe(
+      "Run all issues in this epic inside a dedicated git worktree. " +
+        "Requires worktreeBase to be set on the project.",
+    ),
 });
 
 export const EpicsShowSchema = z.object({
@@ -233,6 +240,13 @@ export const EpicsUpdateSchema = z.object({
     .string()
     .optional()
     .describe("New description. Supports markdown."),
+  useWorktree: z
+    .boolean()
+    .optional()
+    .describe(
+      "Run all issues in this epic inside a dedicated git worktree. " +
+        "Requires worktreeBase to be set on the project.",
+    ),
 });
 
 export const EpicsCloseSchema = z.object({
@@ -274,8 +288,18 @@ export const IssuesBulkCreateSchema = z.object({
       title: z.string(),
       description: z.string().optional(),
       priority: issuePriorityEnum.optional(),
+      epicId: z
+        .string()
+        .optional()
+        .describe("Epic ID override for this issue."),
     }),
   ).describe("Array of issues to create."),
+  epicId: z
+    .string()
+    .optional()
+    .describe(
+      "Attach all created issues to this epic (epic document ID). Per-issue epicId takes precedence.",
+    ),
 });
 
 export const IssuesBulkUpdateSchema = z.object({

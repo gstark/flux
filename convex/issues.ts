@@ -12,6 +12,7 @@ import {
   type IssueStatusValue,
   issuePriorityValidator,
   issueStatusValidator,
+  looksLikeShortId,
   toPriorityOrder,
 } from "./schema";
 import {
@@ -252,6 +253,18 @@ export const get = query({
   args: { issueId: v.id("issues") },
   handler: async (ctx, args) => {
     const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.deletedAt !== undefined) return null;
+    return issue;
+  },
+});
+
+export const getByShortId = query({
+  args: { shortId: v.string() },
+  handler: async (ctx, { shortId }) => {
+    const issue = await ctx.db
+      .query("issues")
+      .withIndex("by_shortId", (q) => q.eq("shortId", shortId.toUpperCase()))
+      .first();
     if (!issue || issue.deletedAt !== undefined) return null;
     return issue;
   },
@@ -592,8 +605,8 @@ export const search = query({
   handler: async (ctx, args) => {
     const cap = Math.min(args.limit ?? 20, 100);
 
-    // If the query looks like a shortId (e.g. "FLUX-42"), do a direct index lookup first
-    const shortIdMatch = /^[A-Za-z]+-\d+$/.test(args.query.trim())
+    // If the query looks like a shortId (e.g. "FLUX-42" or "DENTAL-AI-42"), do a direct index lookup first
+    const shortIdMatch = looksLikeShortId(args.query)
       ? await ctx.db
           .query("issues")
           .withIndex("by_project_shortId", (q) =>
