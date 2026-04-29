@@ -155,6 +155,9 @@ export function parseStreamLine(
   if (agent === "opencode") {
     return parseOpenCodeStreamLine(line);
   }
+  if (agent === "pi") {
+    return parsePiStreamLine(line);
+  }
   if (agent !== "claude") {
     return parseGenericStreamLine(line);
   }
@@ -478,6 +481,97 @@ function parseOpenCodeStreamLine(line: string): ParsedLine[] {
   return [{ kind: "skip" }];
 }
 
+function parsePiStreamLine(line: string): ParsedLine[] {
+  let obj: Record<string, unknown>;
+  try {
+    obj = JSON.parse(line) as Record<string, unknown>;
+  } catch {
+    return line.trim() ? [{ kind: "text", text: line }] : [{ kind: "skip" }];
+  }
+
+  if (
+    obj.type === "response" ||
+    obj.type === "agent_start" ||
+    obj.type === "turn_start" ||
+    obj.type === "extension_ui_request" ||
+    obj.type === "tool_execution_update"
+  ) {
+    return [{ kind: "skip" }];
+  }
+
+  if (obj.type === "tool_execution_start") {
+    const toolName = canonicalizeToolName(
+      typeof obj.toolName === "string" ? obj.toolName : "unknown",
+    );
+    const toolId = typeof obj.toolCallId === "string" ? obj.toolCallId : "";
+    const toolInput = extractToolInput(obj.args);
+
+    return [
+      {
+        kind: "tool_use",
+        toolName,
+        toolId,
+        toolInput,
+        blockIndex: null,
+      },
+    ];
+  }
+
+  if (obj.type === "message_update") {
+    // Pi emits token/word-level thinking deltas before the turn-level summary.
+    // If we surface them here, tool_result events flush pending output before
+    // turn_end arrives, which leaves the transcript split into one-word rows.
+    // Prefer the complete turn_end thinking block for readable transcripts.
+    return [{ kind: "skip" }];
+  }
+
+  if (obj.type === "turn_end") {
+    const message = obj.message as Record<string, unknown> | undefined;
+    if (!message || !Array.isArray(message.content)) {
+      return [{ kind: "skip" }];
+    }
+
+    const results: ParsedLine[] = [];
+    for (const block of message.content) {
+      if (!block || typeof block !== "object") continue;
+      const part = block as Record<string, unknown>;
+
+      if (part.type !== "thinking") continue;
+
+      const text = extractPiThinkingText(part);
+      if (text) {
+        results.push({ kind: "text", text, source: "full" });
+      }
+    }
+
+    return results.length > 0 ? results : [{ kind: "skip" }];
+  }
+
+  if (obj.type === "tool_execution_end") {
+    const toolName = canonicalizeToolName(
+      typeof obj.toolName === "string" ? obj.toolName : "unknown",
+    );
+    const toolUseId =
+      typeof obj.toolCallId === "string" ? obj.toolCallId : null;
+    const content = extractPiToolResultText(obj.result);
+
+    return [
+      {
+        kind: "tool_result",
+        toolUseId,
+        toolName,
+        content,
+      },
+    ];
+  }
+
+  if (obj.type === "message_start" || obj.type === "message_end") {
+    return [{ kind: "skip" }];
+  }
+
+  return [{ kind: "skip" }];
+}
+
 /**
  * Extract concatenated text content from a single NDJSON line.
  *
@@ -497,7 +591,9 @@ export function extractTextFromLine(
         ? parseCodexStreamLine(line)
         : agent === "opencode"
           ? parseOpenCodeStreamLine(line)
-          : parseGenericStreamLine(line);
+          : agent === "pi"
+            ? parsePiStreamLine(line)
+            : parseGenericStreamLine(line);
   const texts: string[] = [];
   for (const p of parsed) {
     if (p.kind === "text") texts.push(p.text);
@@ -517,4 +613,73 @@ function extractToolInput(input: unknown): Record<string, unknown> | null {
     return Object.keys(obj).length > 0 ? obj : null;
   }
   return null;
+}
+
+function extractPiToolResultText(result: unknown): string {
+  if (typeof result === "string") {
+    return result;
+  }
+
+  if (!result || typeof result !== "object") {
+    return "";
+  }
+
+  const obj = result as Record<string, unknown>;
+  const content = obj.content;
+  if (Array.isArray(content)) {
+    const text = content
+      .flatMap((part) => {
+        if (!part || typeof part !== "object") return [] as string[];
+        const entry = part as Record<string, unknown>;
+        if (typeof entry.text === "string") return [entry.text];
+        return [] as string[];
+      })
+      .join("");
+    if (text) return text;
+  }
+
+  if (typeof obj.summary === "string") {
+    return obj.summary;
+  }
+
+  if (typeof obj.message === "string") {
+    return obj.message;
+  }
+
+  if (typeof obj.error === "string") {
+    return obj.error;
+  }
+
+  return JSON.stringify(obj);
+}
+
+function extractPiThinkingText(block: Record<string, unknown>): string | null {
+  if (typeof block.thinking === "string" && block.thinking.trim()) {
+    return block.thinking;
+  }
+
+  const signature = block.thinkingSignature;
+  if (!signature || typeof signature !== "string") {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(signature) as Record<string, unknown>;
+    const summary = parsed.summary;
+    if (!Array.isArray(summary)) {
+      return null;
+    }
+
+    const text = summary
+      .flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [] as string[];
+        const item = entry as Record<string, unknown>;
+        return typeof item.text === "string" ? [item.text] : [];
+      })
+      .join("\n");
+
+    return text || null;
+  } catch {
+    return null;
+  }
 }

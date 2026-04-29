@@ -782,20 +782,18 @@ class ProjectRunner {
 
     const { process: agentProcess, monitor, issueId } = this.activeSession;
 
-    if (!agentProcess.stdin) {
-      // Use HTTP API if the agent supports it (e.g. OpenCode's prompt_async).
-      if (agentProcess.httpNudge && this.activeSession.agentSessionId) {
-        await agentProcess.httpNudge(
-          this.activeSession.agentSessionId,
-          message,
-        );
-        monitor.recordInput(message);
-        console.log(
-          `[ProjectRunner] Nudge delivered via HTTP to OpenCode session ${this.activeSession.agentSessionId}`,
-        );
-        return;
-      }
+    // Prefer provider-specific nudge paths when available.
+    // OpenCode uses HTTP prompt_async; Pi uses RPC steer over the same hook.
+    if (agentProcess.httpNudge && this.activeSession.agentSessionId) {
+      await agentProcess.httpNudge(this.activeSession.agentSessionId, message);
+      monitor.recordInput(message);
+      console.log(
+        `[ProjectRunner] Nudge delivered via provider hook to ${this.provider.name} session ${this.activeSession.agentSessionId}`,
+      );
+      return;
+    }
 
+    if (!agentProcess.stdin) {
       // Last resort: post as a Convex comment so the agent sees it next session.
       if (issueId) {
         await getConvexClient().mutation(api.comments.create, {

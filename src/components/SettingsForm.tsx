@@ -82,7 +82,7 @@ export function SettingsForm() {
 
   // ── Orchestrator config form state ───────────────────────────────
   const [focusEpicId, setFocusEpicId] = useState<string>("all");
-  const [agent, setAgent] = useState<AgentKindValue>(AgentKind.Claude);
+  const [agent, setAgent] = useState<AgentKindValue>(AgentKind.Pi);
   const [maxReviewIterations, setMaxReviewIterations] = useState("");
   const [maxFailures, setMaxFailures] = useState("");
   const [sessionTimeoutMin, setSessionTimeoutMin] = useState("");
@@ -379,7 +379,8 @@ export function SettingsForm() {
                   }}
                 >
                   <option value={AgentKind.Claude}>Claude Code</option>
-                  <option value={AgentKind.Codex}>Codex (coming soon)</option>
+                  <option value={AgentKind.Pi}>Pi</option>
+                  <option value={AgentKind.Codex}>Codex</option>
                   <option value={AgentKind.OpenCode}>
                     OpenCode (coming soon)
                   </option>
