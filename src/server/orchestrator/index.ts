@@ -19,6 +19,7 @@ import { readFluxConfig } from "../fluxConfig";
 import {
   autoCommitDirtyTree,
   ensureWorktree,
+  getChangedFiles,
   getCommitLog,
   getCommitLogBetween,
   getCurrentHead,
@@ -46,6 +47,33 @@ import { SessionMonitor } from "./monitor";
  * This is a pragmatic fallback since Bun's in-process cron API is not yet
  * available in our pinned Bun versions.
  */
+function formatReviewChangeSummary(
+  iteration: number,
+  maxIterations: number,
+  commitLog: string,
+  changedFiles: string[],
+): string {
+  const fileLimit = 20;
+  const displayedFiles = changedFiles.slice(0, fileLimit);
+  const remainingFileCount = changedFiles.length - displayedFiles.length;
+  const fileLines = displayedFiles.map((file) => `- ${file}`);
+  if (remainingFileCount > 0) {
+    fileLines.push(`- …and ${remainingFileCount} more`);
+  }
+
+  return [
+    `Review changed code, so Flux started another review iteration (${iteration}/${maxIterations}).`,
+    "",
+    "Commits:",
+    commitLog || "- (no commit log available)",
+    "",
+    "Files changed:",
+    fileLines.length > 0
+      ? fileLines.join("\n")
+      : "- (no files reported by git)",
+  ].join("\n");
+}
+
 function parseCronIntervalMs(schedule: string): number | null {
   const s = schedule.trim();
   if (s === "@hourly") return 60 * 60 * 1000;
@@ -1541,6 +1569,22 @@ class ProjectRunner {
       return true;
     }
 
+    try {
+      await autoCommitDirtyTree(
+        cwd,
+        issue.shortId,
+        String(sessionId),
+        SessionPhase.Review,
+        active.process.pid,
+      );
+    } catch (err) {
+      console.warn(
+        `[ProjectRunner] Auto-commit after review failed for ${issue.shortId} — ` +
+          "uncommitted changes remain in working tree:",
+        err,
+      );
+    }
+
     let hasCommits: boolean;
     try {
       hasCommits = await hasNewCommits(cwd, startHead);
@@ -1573,20 +1617,30 @@ class ProjectRunner {
       return true;
     }
 
+    let reviewChangeSummary: string;
     try {
-      await autoCommitDirtyTree(
-        cwd,
-        issue.shortId,
-        String(sessionId),
-        SessionPhase.Review,
-        active.process.pid,
+      const [commitLog, changedFiles] = await Promise.all([
+        getCommitLog(cwd, startHead),
+        getChangedFiles(cwd, startHead),
+      ]);
+      reviewChangeSummary = formatReviewChangeSummary(
+        newIterations + 1,
+        this.maxReviewIterations,
+        commitLog,
+        changedFiles,
       );
     } catch (err) {
-      console.warn(
-        `[ProjectRunner] Auto-commit after review failed for ${issue.shortId} — ` +
-          "uncommitted changes remain in working tree:",
+      console.error(
+        `[ProjectRunner] Git error summarizing review changes for ${issue.shortId}:`,
         err,
       );
+      await convex.mutation(api.issues.incrementFailure, {
+        issueId,
+        maxFailures: this.maxFailures,
+        reopenToOpen: false,
+      });
+      this.finalize();
+      return false;
     }
 
     if (newIterations >= this.maxReviewIterations) {
@@ -1613,10 +1667,7 @@ class ProjectRunner {
     } catch {
       // Non-fatal
     }
-    await this.setSessionTransitionSummary(
-      sessionId,
-      `Review changed code, so Flux started another review iteration (${newIterations + 1}/${this.maxReviewIterations}).`,
-    );
+    await this.setSessionTransitionSummary(sessionId, reviewChangeSummary);
     await this.startReviewLoop();
     return true;
   }

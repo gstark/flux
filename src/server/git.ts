@@ -160,6 +160,21 @@ export async function getCommitLogBetween(
 }
 
 /**
+ * Get changed file paths between a starting commit and HEAD.
+ * Throws on git errors — callers must handle failures explicitly.
+ */
+export async function getChangedFiles(
+  cwd: string,
+  since: string,
+): Promise<string[]> {
+  const output = (
+    await $`git -C ${cwd} diff --name-only ${since}..HEAD`.text()
+  ).trim();
+  if (!output) return [];
+  return output.split("\n").filter((path) => path.length > 0);
+}
+
+/**
  * Auto-commit any dirty working tree changes.
  * Returns true if a commit was made, false if tree was clean or commit was suppressed.
  * Non-blocking by design — callers should catch errors and continue.
