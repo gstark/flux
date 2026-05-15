@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -9,7 +10,19 @@ import { defineConfig } from "vite";
 const FLUX_VITE_PORT = Number(process.env.FLUX_VITE_PORT) || 8043;
 const fluxBackend = `http://localhost:${process.env.FLUX_PORT ?? "8042"}`;
 
+function currentGitCommitSha(): string {
+  return execFileSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+const gitCommitSha = currentGitCommitSha();
+
 export default defineConfig({
+  define: {
+    __GIT_COMMIT_SHA__: JSON.stringify(gitCommitSha),
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
